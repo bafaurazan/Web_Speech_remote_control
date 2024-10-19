@@ -161,10 +161,14 @@ function sendMsgOnClick(){
 
     var dataChannels = getDataChannels();
 
-    message = username + ': ' + message;
+    var dataToSend = {
+        username: username,
+        message: message
+    };
+    var jsonMessage = JSON.stringify(dataToSend);
 
     for(index in dataChannels){
-        dataChannels[index].send(message);
+        dataChannels[index].send(jsonMessage);
     }
 
     messageInput.value = '';
@@ -298,11 +302,17 @@ function addLocalTracks(peer){
 }
 
 function dcOnMessage(event){
-    var message = event.data;
+    console.log("Received message: ", event.data);  // Dodaj to dla sprawdzenia co jest odbierane.
+    var data = JSON.parse(event.data);
+    console.log("Received message: ", data);
+    
+    var username = data.username;
+    var message = data.message;
 
     var li = document.createElement('li');
-    li.appendChild(document.createTextNode(message));
+    li.appendChild(document.createTextNode(username + ': ' + message));
     messageList.appendChild(li);
+    console.log("wysłane dane: ", message)
 }
 
 function createVideo(peerUsername){
