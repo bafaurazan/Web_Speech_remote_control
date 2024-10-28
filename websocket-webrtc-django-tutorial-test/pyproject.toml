@@ -10,6 +10,7 @@ packages = [{include = "mysite"}]
 python = "^3.12"
 django = "^5.1.1"
 channels = {extras = ["daphne"], version = "^4.1.0"}
+channels-redis = "^4.2.0"
 
 
 [build-system]
