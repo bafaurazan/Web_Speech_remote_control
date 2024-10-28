@@ -1,6 +1,17 @@
-# FusionHouse
+### Websocket webrtc django tutorial
 
-Tutorial about websockets-webrtc-django are come from this youtube tutorial
-[Watch this video](https://youtu.be/MBOlZMLaQ8g?si=QB97oG7h3Vlrpvi4)
+```
+./websocket-webrtc-django-tutorial
+```
+
+#### My setup
+
+```
+cd websocket-webrtc-django-tutorial/mysite
+poetry install
+poetry run python manage.py runserver 0.0.0.0:8000
+```
+
+[Link to youtube tutorial](https://www.youtube.com/watch?v=MBOlZMLaQ8g)
 
 **Note!:** on latest version of django try to use daphne for runserver command. Read documentation!
