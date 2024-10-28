@@ -1,17 +1,17 @@
-# FusionHouse
-The project presents the compilation of an AI assistant with multiple technologies
+# Web_Speech_Remote_control
 
-## Opening
+The project presents the compilation of an AI assistant with online remote voice control
 
-### at 
-
-```
-~/FusionHouse/websocket-webrtc-django-tutorial-test/mysite 
-```
-
-### type
+### api
 
 ```
+./api
+```
+
+#### My setup
+
+```
+cd api
 poetry install
 poetry run python manage.py runserver 0.0.0.0:8000
 ```

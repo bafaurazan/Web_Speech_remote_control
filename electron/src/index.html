@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'    wss://e70f-193-19-165-84.ngrok-free.app;">
+
+    <title>Chat</title>
+</head>
+<body>
+    <h2>WebRTC Chat</h2>
+    
+    <label for="username">Username:</label>
+    <input type="text" id="username">
+    <button id="btn-join">Join</button>
+    
+    <div id="video-container">
+        <video id="local-video" autoplay muted></video>
+    </div>
+
+    <ul id="message-list"></ul>
+
+    <input type="text" id="msg">
+    <button id="btn-send-msg">Send</button>
+
+    <button id="btn-toggle-audio">Audio Mute</button>
+    <button id="btn-toggle-video">Video Off</button>
+
+    <label id="label-username"></label>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
