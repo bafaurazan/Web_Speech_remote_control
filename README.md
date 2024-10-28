@@ -25,7 +25,7 @@ ngrok http 8000
 ### open
 
 ```
-~/electron_app_installer
+~/electron
 ```
 
 ### in renderer.js code change line with your ngrok adress 

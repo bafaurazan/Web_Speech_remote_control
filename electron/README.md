@@ -1,55 +1,8 @@
-# electron_app_installer
+# electron
 This project automates app installation for me to linux and windows from scratch
 
-## to create installer
-`npm run build`
-
-## to fast app test
-`npx electron .`
-
-## to install app open 
-
-somethink like that
-
-`dist/my_app Setup 0.0.1.exe`
-
-## to open app open
-
-`dist/win-unpacked/my_app.exe`
-
-or
-
-`selected installation path`
-
-
-# FusionHouse
-The project presents the compilation of an AI assistant with multiple technologies
-
-## Opening
-
-### at 
-
 ```
-~/FusionHouse/websocket-webrtc-django-tutorial-test/mysite 
-```
-
-### type
-
-```
-poetry install
-poetry run python manage.py runserver 0.0.0.0:8000
-```
-
-### open ngrok and write
-
-```
-ngrok http 8000
-```
-
-### open
-
-```
-~/electron_app_installer
+~/electron
 ```
 
 ### in renderer.js code change line with your ngrok adress 
@@ -80,4 +33,19 @@ npm run start
 start chrome
 start python
 ```
+
+## to install app open 
+
+somethink like that
+
+`dist/my_app Setup 0.0.1.exe`
+
+## to open app open
+
+`dist/win-unpacked/my_app.exe`
+
+or
+
+`selected installation path`
+
 
