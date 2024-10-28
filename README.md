@@ -19,3 +19,19 @@ poetry run python manage.py runserver 0.0.0.0:8000
 ```
 
 [Link to youtube tutorial](https://www.youtube.com/watch?v=MBOlZMLaQ8g)
+
+### electron-local-terminal-prototype
+
+#### setup
+
+```
+npm install 
+npm run rebuild
+npm run start
+```
+
+[Link to prototype github](https://github.com/77Z/electron-local-terminal-prototype)
+
+### web_speech_api
+
+just chatgpt
