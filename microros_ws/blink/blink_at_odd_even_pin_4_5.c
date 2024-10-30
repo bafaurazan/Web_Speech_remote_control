@@ -15,8 +15,6 @@
 
 #define LED_PIN_1 4    // Pin dla pierwszej diody LED
 #define LED_PIN_2 5    // Pin dla drugiej diody LED
-#define LED_PIN_3 18   // Pin dla trzeciej diody LED
-#define LED_PIN_4 19   // Pin dla czwartej diody LED
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Aborting.\n",__LINE__,(int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Continuing.\n",__LINE__,(int)temp_rc);}}
@@ -36,11 +34,11 @@ void subscription_callback(const void * msgin)
         fade_led = true;
     } else {
         fade_led = false;
-        // Wyłącz LED przez ustawienie wypełnienia PWM na 0 dla wszystkich kanałów
-        for (int i = 0; i < 4; i++) {
-            ledc_set_duty(LEDC_LOW_SPEED_MODE, i, 0);
-            ledc_update_duty(LEDC_LOW_SPEED_MODE, i);
-        }
+        // Wyłącz LED przez ustawienie wypełnienia PWM na 0
+        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, 0);
+        ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, 0);
+        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+        ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
     }
 }
 
@@ -51,11 +49,11 @@ void pwm_led_fade_task(void *arg) {
 
     while (1) {
         if (fade_led) {
-            // Ustaw wypełnienie PWM dla wszystkich diod LED
-            for (int i = 0; i < 4; i++) {
-                ledc_set_duty(LEDC_LOW_SPEED_MODE, i, duty);
-                ledc_update_duty(LEDC_LOW_SPEED_MODE, i);
-            }
+            // Ustaw wypełnienie PWM dla obu diod LED
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty);
+            ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1, duty);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
+            ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_1);
 
             // Zmieniaj wypełnienie PWM dla płynnego efektu rozjaśniania i ściemniania
             if (increasing) {
@@ -80,7 +78,7 @@ void pwm_led_fade_task(void *arg) {
 
 void appMain(void * arg)
 {
-    // Inicjalizacja PWM dla czterech diod LED
+    // Inicjalizacja PWM dla obu diod LED
     ledc_timer_config_t ledc_timer = {
         .speed_mode = LEDC_LOW_SPEED_MODE,
         .timer_num = LEDC_TIMER_0,
@@ -109,26 +107,6 @@ void appMain(void * arg)
         .hpoint = 0
     };
     ledc_channel_config(&ledc_channel_2);
-
-    ledc_channel_config_t ledc_channel_3 = {
-        .gpio_num = LED_PIN_3,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = LEDC_CHANNEL_2,
-        .timer_sel = LEDC_TIMER_0,
-        .duty = 0,
-        .hpoint = 0
-    };
-    ledc_channel_config(&ledc_channel_3);
-
-    ledc_channel_config_t ledc_channel_4 = {
-        .gpio_num = LED_PIN_4,
-        .speed_mode = LEDC_LOW_SPEED_MODE,
-        .channel = LEDC_CHANNEL_3,
-        .timer_sel = LEDC_TIMER_0,
-        .duty = 0,
-        .hpoint = 0
-    };
-    ledc_channel_config(&ledc_channel_4);
 
     rcl_allocator_t allocator = rcl_get_default_allocator();
     rclc_support_t support;

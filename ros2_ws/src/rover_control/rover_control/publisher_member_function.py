@@ -9,7 +9,7 @@ class SpeedPublisher(Node):
     def __init__(self):
         super().__init__('speed_publisher')
         self.publisher_ = self.create_publisher(Int32, 'rover/speed', 10)  # Typ wiadomości to teraz Int32
-        timer_period = 1.0
+        timer_period = 2.0
         self.timer = self.create_timer(timer_period, self.timer_callback)
         self.i = 0  # Zmieniono na typ int
 
