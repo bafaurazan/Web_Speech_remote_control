@@ -274,13 +274,15 @@ drawCircle(40,125,5)
       <x>330</x>
       <y>520</y>
       <w>460</w>
-      <h>190</h>
+      <h>220</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;-&gt;&gt;
-m1=software
+m1=electron
 m2=web
 Channel 
-web - software
+web - electron
+
+
 </panel_attributes>
     <additional_attributes>400.0;10.0;330.0;150.0;20.0;150.0;10.0;80.0</additional_attributes>
   </element>
