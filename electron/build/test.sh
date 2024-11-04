@@ -1,0 +1,1 @@
+read -n 1 -s -r -p "test.sh dziala, nacisnij dowolny klawisz..."
