@@ -1,3 +1,0 @@
-@echo off
-echo test.bat dziala, nacisnij dowolny klawisz...
-pause
