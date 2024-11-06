@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "nlp"
+version = "0.1.0"
+description = "Word representation embeddings"
+authors = ["sand194 <piasekj1602@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = "1.26.4"
+pandas = "^2.2.3"
+fasttext-wheel = "^0.9.2"
+scikit-learn = "^1.5.2"
+kagglehub = "^0.3.3"
+ipykernel = "^6.29.5"
+tensorflow = "^2.18.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
