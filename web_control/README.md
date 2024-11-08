@@ -1,30 +1,23 @@
 # Setup ROS2
 
-## After cloning repository or changing publisher:
+## After preparing micro-ros
 
 ```
-~/ros2_ws/src/rover_control/publisher_member_function.py
-```
-
-### then
-
-```
-cd ros2_ws/src
-colcon build
+ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ```
 
 ## Testing
 
-### Source installation
+### /turtle1/cmd_vel
 
 ```
-source install/local_setup.bash
+web_controling_cmd_vel.html
 ```
 
-#### 1. opening Python Publisher 
+### rover/speed
 
 ```
-ros2 run rover_control publisher_node
+web_controling_micro_ros.html
 ```
 
 #### 2. opening cli Publisher test
