@@ -2,17 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="style.css">
-    <title>
-        Web Speech Remote Control
-    </title>
+    <title>Web Speech Remote Control</title>
 </head>
-<header>
-    <p>vawevawevawev</p>
-    
-</header>
 <body>
-    <img src ="lock-closed.svg" alt="Ikona" style="width: 50px; height: 50px;">
-        <p></p>
+    <header>
+        <p class="header"></p>
+        <h2 class="title">Web Speech Remote Control</h2>
+    </header>
+    <div class="loginformbox">
+        <h2>Login</h2>
+         <form>
+            <p>New user? <a class="link" href="xd">Create an account!</a></p>
+            <div class="loginbox">
+                <img src="person-circle.svg" style="height:30px;"></img>
+                <input type="text" required>
+                <label>Login</label>
+            </div>
+            <div>
+                <img src="lock-closed.svg" style="height:30px;"></img>
+                <input type="password" required>
+                <label>Password</label>
+            </div>
+            <p>Forgot your password? <a class="link" href="xd2">Get it back!</a></p>
+        </form>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>

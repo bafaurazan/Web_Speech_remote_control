@@ -1,0 +1,30 @@
+body {
+    font-family: Arial, serif;
+    background-image: url('background.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100vh;
+    margin: 0;
+    color: white;
+    overflow: hidden;
+}
+.header{
+    filter: blur(8px);
+}
+.title{
+    font-size: 3em;
+    padding-left: 30px;
+    text-shadow: -2px 0 black, 0 2px black, 2px 0 black, 0 -2px black;
+}
+.loginformbox{
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    width: 30%;
+    margin: 0 auto;
+    border: solid 3px black;
+    border-radius:25px;
+}
+.link{
+    color:blue;
+}
