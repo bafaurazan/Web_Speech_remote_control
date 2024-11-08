@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="15.1">
+  <help_text/>
+  <zoom_level>10</zoom_level>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>250</x>
+      <y>100</y>
+      <w>80</w>
+      <h>150</h>
+    </coordinates>
+    <panel_attributes>tester PC
+bg=gray
+_umletcode=
+//cloud
+
+
+
+//server
+//Parameters (x, y, width, height, radius, drawConfig?)
+drawRectangleRound(10,50,60,90,5, {bg: 'gray', fg: 'black', lt: '-', lw: 2})
+
+//Parameters (x, y, width, height, drawConfig?)
+drawRectangle(20,60,40,8)
+drawRectangle(20,80,40,8)
+drawRectangle(20,100,40,8)
+
+//Parameters (x, y, radius, drawConfig?)
+drawCircle(40,125,5)
+
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>580</x>
+      <y>100</y>
+      <w>70</w>
+      <h>160</h>
+    </coordinates>
+    <panel_attributes>mobile
+bg=gray
+_umletcode=
+// Obudowa telefonu
+drawRectangleRound(10, 30, 50, 100, 10, {bg: 'white', fg: 'black', lt: '-', lw: 2})
+
+// Ekran telefonu
+drawRectangle(15, 40, 40, 70, {bg: 'black', fg: 'black'})
+
+
+// Głośnik
+drawRectangle(25, 35, 20, 3, {bg: 'black', fg: 'black'})
+
+// Przycisk nawigacyjny
+drawCircle(35, 120, 5, {bg: 'black', fg: 'black'})</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Text</id>
+    <coordinates>
+      <x>440</x>
+      <y>510</y>
+      <w>100</w>
+      <h>100</h>
+    </coordinates>
+    <panel_attributes>      Server 
+// DB Symbol
+_umletcode=
+fg='black';
+bg='#222222';
+drawArc(0,0,width,height*2/5,0,180,true) //Parameters (x, y, width, height, start, extent, open)
+bg='bg';
+drawArc(0,0,width,height*2/5,180,180,true)  //Parameters (x, y, width, height, start, extent, open)
+fg='#929292';
+bg='#222222';
+drawRectangle(0,(height+0.5)/5,width,(height)*3/5-1)  //Parameters (x, y, width, height)
+fg='black'
+drawLine(0,height/5,0,height*4/5) //Parameters (x1, y1, x2, y2)
+drawLine(width,height/5,width,height*4/5) //Parameters (x1, y1, x2, y2)
+bg='bg';
+drawArc(0,height*1/5,width,height*2/5,180,180,true)  //Parameters (x, y, width, height, start, extent, open)
+drawArc(0,height*2/5,width,height*2/5,180,180,true)  //Parameters (x, y, width, height, start, extent, open)
+bg='#222222'
+drawArc(0,height*3/5,width,height*2/5,180,180,true)  //Parameters (x, y, width, height, start, extent, open)
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>660</x>
+      <y>430</y>
+      <w>100</w>
+      <h>100</h>
+    </coordinates>
+    <panel_attributes>Robot
+bg=gray
+_umletcode=
+
+// Główka
+drawRectangleRound(25, 30, 50, 40, 10, {bg: 'white', fg: 'black', lt: '-', lw: 2})
+
+// Oczy
+drawCircle(40, 45, 5, {bg: 'white', fg: 'black'})
+drawCircle(60, 45, 5, {bg: 'white', fg: 'black'})
+
+// Usta
+drawRectangle(40, 55, 20, 5, {bg: 'black', fg: 'black'})
+
+// Uszy
+drawRectangle(20, 40, 5, 20, {bg: 'white', fg: 'black'})
+drawRectangle(75, 40, 5, 20, {bg: 'white', fg: 'black'})
+
+// Tułów
+drawRectangleRound(25, 70, 50, 20, 5, {bg: 'white', fg: 'black', lt: '-', lw: 2})
+
+// Przyciski na tułowiu
+drawCircle(32, 80, 3, {bg: 'black', fg: 'black'})
+drawCircle(40, 80, 3, {bg: 'black', fg: 'black'})
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>320</x>
+      <y>130</y>
+      <w>280</w>
+      <h>60</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-&gt;&gt;&gt;
+m1=web
+m2=web
+Channel 
+web - web
+</panel_attributes>
+    <additional_attributes>260.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>320</x>
+      <y>240</y>
+      <w>360</w>
+      <h>270</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-&gt;&gt;
+m1=software
+m2=web
+Channel 
+web - software
+</panel_attributes>
+    <additional_attributes>340.0;240.0;260.0;240.0;220.0;160.0;80.0;160.0;20.0;50.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>610</x>
+      <y>240</y>
+      <w>230</w>
+      <h>210</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-&gt;&gt;
+m1=software
+m2=web
+Channel 
+web - software
+
+
+</panel_attributes>
+    <additional_attributes>150.0;190.0;190.0;110.0;10.0;110.0;40.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>260</x>
+      <y>240</y>
+      <w>200</w>
+      <h>340</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;.</panel_attributes>
+    <additional_attributes>10.0;10.0;180.0;320.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>490</x>
+      <y>250</y>
+      <w>140</w>
+      <h>280</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;.</panel_attributes>
+    <additional_attributes>120.0;10.0;10.0;260.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>530</x>
+      <y>520</y>
+      <w>180</w>
+      <h>40</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;.</panel_attributes>
+    <additional_attributes>160.0;10.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLActor</id>
+    <coordinates>
+      <x>150</x>
+      <y>60</y>
+      <w>60</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>Tester</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>180</x>
+      <y>120</y>
+      <w>90</w>
+      <h>100</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;&lt;..</panel_attributes>
+    <additional_attributes>70.0;80.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>260</x>
+      <y>480</y>
+      <w>80</w>
+      <h>160</h>
+    </coordinates>
+    <panel_attributes>PC
+bg=gray
+_umletcode=
+//cloud
+
+
+
+//server
+//Parameters (x, y, width, height, radius, drawConfig?)
+drawRectangleRound(10,50,60,90,5, {bg: 'gray', fg: 'black', lt: '-', lw: 2})
+
+//Parameters (x, y, width, height, drawConfig?)
+drawRectangle(20,60,40,8)
+drawRectangle(20,80,40,8)
+drawRectangle(20,100,40,8)
+
+//Parameters (x, y, radius, drawConfig?)
+drawCircle(40,125,5)
+
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>240</x>
+      <y>470</y>
+      <w>320</w>
+      <h>180</h>
+    </coordinates>
+    <panel_attributes>bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>330</x>
+      <y>520</y>
+      <w>460</w>
+      <h>190</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;-&gt;&gt;
+m1=software
+m2=web
+Channel 
+web - software
+</panel_attributes>
+    <additional_attributes>400.0;10.0;330.0;150.0;20.0;150.0;10.0;80.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>210</x>
+      <y>240</y>
+      <w>90</w>
+      <h>260</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-&gt;&gt;&gt;
+m1=web
+m2=web
+Channel 
+web - web
+</panel_attributes>
+    <additional_attributes>40.0;10.0;10.0;110.0;10.0;150.0;50.0;240.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>290</x>
+      <y>250</y>
+      <w>320</w>
+      <h>250</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-&gt;&gt;&gt;
+m1=web
+m2=web
+Channel 
+web - web
+</panel_attributes>
+    <additional_attributes>300.0;10.0;250.0;10.0;140.0;50.0;140.0;100.0;20.0;190.0;10.0;230.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>330</x>
+      <y>570</y>
+      <w>130</w>
+      <h>30</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;.</panel_attributes>
+    <additional_attributes>10.0;10.0;110.0;10.0</additional_attributes>
+  </element>
+</diagram>
