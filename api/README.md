@@ -76,3 +76,27 @@ ngrok http 8081
 ```
 ngrok http 5900 --websocket-tcp-converter
 ```
+
+# To start server
+
+```
+cd api
+poetry install
+poetry run python manage.py runserver 0.0.0.0:8000
+```
+
+## To share server remotely
+
+download tailscale
+
+```
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+and start tailscale serve
+
+```
+sudo tailscale serve 8000
+```
+
+share generated link
