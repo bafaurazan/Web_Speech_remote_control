@@ -111,3 +111,53 @@ input:valid ~ .icon {
         opacity: 1;
     }
 }
+.buttonbox{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.button {
+    background: linear-gradient(135deg, #653778 , #4b215d);
+    text-shadow: 2px 2px #653778;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.3);
+  }
+  
+  .button::before {
+    content: "";
+    position: absolute;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    width: 300%;
+    height: 300%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.5s ease;
+    opacity: 0;
+  }
+  
+  .button:active::before {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    transition: 0s;
+  }
+  
+  .button:hover {
+    background: linear-gradient(135deg, #5f2e72, #512066);
+  }
+  
