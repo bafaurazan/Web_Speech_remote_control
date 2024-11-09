@@ -13,24 +13,37 @@
     <header>
         <h2 class="title">Web Speech Remote Control</h2>
     </header>
-    <div class="login">
+    <div class="login" id="login">
         <div class="loginformbox">
             <h1 class="logintext">Login</h1>
-            <form class="form">
+            <form class="form" id="loginForm">
                 <div class="loginbox">
                     <img src="person-circle.svg" class="icon">
-                    <input type="text" required>
+                    <input type="text" id="username" required>
                     <label>Login</label>
                 </div>
                 <div class="loginbox">
                     <img src="lock-closed.svg" class="icon">
-                    <input type="password" required>
+                    <input type="password" id="password" required>
                     <label>Password</label>
                 </div>
                 <div class="buttonbox">
-                    <button class="button">Login</button>
+                    <button type="submit" class="button">Login</button>
                 </div>
             </form>
+        </div>
+    </div>
+    <div class="main-content" id="mainContent" style="display: none;">
+        <p>Welcome to the Web Speech Remote Control Dashboard!</p>
+        <!-- Chatbox Section -->
+        <div class="chatbox" id="chatbox">
+            <div class="chatbox-messages" id="chatMessages">
+                <!-- Chat messages will appear here -->
+            </div>
+            <div class="chatbox-input">
+                <input type="text" id="chatInput" placeholder="Type a message..." />
+                <button id="sendButton">Send</button>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>

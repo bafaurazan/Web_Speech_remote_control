@@ -160,4 +160,71 @@ input:valid ~ .icon {
   .button:hover {
     background: linear-gradient(135deg, #5f2e72, #512066);
   }
+
+
+
+
+
   
+  .chatbox {
+    width: 300px;
+    max-height: 400px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-color: #f1f1f1;
+}
+
+.chatbox-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.chatbox-messages p {
+    padding: 5px;
+    margin: 0;
+    border-radius: 4px;
+}
+
+.chatbox-messages .user-message {
+    background-color: #e0f7fa;
+    text-align: right;
+}
+
+.chatbox-messages .system-message {
+    background-color: #c8e6c9;
+    text-align: left;
+}
+
+.chatbox-input {
+    display: flex;
+    gap: 5px;
+}
+
+#chatInput {
+    flex-grow: 1;
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid #333;
+}
+
+#sendButton {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #333;
+    color: #fff;
+    cursor: pointer;
+}
+
+#sendButton:hover {
+    background-color: #555;
+}
