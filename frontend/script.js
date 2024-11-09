@@ -3,7 +3,7 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     
     const password = document.getElementById('password').value;
 
-    if (password === 'admin') {
+    if (password === '1') {
         document.getElementById('login').style.display = 'none';
         document.getElementById('mainContent').style.display = 'block';
     } else {

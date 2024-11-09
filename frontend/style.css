@@ -9,9 +9,11 @@ body {
     color: black;
     overflow: hidden;
 }
+
 .header{
     filter: blur(8px);
 }
+
 .title{
     font-size: 3em;
     padding-left: 30px;
@@ -20,6 +22,7 @@ body {
     text-align:center;
     text-shadow: 2px 2px #653778;
 }
+
 .loginformbox{
     backdrop-filter: blur(10px);
     padding: 20px;
@@ -27,25 +30,30 @@ body {
     border-radius:25px;
 
 }
+
 .login{
     display: flex;
     justify-content: center;
     align-items: center;
     height: 60%;
 }
+
 .link{
     color:blue;
 }
+
 .logintext{
     margin: 0 auto;
     padding-bottom: 25px;
     text-shadow: 2px 2px #653778;
 }
+
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
+
 .loginbox {
     position: relative;
     margin-bottom: 2rem;
@@ -130,14 +138,14 @@ input:valid ~ .icon {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     position: relative;
     overflow: hidden;
-  }
+}
 
-  .button:hover {
+.button:hover {
     transform: scale(1.05);
     box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.3);
-  }
+}
   
-  .button::before {
+.button::before {
     content: "";
     position: absolute;
     background: rgba(0, 0, 0, 0.3);
@@ -149,28 +157,23 @@ input:valid ~ .icon {
     transform: translate(-50%, -50%) scale(0);
     transition: transform 0.5s ease;
     opacity: 0;
-  }
+}
   
-  .button:active::before {
+.button:active::before {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
     transition: 0s;
-  }
+}
   
-  .button:hover {
+.button:hover {
     background: linear-gradient(135deg, #5f2e72, #512066);
-  }
+}
 
 
-
-
-
-
-/* Chatbox container animation */
 .chatbox {
     margin: 0 auto;
     width: 300px;
-    max-height: 400px;
+    max-height: 600px;
     border: 3px solid #000000;
     border-radius: 8px;
     padding: 10px;
@@ -178,46 +181,40 @@ input:valid ~ .icon {
     flex-direction: column;
     justify-content: space-between;
     backdrop-filter: blur(10px);
-    animation: slideIn 0.5s ease-out;  /* Animation for chatbox entry */
+    animation: slideIn 0.5s ease-out; 
 }
 
-/* Chatbox messages container animation */
 .chatbox-messages {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 10px;
     padding: 10px;
     opacity: 0;
-    animation: fadeIn 1s forwards;  /* Fade-in effect for messages container */
+    animation: fadeIn 1s forwards; 
 }
 
-/* Animation for individual messages */
 .chatbox-messages p {
     padding: 5px;
     margin: 0;
     border-radius: 4px;
     opacity: 0;
-    animation: messageFadeIn 0.5s ease-out forwards;  /* Fade-in effect for each message */
+    animation: messageFadeIn 0.5s ease-out forwards;
 }
 
-/* Animation for user messages */
 .chatbox-messages .user-message {
     text-align: right;
 }
 
-/* Animation for system messages */
 .chatbox-messages .system-message {
     background-color: #c8e6c9;
     text-align: left;
 }
 
-/* Input and button container styling */
 .chatbox-input {
     display: flex;
     gap: 5px;
 }
 
-/* Animation for input focus */
 #chatInput {
     flex-grow: 1;
     padding: 5px;
@@ -227,10 +224,9 @@ input:valid ~ .icon {
 }
 
 #chatInput:focus {
-    border-color: #653778;  /* Change border color on focus */
+    border-color: #653778;
 }
 
-/* Send button styling */
 #sendButton {
     padding: 5px 10px;
     border: none;
@@ -238,16 +234,14 @@ input:valid ~ .icon {
     background: linear-gradient(135deg, #653778 , #4b215d);;
     color: #000;
     cursor: pointer;
-    transition: transform 0.2s ease;  /* Animation for hover effect */
+    transition: transform 0.2s ease;
 }
 
-/* Hover effect for send button */
 #sendButton:hover {
     background-color: rgba(0, 0, 0, 0.3);
-    transform: scale(1.1);  /* Button grows slightly on hover */
+    transform: scale(1.1);
 }
 
-/* Keyframe animations */
 @keyframes slideIn {
     from {
         transform: translateY(-20px);
@@ -271,7 +265,7 @@ input:valid ~ .icon {
 @keyframes messageFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-10px); /* Slightly slide in */
+        transform: translateY(-10px);
     }
     to {
         opacity: 1;
@@ -279,23 +273,22 @@ input:valid ~ .icon {
     }
 }
 ::-webkit-scrollbar {
-    width: 7px;  /* Adjust the width for vertical scrollbar */
-    height: 10px; /* Adjust the height for horizontal scrollbar */
-  }
+    width: 7px;
+    height: 10px;
+}
   
-  /* Customizing the scrollbar track */
-  ::-webkit-scrollbar-track {
-    background-color: #653778;  /* Light background color */
-    border-radius: 10px;         /* Rounded corners */
-  }
+::-webkit-scrollbar-track {
+    background-color: #653778; 
+    border-radius: 10px; 
+}
   
-  /* Customizing the scrollbar thumb (the part you drag) */
-  ::-webkit-scrollbar-thumb {
-    background-color: #411853;      /* Darker color for the thumb */
-    border-radius: 10px;         /* Rounded corners for the thumb */
-  }
+
+::-webkit-scrollbar-thumb {
+    background-color: #411853;  
+    border-radius: 10px;   
+}
   
-  /* Hover effect on the scrollbar thumb */
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: #360d49;      /* Darker color when hovered */
-  }
+ 
+::-webkit-scrollbar-thumb:hover {
+    background-color: #360d49;  
+}
