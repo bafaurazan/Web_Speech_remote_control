@@ -50,7 +50,7 @@ btnJoin.addEventListener('click', () => {
     var labelUsername = document.querySelector('#label-username');
     labelUsername.innerHTML = username;
 
-    var wsStart = 'wss://e70f-193-19-165-84.ngrok-free.app';  // Adres WebSocket serwera
+    var wsStart = 'wss://rafal.tail43fbf9.ts.net/';  // Adres WebSocket serwera
     webSocket = new WebSocket(wsStart);
 
     webSocket.addEventListener('open', (e) => {

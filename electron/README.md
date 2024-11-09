@@ -21,6 +21,7 @@ var wsStart = 'wss://e70f-193-19-165-84.ngrok-free.app';
 ### type
 
 ```
+npm install
 npm run build
 npm run start
 ```
