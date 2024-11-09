@@ -16,7 +16,13 @@ var wsStart = 'wss://e70f-193-19-165-84.ngrok-free.app';
 ```
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'    wss://e70f-193-19-165-84.ngrok-free.app;">
 ```
+### for testing electron ros2 connection
 
+```
+ros2 run turtlesim turtlesim_node
+```
+
+and click button in electron app to move turtle
 
 ### type
 
