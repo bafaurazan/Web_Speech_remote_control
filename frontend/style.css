@@ -165,66 +165,137 @@ input:valid ~ .icon {
 
 
 
-  
-  .chatbox {
+
+/* Chatbox container animation */
+.chatbox {
+    margin: 0 auto;
     width: 300px;
     max-height: 400px;
-    border: 2px solid #333;
+    border: 3px solid #000000;
     border-radius: 8px;
     padding: 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    background-color: #f1f1f1;
+    backdrop-filter: blur(10px);
+    animation: slideIn 0.5s ease-out;  /* Animation for chatbox entry */
 }
 
+/* Chatbox messages container animation */
 .chatbox-messages {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 10px;
     padding: 10px;
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    opacity: 0;
+    animation: fadeIn 1s forwards;  /* Fade-in effect for messages container */
 }
 
+/* Animation for individual messages */
 .chatbox-messages p {
     padding: 5px;
     margin: 0;
     border-radius: 4px;
+    opacity: 0;
+    animation: messageFadeIn 0.5s ease-out forwards;  /* Fade-in effect for each message */
 }
 
+/* Animation for user messages */
 .chatbox-messages .user-message {
-    background-color: #e0f7fa;
     text-align: right;
 }
 
+/* Animation for system messages */
 .chatbox-messages .system-message {
     background-color: #c8e6c9;
     text-align: left;
 }
 
+/* Input and button container styling */
 .chatbox-input {
     display: flex;
     gap: 5px;
 }
 
+/* Animation for input focus */
 #chatInput {
     flex-grow: 1;
     padding: 5px;
     border-radius: 4px;
-    border: 1px solid #333;
+    border: 2px solid #653778;
+    transition: border 0.3s ease;
 }
 
+#chatInput:focus {
+    border-color: #653778;  /* Change border color on focus */
+}
+
+/* Send button styling */
 #sendButton {
     padding: 5px 10px;
     border: none;
     border-radius: 4px;
-    background-color: #333;
-    color: #fff;
+    background: linear-gradient(135deg, #653778 , #4b215d);;
+    color: #000;
     cursor: pointer;
+    transition: transform 0.2s ease;  /* Animation for hover effect */
 }
 
+/* Hover effect for send button */
 #sendButton:hover {
-    background-color: #555;
+    background-color: rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);  /* Button grows slightly on hover */
 }
+
+/* Keyframe animations */
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes messageFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px); /* Slightly slide in */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+::-webkit-scrollbar {
+    width: 7px;  /* Adjust the width for vertical scrollbar */
+    height: 10px; /* Adjust the height for horizontal scrollbar */
+  }
+  
+  /* Customizing the scrollbar track */
+  ::-webkit-scrollbar-track {
+    background-color: #653778;  /* Light background color */
+    border-radius: 10px;         /* Rounded corners */
+  }
+  
+  /* Customizing the scrollbar thumb (the part you drag) */
+  ::-webkit-scrollbar-thumb {
+    background-color: #411853;      /* Darker color for the thumb */
+    border-radius: 10px;         /* Rounded corners for the thumb */
+  }
+  
+  /* Hover effect on the scrollbar thumb */
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #360d49;      /* Darker color when hovered */
+  }

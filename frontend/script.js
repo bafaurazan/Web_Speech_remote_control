@@ -3,15 +3,13 @@ document.getElementById('loginForm').addEventListener('submit', function(event) 
     
     const password = document.getElementById('password').value;
 
-    if (password === '1') {
+    if (password === 'admin') {
         document.getElementById('login').style.display = 'none';
         document.getElementById('mainContent').style.display = 'block';
     } else {
         alert('Invalid password!');
     }
 });
-
-const name = document.getElementById('username').value;
 
 // Chatbox functionality
 const sendButton = document.getElementById('sendButton');
