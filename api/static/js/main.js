@@ -154,6 +154,7 @@ btnSendMsg.addEventListener('click', sendMsgOnClick);
 
 function sendMsgOnClick(){
     var message = messageInput.value;
+    console.log("wysłane dane z sendMsgOnClick: ", message);
 
     var li = document.createElement('li');
     li.appendChild(document.createTextNode('Me: ' + message));
@@ -174,6 +175,26 @@ function sendMsgOnClick(){
     messageInput.value = '';
 }
 
+var moveForward = document.querySelector('#move-forward');
+
+moveForward.addEventListener('click', sendToRobot);
+
+function sendToRobot(){
+    var message = "move-forward";
+    console.log("wysłane dane dla robota: ", message);
+    
+    var dataChannels = getDataChannels();
+
+    var dataToSend = {
+        username: username,
+        message: message
+    };
+    var jsonMessage = JSON.stringify(dataToSend);
+
+    for(index in dataChannels){
+        dataChannels[index].send(jsonMessage);
+    }
+}
 
 function sendSignal(action, message){
     var jsonStr = JSON.stringify({
@@ -309,10 +330,15 @@ function dcOnMessage(event){
     var username = data.username;
     var message = data.message;
 
-    var li = document.createElement('li');
-    li.appendChild(document.createTextNode(username + ': ' + message));
-    messageList.appendChild(li);
-    console.log("wysłane dane: ", message)
+    if(message == "move-forward"){
+        console.log("wysłane dane do robota: ", message);
+    }
+    else{
+        var li = document.createElement('li');
+        li.appendChild(document.createTextNode(username + ': ' + message));
+        messageList.appendChild(li);
+        console.log("wysłane dane do użytkownika: ", message);
+    }
 }
 
 function createVideo(peerUsername){

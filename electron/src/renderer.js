@@ -261,11 +261,18 @@ function dcOnMessage(event){
     var username = data.username;
     var message = data.message;
 
-    var li = document.createElement('li');
-    li.appendChild(document.createTextNode(username + ': ' + message));
-    messageList.appendChild(li);
-    console.log("wysłane dane: ", message)
-    ipc.send("terminal.executeCommand", message);
+    if(message == "move-forward"){
+        console.log("wysłane dane: ", message);
+        ipcROS.send('move-forward');
+    }
+    else{
+        var li = document.createElement('li');
+        li.appendChild(document.createTextNode(username + ': ' + message));
+        messageList.appendChild(li);
+        console.log("wysłane dane: ", message);
+        ipc.send("terminal.executeCommand", message);  
+    }
+    
 }
 
 function createVideo(peerUsername){
