@@ -265,6 +265,10 @@ function dcOnMessage(event){
         console.log("wysłane dane: ", message);
         ipcROS.send('move-forward');
     }
+    else if(message == "move-backward"){
+        console.log("wysłane dane: ", message);
+        ipcROS.send('move-backward');
+    }
     else{
         var li = document.createElement('li');
         li.appendChild(document.createTextNode(username + ': ' + message));

@@ -61,8 +61,25 @@ app.on("ready", () => {
 
         // Obsługa eventów do ruchu żółwia na podstawie przycisków
         ipcMain.on('move-forward', () => moveTurtle(1, 0));
+        ipcMain.on('move-backward', () => moveTurtle(-1, 0));
         ipcMain.on('turn-right', () => moveTurtle(0, 1));
         ipcMain.on('turn-left', () => moveTurtle(0, -1));
+
+        const node2 = new rclnodejs.Node('rover_control_web');
+        
+        // Tworzymy publisher dla topicu /turtle1/cmd_vel
+        const cmdVelPublisher2 = node2.createPublisher('std_msgs/msg/Int32', '/rover/speed');
+
+        // Definiujemy funkcję do kontrolowania żółwia
+        function blink(data) {
+            const myInt = {
+                data: data
+            };
+            cmdVelPublisher2.publish(myInt);
+        }
+
+        ipcMain.on('move-forward', () => blink(1));
+        ipcMain.on('move-backward', () => blink(0));
 
         rclnodejs.spin(node);
     }).catch(console.error);
