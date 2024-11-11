@@ -16,6 +16,8 @@ ipykernel = "^6.29.5"
 tensorflow = "^2.18.0"
 ipython = "^8.29.0"
 fastparquet = "^2024.5.0"
+ipython-extensions = "^0.2"
+pyarrow = "^18.0.0"
 
 
 [build-system]
