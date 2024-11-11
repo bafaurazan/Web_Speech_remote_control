@@ -5,7 +5,9 @@ Run this python file
 python3 modelPrep.py
 ```
 
-if fasttext doesn't work, use fasttext-wheel
+if fasttext doesn't work, install fasttext-wheel
+
+[How to set up Jupyter Notebook Kernel in poetry environment](https://stackoverflow.com/questions/72434896/jupyter-kernel-doesnt-use-poetry-environment)
 
 
 ### To-do list:
