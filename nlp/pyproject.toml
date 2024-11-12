@@ -18,6 +18,8 @@ ipython = "^8.29.0"
 fastparquet = "^2024.5.0"
 ipython-extensions = "^0.2"
 pyarrow = "^18.0.0"
+dask = "^2024.11.0"
+dask-expr = "^1.1.18"
 
 
 [build-system]
