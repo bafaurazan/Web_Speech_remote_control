@@ -79,6 +79,7 @@
                             if (indexStart !== -1) {
                                 console.log(`Słowo 'start' wykryto na indeksie ${indexStart}`);
                                 lastIndexStart = indexStart + "start".length; // Ustawienie nowego startowego indeksu
+                                sendToRobotForward();
                             }
     
                             // Sprawdzanie i znajdowanie indeksu słowa "stop" po ostatnim znalezionym indeksie
@@ -86,6 +87,7 @@
                             if (indexStop !== -1) {
                                 console.log(`Słowo 'stop' wykryto na indeksie ${indexStop}`);
                                 lastIndexStop = indexStop + "stop".length; // Ustawienie nowego startowego indeksu
+                                sendToRobotBackward();
                             }
                         }
                     }
