@@ -36,7 +36,15 @@
         <button id="move-forward">Move Forward</button>
         <button id="move-backward">Move Forward</button>
     </div>
-
+    <div>
+        <button id="start-record-btn">Rozpocznij nagrywanie</button>
+        <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
+        <p id="recording-status"></p>
+        <h2>Rozpoznany tekst:</h2>
+        <p id="recognized-text"></p>
+        <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+    </div>
+    
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
 </body>
 </html>
