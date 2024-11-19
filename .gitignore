@@ -2,3 +2,4 @@ nlp_venv/
 nlp/data/
 requirements.txt
 result/
+.env
