@@ -9,6 +9,19 @@ var username;
 
 var webSocket;
 
+document.getElementById('loginForm').addEventListener('submit', function(event) {
+    event.preventDefault(); 
+    
+    const password = document.getElementById('password').value;
+
+    if (password === '1') {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+    } else {
+        alert('Invalid password!');
+    }
+});
+
 function webSocketOnMessage(event){
     var parsedData = JSON.parse(event.data);
 

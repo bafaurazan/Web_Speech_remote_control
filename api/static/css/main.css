@@ -1,185 +1,299 @@
-/* Reset podstawowy */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* Ogólny styl strony */
 body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-    background-color: #f4f4f9;
-    color: #333;
+    font-family: Poppins;
+    background-image: url('/static/images/background.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    height: 100vh;
+    margin: 0;
+    color: black;
+    overflow: hidden;
+}
+
+.header{
+    filter: blur(8px);
+}
+
+.title{
+    font-size: 3em;
+    padding-left: 30px;
+    padding-top: 5px;
+    margin: 0;
+    text-align:center;
+    text-shadow: 2px 2px #653778;
+}
+
+.loginformbox{
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border: solid 3px black;
+    border-radius:25px;
+
+}
+
+.login{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 60%;
+}
+
+.link{
+    color:blue;
+}
+
+.logintext{
+    margin: 0 auto;
+    padding-bottom: 25px;
+    text-shadow: 2px 2px #653778;
+}
+
+* {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
 }
 
-/* Nagłówek */
-h3 {
-    margin-bottom: 15px;
-    text-align: center;
-    color: #4a4a7a;
+.loginbox {
+    position: relative;
+    margin-bottom: 2rem;
+    backdrop-filter: blur(10px);
+
 }
 
-/* Formularz użytkownika */
-#username {
-    padding: 10px;
-    margin-right: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+.icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    transition: opacity 0.3s;
 }
 
-#btn-join {
-    padding: 10px 20px;
-    background-color: #4caf50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-#btn-join:hover {
-    background-color: #45a049;
-}
-
-/* Główna siatka */
-.main-grid-container {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-    width: 90%;
-    max-width: 1200px;
-    margin: 20px auto;
-}
-
-/* Sekcja wideo */
-#video-container {
-    background-color: #fff;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-#local-video {
+input[type="text"],
+input[type="password"] {
     width: 100%;
-    max-width: 500px;
-    border-radius: 10px;
-    background-color: #000;
-    margin-bottom: 10px;
-}
-
-#btn-toggle-audio,
-#btn-toggle-video {
-    padding: 10px 20px;
-    margin: 5px;
-    background-color: #007bff;
-    color: white;
+    padding: 10px 10px 10px 40px;
     border: none;
-    border-radius: 5px;
+    border-bottom: 3px solid black;
+    outline: none;
+    font-size: 1rem;
+    background-color: transparent;
+    transition: border-color 0.3s;
+}
+
+input:focus {
+    border-bottom-color: #653778;
+}
+
+input:focus + label,
+input:valid + label {
+    top: -20px;
+    font-size: 0.75rem;
+    color: black;
+}
+
+label {
+    position: absolute;
+    left: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    color: black;
+    pointer-events: none;
+    transition: 0.3s;
+}
+
+input:focus ~ .icon,
+input:valid ~ .icon {
+    opacity: 1;
+    color: #653778;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+.buttonbox{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.button {
+    background: linear-gradient(135deg, #653778 , #4b215d);
+    text-shadow: 2px 2px #653778;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 30px;
     cursor: pointer;
-    transition: background-color 0.3s;
+    outline: none;
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+    overflow: hidden;
 }
 
-#btn-toggle-audio:hover,
-#btn-toggle-video:hover {
-    background-color: #0056b3;
+.button:hover {
+    transform: scale(1.05);
+    box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.3);
+}
+  
+.button::before {
+    content: "";
+    position: absolute;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    width: 300%;
+    height: 300%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.5s ease;
+    opacity: 0;
+}
+  
+.button:active::before {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    transition: 0s;
+}
+  
+.button:hover {
+    background: linear-gradient(135deg, #5f2e72, #512066);
 }
 
-/* Sekcja czatu */
-#chat {
-    background-color: #fff;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
+.chattext{
+    margin: 0 auto;
+    text-shadow: 2px 2px #653778;
+}
+
+.chatbox {
+    margin-left: 78%; 
+    margin-right: 0;
+    width: 300px;
+    max-height: 600px;
+    border: 3px solid #000000;
+    border-radius: 8px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    backdrop-filter: contrast(80%);
+    animation: slideIn 0.5s ease-out; 
 }
 
-#messages {
-    max-height: 300px;
+.chatbox-messages {
+    flex-grow: 1;
     overflow-y: auto;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
+    margin-bottom: 10px;
     padding: 10px;
-    background-color: #f9f9f9;
+    opacity: 0;
+    animation: fadeIn 1s forwards; 
 }
 
-#message-list {
-    list-style: none;
+.chatbox-messages p {
+    padding: 5px;
+    margin: 0;
+    border-radius: 4px;
+    opacity: 0;
+    animation: messageFadeIn 0.5s ease-out forwards;
 }
 
-#msg {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    width: calc(100% - 110px);
-    margin-right: 10px;
+.chatbox-messages .user-message {
+    text-align: right;
 }
 
-#btn-send-msg {
-    padding: 10px 20px;
-    background-color: #28a745;
-    color: white;
+.chatbox-messages .system-message {
+    background-color: #c8e6c9;
+    text-align: left;
+}
+
+.chatbox-input {
+    display: flex;
+    gap: 5px;
+}
+
+#chatInput {
+    flex-grow: 1;
+    padding: 5px;
+    border-radius: 4px;
+    border: 2px solid #653778;
+    transition: border 0.3s ease;
+}
+
+#chatInput:focus {
+    border-color: #653778;
+}
+
+#sendButton {
+    padding: 5px 10px;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #653778 , #4b215d);;
+    color: #000;
     cursor: pointer;
+    transition: transform 0.2s ease;
 }
 
-#btn-share-screen {
-    margin-top: 10px;
-    padding: 10px 20px;
-    background-color: #17a2b8;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+#sendButton:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);
 }
 
-/* Przyciski ruchu */
-#move-forward,
-#move-backward {
-    padding: 10px 20px;
-    background-color: #ffc107;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin: 10px;
-}
-
-/* Sekcja nagrywania */
-#start-record-btn,
-#stop-record-btn {
-    padding: 10px 20px;
-    margin: 10px;
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-#stop-record-btn:disabled {
-    background-color: #b3b3b3;
-    cursor: not-allowed;
-}
-
-/* Responsywność */
-@media (max-width: 768px) {
-    .main-grid-container {
-        grid-template-columns: 1fr;
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
     }
-
-    #chat {
-        margin-top: 20px;
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes messageFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+::-webkit-scrollbar {
+    width: 7px;
+    height: 10px;
+}
+  
+::-webkit-scrollbar-track {
+    background-color: #653778; 
+    border-radius: 10px; 
+}
+  
+
+::-webkit-scrollbar-thumb {
+    background-color: #411853;  
+    border-radius: 10px;   
+}
+  
+ 
+::-webkit-scrollbar-thumb:hover {
+    background-color: #360d49;  
 }
