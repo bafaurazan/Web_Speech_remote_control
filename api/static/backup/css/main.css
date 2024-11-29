@@ -1,0 +1,185 @@
+/* Reset podstawowy */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Ogólny styl strony */
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    background-color: #f4f4f9;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Nagłówek */
+h3 {
+    margin-bottom: 15px;
+    text-align: center;
+    color: #4a4a7a;
+}
+
+/* Formularz użytkownika */
+#username {
+    padding: 10px;
+    margin-right: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+#btn-join {
+    padding: 10px 20px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#btn-join:hover {
+    background-color: #45a049;
+}
+
+/* Główna siatka */
+.main-grid-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+    width: 90%;
+    max-width: 1200px;
+    margin: 20px auto;
+}
+
+/* Sekcja wideo */
+#video-container {
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#local-video {
+    width: 100%;
+    max-width: 500px;
+    border-radius: 10px;
+    background-color: #000;
+    margin-bottom: 10px;
+}
+
+#btn-toggle-audio,
+#btn-toggle-video {
+    padding: 10px 20px;
+    margin: 5px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#btn-toggle-audio:hover,
+#btn-toggle-video:hover {
+    background-color: #0056b3;
+}
+
+/* Sekcja czatu */
+#chat {
+    background-color: #fff;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+#messages {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+#message-list {
+    list-style: none;
+}
+
+#msg {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    width: calc(100% - 110px);
+    margin-right: 10px;
+}
+
+#btn-send-msg {
+    padding: 10px 20px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#btn-share-screen {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+/* Przyciski ruchu */
+#move-forward,
+#move-backward {
+    padding: 10px 20px;
+    background-color: #ffc107;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px;
+}
+
+/* Sekcja nagrywania */
+#start-record-btn,
+#stop-record-btn {
+    padding: 10px 20px;
+    margin: 10px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#stop-record-btn:disabled {
+    background-color: #b3b3b3;
+    cursor: not-allowed;
+}
+
+/* Responsywność */
+@media (max-width: 768px) {
+    .main-grid-container {
+        grid-template-columns: 1fr;
+    }
+
+    #chat {
+        margin-top: 20px;
+    }
+}

@@ -1,0 +1,15 @@
+db.sqlite3
+.env
+env/
+*.bin
+.envrc
+.venv
+venv/
+.mypy_cache
+.ruff_cache
+models/**
+db/
+.idea/
+poetry.lock
+**/poetry.lock
+**/__pycache__/

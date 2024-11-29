@@ -1,0 +1,62 @@
+{
+  "name": "my_app",
+  "version": "0.0.1",
+  "description": "electron_app_installer",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "build": {
+    "appId": "my_app",
+    "extraResources": [
+      {
+        "from": "git-bash/",
+        "to": "git-bash/"
+      },
+      {
+        "from": "build/",
+        "to": "build/"
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "snap"
+      ],
+      "category": "Utility",
+      "icon": "icon.png"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "include": "build/installer.nsh",
+      "oneClick": false,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "uninstallDisplayName": "my-app-uninstaller",
+      "license": "license",
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true
+    }
+  },
+  "author": "Rafał [Bafau] Bazan <rafalbe777@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^19.1.9",
+    "electron-builder": "^25.0.5"
+  },
+  "dependencies": {
+    "electron-tools": "^2.4.2",
+    "nan": "^2.22.0",
+    "node-pty": "^1.0.0",
+    "rclnodejs": "^0.27.4",
+    "xterm": "^5.3.0"
+  }
+}
