@@ -17,21 +17,25 @@
     <header>
         <h2 class="title">Web Speech Remote Control</h2>
     </header>
-    <div id="login">
-        <form id="form-join">
-            <h1 id="logintext">Login</h1>
-            <label for="username">Username:</label>
-            <input id="username" type="text" required>
-            <div id="loginbox">
-                <label for="password">Password:</label>
-                <img src="/static/images/lock-closed.svg" class="icon">
-                <input id="password" type="password" required>
-            </div>
-            <div id="buttonbox">
-                <button type="submit" id="btn-join">Login</button>
-            </div>
-        </form>
-        <p class="title"></p>
+    <div class="loginbox1">
+        <div id="login">
+            <form id="form-join">
+                <h1 id="logintext">Login</h1>
+                <div id="loginbox">
+                    <label for="username">Username</label>
+                    <img src="/static/images/person-circle.svg" class="icon">
+                    <input id="username" type="text" required>
+                </div>
+                <div id="loginbox">
+                    <label for="password">Password</label>
+                    <img src="/static/images/lock-closed.svg" class="icon">
+                    <input id="password" type="password" required>
+                </div>
+                <div id="buttonbox">
+                    <button type="submit" id="btn-join">Login</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <div id="mainContent" style="display: none;">
@@ -56,21 +60,18 @@
         <div>
             <button id="move-forward">Move Forward</button>
             <button id="move-backward">Move Forward</button>
-        </div>
-        <div>
+            <button id="btn-share-screen">Share Screen</button>
             <button id="start-record-btn">Rozpocznij nagrywanie</button>
             <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
+        </div>
+        <div>
             <p id="recording-status"></p>
             <h2>Rozpoznany tekst:</h2>
             <p id="recognized-text"></p>
-            <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
         </div>
-    
-        <button id="btn-share-screen">Share Screen</button>
-
-        <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
-    
     </div>
+    <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
 </body>
 </html>
