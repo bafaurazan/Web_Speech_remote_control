@@ -8,43 +8,69 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Django Channels WebRTC</title>
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;800&display=swap" rel="stylesheet">
+</head>
 </head>
 <body>
-    <h3 id="label-username">USERNAME</h3>
-    <div>
-        <input id="username"><button id="btn-join">Join Room</button>
-    </div>
-
-    <div class="main-grid-container">
-        <div id="video-container">
-            <div><video id="local-video" style="float: left;" autoplay playsinline></video></div>
-            <button id="btn-toggle-audio">Audio Mute</button>
-            <button id="btn-toggle-video">video Off</button>
-        </div>
-
-        <div id="chat">
-            <h3>CHAT</h3>
-            <div id="messages">
-                <ul id="message-list"></ul>
+    <header>
+        <h2 class="title">Web Speech Remote Control</h2>
+    </header>
+    <div id="login">
+        <form id="form-join">
+            <h1 id="logintext">Login</h1>
+            <label for="username">Username:</label>
+            <input id="username" type="text" required>
+            <div id="loginbox">
+                <label for="password">Password:</label>
+                <img src="/static/images/lock-closed.svg" class="icon">
+                <input id="password" type="password" required>
             </div>
-
-            <div><input id="msg"><button id="btn-send-msg">Send Message</button></div>
-            <button id="btn-share-screen">Share Screen</button>
-        </div>
-    </div>
-    <div>
-        <button id="move-forward">Move Forward</button>
-        <button id="move-backward">Move Forward</button>
-    </div>
-    <div>
-        <button id="start-record-btn">Rozpocznij nagrywanie</button>
-        <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
-        <p id="recording-status"></p>
-        <h2>Rozpoznany tekst:</h2>
-        <p id="recognized-text"></p>
-        <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+            <div id="buttonbox">
+                <button type="submit" id="btn-join">Login</button>
+            </div>
+        </form>
+        <p class="title"></p>
     </div>
     
+    <div id="mainContent" style="display: none;">
+
+        <div class="main-grid-container">
+            <div id="video-container">
+                <div><video id="local-video" style="float: left;" autoplay playsinline></video></div>
+                <button id="btn-toggle-audio">Audio Mute</button>
+                <button id="btn-toggle-video">video Off</button>
+            </div>
+
+            <div id="chat">
+                <h3>CHAT</h3>
+                <div id="messages">
+                    <ul id="message-list"></ul>
+                </div>
+
+                <div><input id="msg"><button id="btn-send-msg">Send Message</button></div>
+                
+            </div>
+        </div>
+        <div>
+            <button id="move-forward">Move Forward</button>
+            <button id="move-backward">Move Forward</button>
+        </div>
+        <div>
+            <button id="start-record-btn">Rozpocznij nagrywanie</button>
+            <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
+            <p id="recording-status"></p>
+            <h2>Rozpoznany tekst:</h2>
+            <p id="recognized-text"></p>
+            <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+        </div>
+    
+        <button id="btn-share-screen">Share Screen</button>
+
+        <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
+    
+    </div>
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
 </body>
 </html>

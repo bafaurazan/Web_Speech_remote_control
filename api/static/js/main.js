@@ -3,95 +3,92 @@ console.log('In main.js!');
 var mapPeers = {};
 
 var usernameInput = document.querySelector('#username');
-var btnJoin = document.querySelector('#btn-join');
+var passwordInput = document.querySelector('#password');
+var login = document.querySelector('#login');
+var formJoin = document.querySelector('#form-join');
+var title = document.querySelector('.title');
 
 var username;
-
 var webSocket;
 
-function webSocketOnMessage(event){
+function webSocketOnMessage(event) {
     var parsedData = JSON.parse(event.data);
 
     var peerUsername = parsedData['peer'];
     var action = parsedData['action'];
 
-    if(username == peerUsername){
+    if (username == peerUsername) {
         return;
     }
 
     var receiver_channel_name = parsedData['message']['receiver_channel_name'];
 
-    if(action == 'new-peer'){
+    if (action == 'new-peer') {
         createOfferer(peerUsername, receiver_channel_name);
-
         return;
     }
 
-    if(action == 'new-offer'){
+    if (action == 'new-offer') {
         var offer = parsedData['message']['sdp'];
-
         createAnswerer(offer, peerUsername, receiver_channel_name);
-
         return;
-
     }
 
-    if(action == 'new-answer'){
+    if (action == 'new-answer') {
         var answer = parsedData['message']['sdp'];
-
         var peer = mapPeers[peerUsername][0];
-
         peer.setRemoteDescription(answer);
-
         return;
     }
 }
 
-btnJoin.addEventListener('click', () => {
+formJoin.addEventListener('submit', (event) => {
+    event.preventDefault(); // Zapobiega przeładowaniu strony po wysłaniu formularza
+
     username = usernameInput.value;
+    var password = passwordInput.value;
 
-    console.log('username: ', username);
-
-    if(username == ''){
+    if (!username || password !== 'a') {
+        alert('Invalid username or password. Password must be "a".');
         return;
     }
 
+    console.log('username: ', username);
+
+    // Ukrywanie formularza po poprawnym zalogowaniu
     usernameInput.value = '';
-    usernameInput.disabled = true;
-    usernameInput.style.visibility = 'hidden';
+    passwordInput.value = '';
+    login.style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
 
-    btnJoin.disabled = true;
-    btnJoin.style.visibility = 'hidden';
-
-    var labelUsername = document.querySelector('#label-username');
-    labelUsername.innerHTML = username;
+    title.innerHTML = `Logged in as: ${username}`;
 
     var loc = window.location;
     var wsStart = 'ws://';
 
-    if(loc.protocol == 'https:'){
+    if (loc.protocol == 'https:') {
         wsStart = 'wss://';
     }
 
     var endPoint = wsStart + loc.host + loc.pathname;
 
     console.log('endPoint: ', endPoint);
-    
+
     webSocket = new WebSocket(endPoint);
 
     webSocket.addEventListener('open', (e) => {
         console.log('Connection Opened!');
-
         sendSignal('new-peer', {});
     });
+
     webSocket.addEventListener('message', webSocketOnMessage);
     webSocket.addEventListener('close', (e) => {
         console.log('Connection Closed!');
     });
+
     webSocket.addEventListener('error', (e) => {
         console.log('Error Occurred!');
     });
-    
 });
 
 var localStream = new MediaStream();
@@ -409,3 +406,4 @@ function getDataChannels(){
     }
     return dataChannels;
 }
+
