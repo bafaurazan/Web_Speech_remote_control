@@ -1,74 +1,87 @@
-// Declare global variables
-let model, tokenizer;
-const referenceTexts = ["Hello, world!", "Hi there!", "Greetings!"];
-let referenceEmbeddings = [];
-
-// Ensure TensorFlow.js uses the CPU backend (optional)
-tf.setBackend('cpu').then(() => {
-  console.log('Using CPU backend');
-});
-
-// Load the model and tokenizer, then compute reference embeddings
-async function loadModelAndReferences() {
-  console.log("Loading model and tokenizer...");
-
-  // Load pre-trained model and tokenizer using Transformers.js
-  tokenizer = await transformers.AutoTokenizer.fromPretrained('Xenova/distilbert-base-uncased');
-  model = await transformers.AutoModel.fromPretrained('Xenova/distilbert-base-uncased');
-
-  // Compute embeddings for the reference texts
-  for (let text of referenceTexts) {
-    const inputs = await tokenizer(text, { returnTensors: 'pt' });
-    const outputs = await model(inputs.input_ids);
-    const embedding = outputs.last_hidden_state.mean(1).dataSync();
-    referenceEmbeddings.push(embedding);
-  }
-
-  console.log('Model and reference embeddings loaded successfully!');
+// Load Universal Sentence Encoder model
+async function loadModel() {
+    console.log("Loading Universal Sentence Encoder model...");
+    const model = await use.load();
+    console.log("Model loaded.");
+    return model;
 }
 
-// Calculate cosine similarity
+// Compute cosine similarity between two vectors
 function cosineSimilarity(vecA, vecB) {
-  const dotProduct = vecA.reduce((sum, a, idx) => sum + a * vecB[idx], 0);
-  const magnitudeA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
-  const magnitudeB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
-  return dotProduct / (magnitudeA * magnitudeB);
+    const flatVecA = vecA.arraySync()[0];
+    const flatVecB = vecB.arraySync()[0];
+    const tensorA = tf.tensor(flatVecA);
+    const tensorB = tf.tensor(flatVecB);
+    const dotProduct = tf.dot(tensorA, tensorB).dataSync()[0];
+    const normA = tf.norm(tensorA).dataSync()[0];
+    const normB = tf.norm(tensorB).dataSync()[0];
+    return dotProduct / (normA * normB);
 }
 
-// Validate the input text
-async function validateText() {
-  const inputText = document.getElementById("inputText").value;
-  if (!inputText) {
-    document.getElementById("result").innerText = "Please enter some text.";
-    return;
-  }
+async function main() {
+    const model = await loadModel();
 
-  // Compute embedding for the input text
-  const inputs = await tokenizer(inputText, { returnTensors: 'pt' });
-  const outputs = await model(inputs.input_ids);
-  const inputEmbedding = outputs.last_hidden_state.mean(1).dataSync();
+    // Reference texts (predefined correct embeddings)
+    const referenceTexts = [
+        "This is a valid input.",
+        "Correct example text here.",
+        "Another example of valid text.",
+        "mkdir"
+    ];
+    const referenceEmbeddings = await Promise.all(referenceTexts.map(text => model.embed([text])));
 
-  // Compare input embedding with reference embeddings
-  let maxSimilarity = -1;
-  let bestMatch = null;
-  for (let i = 0; i < referenceEmbeddings.length; i++) {
-    const similarity = cosineSimilarity(inputEmbedding, referenceEmbeddings[i]);
-    if (similarity > maxSimilarity) {
-      maxSimilarity = similarity;
-      bestMatch = referenceTexts[i];
-    }
-  }
+    const checkButton = document.getElementById('checkButton');
+    const resultElement = document.getElementById('result');
+    const similarityList = document.getElementById('similarityList');
 
-  // Display results
-  const threshold = 0.8; // Adjust as needed
-  if (maxSimilarity >= threshold) {
-    document.getElementById("result").innerText =
-      `Input is correct! Best match: "${bestMatch}" (Similarity: ${maxSimilarity.toFixed(2)})`;
-  } else {
-    document.getElementById("result").innerText =
-      `Input is incorrect. Highest similarity: ${maxSimilarity.toFixed(2)}`;
-  }
+    checkButton.addEventListener('click', async () => {
+        const inputText = document.getElementById('inputText').value.trim();
+        similarityList.innerHTML = ''; // Clear previous results
+
+        if (!inputText) {
+            resultElement.textContent = "Please enter some text!";
+            return;
+        }
+
+        // Split input into individual words
+        const words = inputText.split(/\s+/);
+
+        const allResults = [];
+
+        for (const word of words) {
+            // Get embedding for the current word
+            const wordEmbedding = await model.embed([word]);
+
+            // Calculate cosine similarity for each reference embedding
+            const similarities = referenceTexts.map((refText, index) => {
+                const similarity = cosineSimilarity(wordEmbedding, referenceEmbeddings[index]);
+                return { reference: refText, similarity: similarity };
+            });
+
+            // Sort by similarity (highest first)
+            similarities.sort((a, b) => b.similarity - a.similarity);
+
+            // Display similarities for the current word
+            const wordResult = document.createElement('li');
+            wordResult.textContent = `Word "${word}":`;
+            similarityList.appendChild(wordResult);
+
+            const wordList = document.createElement('ul');
+            similarities.forEach(({ reference, similarity }) => {
+                const percentage = (similarity * 100).toFixed(2);
+                const listItem = document.createElement('li');
+                listItem.textContent = `Similarity to "${reference}": ${percentage}%`;
+                wordList.appendChild(listItem);
+            });
+
+            wordResult.appendChild(wordList);
+
+            // Save results for display
+            allResults.push({ word, similarities });
+        }
+
+        resultElement.textContent = `Analysis complete. Results for ${words.length} word(s).`;
+    });
 }
 
-// Load the model and references on page load
-loadModelAndReferences();
+main();
