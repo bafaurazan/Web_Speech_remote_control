@@ -4,10 +4,10 @@ The machine learning aspect of the project, which focuses on simplifying the act
 The script is calculating cosine similarity between embeddings from the words provided by speech recognition (WebSpeechAPI) and the reference embeddings from the dataset. Then it displays the top 5 most similar words.
 
 
-## How to get the dataset
+## Dataset download
 
 Update poetry
-```
+```bash
 poetry update
 ```
 
@@ -19,7 +19,7 @@ Requires [Kaggle API](https://www.kaggle.com/docs/api#authentication) token in o
 ```
 
 Run the data preparation file
-```
+```bash
 poetry run python dataPrepFull.py
 ```
 
