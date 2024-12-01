@@ -22,6 +22,8 @@ dask = "^2024.11.0"
 dask-expr = "^1.1.18"
 openai = "^1.54.5"
 python-dotenv = "^1.0.1"
+sentence-transformers = "^3.3.1"
+tf-keras = "^2.18.0"
 
 
 [build-system]

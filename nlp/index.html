@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Validation and Correction</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+</head>
+<body>
+    <h1>Text Validation and Correction Using TensorFlow.js</h1>
+    <label for="inputText">Enter your text:</label>
+    <input type="text" id="inputText" placeholder="Type something..." />
+    <button id="checkButton">Check and Correct Text</button>
+    <p id="result"></p>
+
+    <script>
+        // Load Universal Sentence Encoder model
+        async function loadModel() {
+            console.log("Loading Universal Sentence Encoder model...");
+            const model = await use.load();
+            console.log("Model loaded.");
+            return model;
+        }
+
+        // Compute cosine similarity between two vectors
+        function cosineSimilarity(vecA, vecB) {
+            // Remove the batch dimension (convert [1, 512] to [512])
+            const flatVecA = vecA.arraySync()[0];
+            const flatVecB = vecB.arraySync()[0];
+
+            // Convert the arrays back to tensors for operations
+            const tensorA = tf.tensor(flatVecA);
+            const tensorB = tf.tensor(flatVecB);
+
+            // Compute cosine similarity
+            const dotProduct = tf.dot(tensorA, tensorB).dataSync()[0];
+            const normA = tf.norm(tensorA).dataSync()[0];
+            const normB = tf.norm(tensorB).dataSync()[0];
+            return dotProduct / (normA * normB);
+        }
+
+        async function main() {
+            const model = await loadModel();
+
+            // Reference texts (predefined correct embeddings)
+            const referenceTexts = [
+                "This is a valid input.",
+                "Correct example text here.",
+                "Another example of valid text.",
+                "mkdir"
+            ];
+            const referenceEmbeddings = await Promise.all(referenceTexts.map(text => model.embed([text])));
+
+            const checkButton = document.getElementById('checkButton');
+            const resultElement = document.getElementById('result');
+
+            checkButton.addEventListener('click', async () => {
+                const inputText = document.getElementById('inputText').value;
+                if (!inputText) {
+                    resultElement.textContent = "Please enter some text!";
+                    return;
+                }
+
+                // Get embedding for input text
+                const inputEmbedding = await model.embed([inputText]);
+
+                // Calculate cosine similarity for each reference embedding
+                let maxSimilarity = -1;
+                let bestMatchText = "";
+                referenceEmbeddings.forEach((refEmbed, index) => {
+                    const similarity = cosineSimilarity(inputEmbedding, refEmbed);
+                    if (similarity > maxSimilarity) {
+                        maxSimilarity = similarity;
+                        bestMatchText = referenceTexts[index];
+                    }
+                });
+
+                // Threshold for correctness
+                const threshold = 0.8;
+
+                if (maxSimilarity >= threshold) {
+                    resultElement.textContent = `✅ Text is correct! Closest match: "${bestMatchText}" (Similarity: ${maxSimilarity.toFixed(2)})`;
+                } else {
+                    resultElement.textContent = `❌ Text is incorrect. Closest match: "${bestMatchText}" (Similarity: ${maxSimilarity.toFixed(2)})`;
+                }
+            });
+        }
+
+        main();
+    </script>
+</body>
+</html>
