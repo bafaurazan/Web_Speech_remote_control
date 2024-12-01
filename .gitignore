@@ -3,3 +3,4 @@ nlp/data/
 requirements.txt
 result/
 .env
+.ipynb_checkpoints/

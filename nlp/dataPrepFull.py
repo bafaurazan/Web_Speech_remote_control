@@ -48,10 +48,11 @@ gc.collect()
 
 # Removing duplicate columns (indexes)
 commandsDf = commandsDf.drop(columns=['Unnamed: 0'])
+commandsDf = commandsDf.drop(columns=['description'])
 
 # Removing unwanted parts of strings
-commandsDf['description'] = commandsDf['description'].str.replace(' •', '')
-commandsDf['description'] = commandsDf['description'].str.replace('•', '')
+# commandsDf['description'] = commandsDf['description'].str.replace(' •', '')
+# commandsDf['description'] = commandsDf['description'].str.replace('•', '')
 
 # Saving the data frame to a plain text file
 commandsDf.to_csv('data/clean/commandsDf.txt', sep='\t', index=False, header=False)

@@ -1,20 +1,48 @@
-# How to train the model yourself
+# Web_Speech_Remote_Control - NLP
 
-Run this python file
+The machine learning aspect of the project, which focuses on simplifying the activation of speech recognition functions by utilizing the Universal Sentence Encoder (USE), a pre-trained model for text embedding.
+The script is calculating cosine similarity between embeddings from the words provided by speech recognition (WebSpeechAPI) and the reference embeddings from the dataset. Then it displays the top 5 most similar words.
+
+
+## How to get the dataset
+
+Update poetry
 ```
-python3 modelPrep.py
+poetry update
 ```
 
-if fasttext doesn't work, install fasttext-wheel package
+Requires [Kaggle API](https://www.kaggle.com/docs/api#authentication) token in one of these directories:
+```
+~/.kaggle/kaggle.json
 
+~/.config/kaggle/kaggle.json
+```
+
+Run the data preparation file
+```
+poetry run python dataPrepFull.py
+```
+
+Used datasets:
+- [Main OSes terminal commands](https://www.kaggle.com/datasets/vaibhavdlights/linuxcmdmacos-commands)
+- [Wikipedia sentences](https://www.kaggle.com/datasets/mikeortman/wikipedia-sentences)
+- [Wikipedia plaintext 2023](https://www.kaggle.com/datasets/jjinho/wikipedia-20230701)
+
+## Testing method
+How to test the pre-trained model by itself
+
+Run python 
+
+## Useful resources
 [How to set up Jupyter Notebook Kernel in poetry environment](https://stackoverflow.com/questions/72434896/jupyter-kernel-doesnt-use-poetry-environment)
-
 
 ### To-do list:
 - [X] Poetry env instead of venv
-- [ ] Convert the model into TF (lite)
+- [X] Convert the model into TF
+- [ ] Convert the model into TF lite
 - [ ] Provide text input from webSpeech API to the embeddings in JS
-- [ ] Compute similarity of the words and fix the mistakes from input
+- [X] Compute similarity between user input and reference embeddings
+- [ ] Fix the mistakes from input (Replace with the most similar words)
 - [ ] Send the result in JSON?
 
 - [ ] Save finished model to cloud? (for easier download)

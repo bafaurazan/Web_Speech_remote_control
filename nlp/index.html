@@ -4,15 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word-by-Word Similarity Percentages</title>
+
+    <!-- Include TensorFlow.js and Universal Sentence Encoder -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+
+    <!-- Include the main JavaScript file -->
     <script src="app.js" defer></script>
 </head>
 <body>
     <h1>Word-by-Word Similarity Percentages</h1>
+    <p id="loadingStatus">Loading model and embeddings... Please wait.</p>
     <label for="inputText">Enter your text:</label>
-    <input type="text" id="inputText" placeholder="Type something..." />
-    <button id="checkButton">Check Word Similarities</button>
+    <input type="text" id="inputText" placeholder="Type something..." disabled />
+    <button id="checkButton" disabled>Check Word Similarities</button>
     <p id="result"></p>
 
     <ul id="similarityList"></ul>
