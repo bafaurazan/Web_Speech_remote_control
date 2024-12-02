@@ -31,9 +31,14 @@ Used datasets:
 ## Testing method
 How to test the pre-trained model by itself
 
-Run python 
+Run python server
+```bash
+poetry run python -m http.server
+```
 
-## Useful resources
+Then go to http://localhost:8000/
+
+### Useful resources
 [How to set up Jupyter Notebook Kernel in poetry environment](https://stackoverflow.com/questions/72434896/jupyter-kernel-doesnt-use-poetry-environment)
 
 ### To-do list:

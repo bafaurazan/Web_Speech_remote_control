@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word-by-Word Similarity Percentages</title>
 
+    <!-- Add favicon -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+
     <!-- Include TensorFlow.js and Universal Sentence Encoder -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
@@ -17,8 +20,12 @@
     <p id="loadingStatus">Loading model and embeddings... Please wait.</p>
     <label for="inputText">Enter your text:</label>
     <input type="text" id="inputText" placeholder="Type something..." disabled />
+    <button id="speechButton" disabled>🎤 Speak</button>
     <button id="checkButton" disabled>Check Word Similarities</button>
     <p id="result"></p>
+
+    <label for="outputText">Corrected Text:</label>
+    <input type="text" id="outputText" placeholder="Corrected text will appear here" readonly />
 
     <ul id="similarityList"></ul>
 </body>

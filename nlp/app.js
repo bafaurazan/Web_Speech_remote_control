@@ -1,6 +1,7 @@
 let model;
 let referenceTexts = [];
 let referenceEmbeddings = [];
+let recognition;
 
 // Load Universal Sentence Encoder model
 async function loadModel() {
@@ -12,17 +13,9 @@ async function loadModel() {
 
 // Load reference texts from a .txt file
 async function loadReferenceTexts(filePath) {
-    try {
-        const response = await fetch(filePath);
-        if (!response.ok) {
-            throw new Error(`Could not fetch ${filePath}: ${response.statusText}`);
-        }
-        const text = await response.text();
-        return text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    } catch (error) {
-        console.error("Error loading reference texts:", error);
-        return [];
-    }
+    const response = await fetch(filePath);
+    const text = await response.text();
+    return text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 }
 
 // Compute cosine similarity between two vectors
@@ -42,16 +35,20 @@ async function initialize() {
     const loadingStatus = document.getElementById('loadingStatus');
     try {
         model = await loadModel();
-      referenceTexts = await loadReferenceTexts('./data/clean/commandsDf.txt');
+        referenceTexts = await loadReferenceTexts('./data/clean/commandsDf.txt');
         console.log("Loaded reference texts:", referenceTexts);
 
         // Pre-compute reference embeddings
         referenceEmbeddings = await Promise.all(referenceTexts.map(text => model.embed([text])));
         console.log("Reference embeddings computed.");
 
-        // Enable input and button after loading
+        // Enable input, buttons, and speech recognition after loading
         document.getElementById('inputText').disabled = false;
         document.getElementById('checkButton').disabled = false;
+        document.getElementById('speechButton').disabled = false;
+
+        initializeSpeechRecognition();
+
         loadingStatus.textContent = "Model and embeddings loaded. You can now input text.";
     } catch (error) {
         console.error("Error during initialization:", error);
@@ -59,9 +56,33 @@ async function initialize() {
     }
 }
 
-// Analyze input text
+// Initialize Web Speech API
+function initializeSpeechRecognition() {
+    if (!('webkitSpeechRecognition' in window)) {
+        alert("Your browser does not support the Web Speech API.");
+        return;
+    }
+
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = 'en-US'; // Set the language
+    recognition.continuous = false; // Stop after one phrase
+    recognition.interimResults = false; // Only final results
+
+    recognition.onresult = function (event) {
+        const speechResult = event.results[0][0].transcript;
+        console.log("Recognized speech:", speechResult);
+        document.getElementById('inputText').value = speechResult; // Set the recognized text
+    };
+
+    recognition.onerror = function (event) {
+        console.error("Speech recognition error:", event.error);
+    };
+}
+
+// Analyze input text and display results
 async function analyzeText(inputText) {
     const similarityList = document.getElementById('similarityList');
+    const outputTextBox = document.getElementById('outputText');
     similarityList.innerHTML = ''; // Clear previous results
 
     if (!inputText) {
@@ -70,6 +91,7 @@ async function analyzeText(inputText) {
     }
 
     const words = inputText.split(/\s+/);
+    const correctedWords = [];
 
     for (const word of words) {
         const wordEmbedding = await model.embed([word]);
@@ -79,15 +101,24 @@ async function analyzeText(inputText) {
             return { reference: refText, similarity: similarity };
         });
 
-        // Sort by similarity (highest first) and select the top 5
-        similarities = similarities.sort((a, b) => b.similarity - a.similarity).slice(0, 5);
+        // Sort by similarity (highest first)
+        similarities = similarities.sort((a, b) => b.similarity - a.similarity);
 
+        // Get the top match
+        const bestMatch = similarities[0];
+        if (bestMatch.similarity >= 0.6) {
+            correctedWords.push(bestMatch.reference); // Replace with the best match
+        } else {
+            correctedWords.push(word); // Keep the original word
+        }
+
+        // Display top 5 similarities
         const wordResult = document.createElement('li');
         wordResult.textContent = `Word "${word}":`;
         similarityList.appendChild(wordResult);
 
         const wordList = document.createElement('ul');
-        similarities.forEach(({ reference, similarity }) => {
+        similarities.slice(0, 5).forEach(({ reference, similarity }) => {
             const percentage = (similarity * 100).toFixed(2);
             const listItem = document.createElement('li');
             listItem.textContent = `Similarity to "${reference}": ${percentage}%`;
@@ -96,6 +127,9 @@ async function analyzeText(inputText) {
 
         wordResult.appendChild(wordList);
     }
+
+    // Display corrected text
+    outputTextBox.value = correctedWords.join(' ');
 
     document.getElementById('result').textContent = `Analysis complete. Results for ${words.length} word(s).`;
 }
@@ -106,6 +140,11 @@ function setupEventHandlers() {
     checkButton.addEventListener('click', () => {
         const inputText = document.getElementById('inputText').value.trim();
         analyzeText(inputText);
+    });
+
+    const speechButton = document.getElementById('speechButton');
+    speechButton.addEventListener('click', () => {
+        recognition.start(); // Start speech recognition
     });
 }
 
