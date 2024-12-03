@@ -41,27 +41,28 @@
         <div class="main-grid-container">
             <div id="video-container">
                 <div><video id="local-video" style="float: left;" autoplay playsinline></video></div>
-                <button id="btn-toggle-audio">Audio Mute</button>
-                <button id="btn-toggle-video">video Off</button>
             </div>
 
+
+
             <div id="chat">
-                <h3>CHAT</h3>
+                <h3 class="chattext">CHAT</h3>
                 <div id="messages">
                     <ul id="message-list"></ul>
                 </div>
-
-                <div><input id="msg"><button id="btn-send-msg">Send Message</button></div>
-                
+                <div><input id="msg"><button id="btn-send-msg">Send</button></div>
             </div>
         </div>
-        <div>
+        <div id="buttons">
+            <button id="btn-toggle-audio">Audio Mute</button>
+            <button id="btn-toggle-video">Video Off</button>
             <button id="move-forward">Move Forward</button>
-            <button id="move-backward">Move Forward</button>
+            <button id="move-backward">Move Backward</button>
             <button id="btn-share-screen">Share Screen</button>
             <button id="start-record-btn">Rozpocznij nagrywanie</button>
             <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
         </div>
+        
         <div>
             <p id="recording-status"></p>
             <h2>Rozpoznany tekst:</h2>

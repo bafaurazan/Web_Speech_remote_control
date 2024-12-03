@@ -183,6 +183,14 @@ input:valid ~ .icon {
     }
 }
 
+@keyframes slideInRight {
+    from {
+        transform: translateX(50em);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -231,34 +239,49 @@ input:valid ~ .icon {
 
 
 
+.main-grid-container{
+    display: flex;           
+    width: 100%;            
+    height: auto; 
+}
 
 
+
+#video-container {
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    width: 70%; 
+    height: auto;
+}
 
 
 
 
 
 .chattext{
+    font-family: Poppins;
+    color: black;
     margin: 0 auto;
     text-shadow: 2px 2px #653778;
 }
 
-.chatbox {
-    margin-left: 78%; 
-    margin-right: 0;
-    width: 300px;
-    max-height: 600px;
+#chat {
+    margin-top:7px;
+    margin-right: 10px;
+    width:30%;
+    height: auto;
+    margin-bottom: 1em;
     border: 3px solid #000000;
     border-radius: 8px;
     padding: 10px;
-    display: flex;
+    display:flex;
     flex-direction: column;
     justify-content: space-between;
     backdrop-filter: contrast(80%);
-    animation: slideIn 0.5s ease-out; 
+    animation: slideInRight 1s ease; 
 }
 
-.chatbox-messages {
+#messages {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 10px;
@@ -267,7 +290,7 @@ input:valid ~ .icon {
     animation: fadeIn 1s forwards; 
 }
 
-.chatbox-messages p {
+.messages p {
     padding: 5px;
     margin: 0;
     border-radius: 4px;
@@ -275,49 +298,53 @@ input:valid ~ .icon {
     animation: messageFadeIn 0.5s ease-out forwards;
 }
 
-.chatbox-messages .user-message {
+.messages .user-message {
     text-align: right;
 }
 
-.chatbox-messages .system-message {
-    background-color: #c8e6c9;
+.messages .system-message {
     text-align: left;
 }
 
-.chatbox-input {
-    display: flex;
-    gap: 5px;
-}
-
-#chatInput {
+#msg {
+    margin:auto;
+    width:70%;
     flex-grow: 1;
     padding: 5px;
-    border-radius: 4px;
-    border: 2px solid #653778;
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border: 2px solid black;
+    border-right: none;
     transition: border 0.3s ease;
+    backdrop-filter: blur(10px);
+    background:none;
 }
 
-#chatInput:focus {
-    border-color: #653778;
-}
-
-#sendButton {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 4px;
+#btn-send-msg {
+    margin-right:auto;
+    width:30%;
+    padding: 5px;
+    border: 2px solid black;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
     background: linear-gradient(135deg, #653778 , #4b215d);;
     color: #000;
     cursor: pointer;
     transition: transform 0.2s ease;
 }
 
-#sendButton:hover {
+#btn-send-msg:hover {
     background-color: rgba(0, 0, 0, 0.3);
     transform: scale(1.1);
 }
 
 
-
+#buttons {
+    margin: auto;
+    width:70%;
+    border: 3px solid black;
+    border-radius: 4px;
+}
 
 
 
@@ -328,31 +355,12 @@ h3 {
     color: #4a4a7a;
 }
 
-.main-grid-container {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-    width: 90%;
-    max-width: 1200px;
-    margin: 20px auto;
-}
-
-#video-container {
-    background-color: #fff;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-#local-video {
-    width: 100%;
-    max-width: 500px;
+video {
+    margin:7px;
+    width: 32em;
+    border: 3px solid black;
     border-radius: 10px;
     background-color: #000;
-    margin-bottom: 10px;
 }
 
 #btn-toggle-audio,
@@ -370,47 +378,6 @@ h3 {
 #btn-toggle-audio:hover,
 #btn-toggle-video:hover {
     background-color: #0056b3;
-}
-
-#chat {
-    background-color: #fff;
-    padding: 20px;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-#messages {
-    max-height: 300px;
-    overflow-y: auto;
-    margin-bottom: 15px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    padding: 10px;
-    background-color: #f9f9f9;
-}
-
-#message-list {
-    list-style: none;
-}
-
-#msg {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    width: calc(100% - 110px);
-    margin-right: 10px;
-}
-
-#btn-send-msg {
-    padding: 10px 20px;
-    background-color: #28a745;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
 }
 
 #btn-share-screen {
