@@ -9,6 +9,7 @@
 body {
     font-family: Poppins;
     background-image: url('/static/images/background.png');
+    background-color: #130d27;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -140,15 +141,29 @@ input:valid + label {
 }
 
 
-label {
-    position: absolute;
-    left: 40px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1rem;
+input::placeholder {
+    font-family: Poppins;
     color: black;
-    pointer-events: none;
-    transition: 0.3s;
+    transition: opacity 0.3s ease, font-size 0.3s ease, transform 0.3s ease;
+}
+
+input:focus::placeholder,
+input:not(:placeholder-shown)::placeholder {
+    opacity: 1;
+    font-size: 0.75rem;
+    transform: translateX(+20em);
+}
+
+/* When the input is focused, apply the animation */
+input:focus::placeholder {
+    animation: placeholderMoveUp 0.3s forwards;
+}
+
+input:focus + label,
+input:not(:placeholder-shown) + label {
+    top: -30px; /* Moves the label up */
+    font-size: 0.75rem; /* Makes the label smaller */
+    color: black;
 }
 
 input:focus ~ .icon,
