@@ -30,6 +30,7 @@ body {
     margin: 0;
     text-align:center;
     text-shadow: 2px 2px #653778;
+    animation: fadeIn 2s ease;
 }
 
 .icon {
@@ -44,6 +45,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    animation: fadeIn 2s ease;
 }
 
 #login{
@@ -191,6 +193,14 @@ input:valid ~ .icon {
         transform: translateX(0);
     }
 }
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-50em);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -254,8 +264,20 @@ input:valid ~ .icon {
     height: auto;
 }
 
-
-
+#przyciski {
+    display: flex;
+    margin: auto;
+    width: auto;
+    height: 3em;
+    margin-top: 7px;
+    margin-right: 10px;
+    border: 3px solid black;
+    border-radius: 8px;
+}
+#right_panel {
+    width: 30%;
+    margin-bottom:1em;
+}
 
 
 .chattext{
@@ -266,11 +288,11 @@ input:valid ~ .icon {
 }
 
 #chat {
+    
     margin-top:7px;
     margin-right: 10px;
-    width:30%;
+    width: auto;
     height: auto;
-    margin-bottom: 1em;
     border: 3px solid #000000;
     border-radius: 8px;
     padding: 10px;
@@ -361,6 +383,7 @@ video {
     border: 3px solid black;
     border-radius: 10px;
     background-color: #000;
+    animation: slideInLeft 1s ease; 
 }
 
 #btn-toggle-audio,

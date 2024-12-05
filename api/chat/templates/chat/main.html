@@ -15,7 +15,7 @@
 </head>
 <body>
     <header>
-        <h2 class="title">Web Speech Remote Control</h2>
+        <h1 class="title">Web Speech Remote Control</h1>
     </header>
     <div class="loginbox1">
         <div id="login">
@@ -42,16 +42,21 @@
             <div id="video-container">
                 <div><video id="local-video" style="float: left;" autoplay playsinline></video></div>
             </div>
-
-
-
-            <div id="chat">
-                <h3 class="chattext">CHAT</h3>
-                <div id="messages">
-                    <ul id="message-list"></ul>
+            
+            <div id="right_panel">
+                <div id="przyciski">
+                    <button id="btn-toggle-audio">Audio Mute</button>
+                    <button id="btn-toggle-video">Video Off</button>
                 </div>
-                <div><input id="msg"><button id="btn-send-msg">Send</button></div>
+                <div id="chat">
+                    <h3 class="chattext">CHAT</h3>
+                    <div id="messages">
+                        <ul id="message-list"></ul>
+                    </div>
+                    <div><input id="msg"><button id="btn-send-msg">Send</button></div>
+                </div>
             </div>
+
         </div>
         <div id="buttons">
             <button id="btn-toggle-audio">Audio Mute</button>
