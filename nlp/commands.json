@@ -1,0 +1,3 @@
+{
+  "commands": ["open", "close", "play", "stop", "pause", "start"]
+}

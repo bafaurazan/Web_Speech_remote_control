@@ -47,8 +47,8 @@ Then go to http://localhost:8000/
 - [ ] Convert the model into TF lite
 - [ ] Provide text input from webSpeech API to the embeddings in JS
 - [X] Compute similarity between user input and reference embeddings
-- [ ] Fix the mistakes from input (Replace with the most similar words)
-- [ ] Send the result in JSON?
+- [X] Fix the mistakes from input (Replace with the most similar words)
+- [ ] ~~Send the result in JSON?~~
 
 - [ ] Save finished model to cloud? (for easier download)
 - [ ] [Convert notebook into a single python file](https://stackoverflow.com/questions/17077494/how-do-i-convert-a-ipython-notebook-into-a-python-file-via-commandline)

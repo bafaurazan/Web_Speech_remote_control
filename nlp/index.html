@@ -8,12 +8,11 @@
     <!-- Add favicon -->
     <link rel="icon" href="favicon.ico" type="image/x-icon">
 
-    <!-- Include TensorFlow.js and Universal Sentence Encoder -->
+    <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
 
-    <!-- Include the main JavaScript file -->
-    <script src="app.js" defer></script>
+    <!-- Load custom NLP logic as an ES Module -->
+    <script type="module" src="nlp.js"></script>
 </head>
 <body>
     <h1>Word-by-Word Similarity Percentages</h1>
