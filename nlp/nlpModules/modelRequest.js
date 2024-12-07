@@ -24,10 +24,10 @@ export function sendRequest(prompt) {
       return response.json();
     })
     .then((data) => {
-      const specificElement = data.response;
+      const commandActivator = data.response + selectedVehicle;
 
       if (specificElement !== "unknown_command") {
-        console.log(specificElement + selectedVehicle);
+        console.log(commandActivator);
       }
     })
     .catch((error) => {
