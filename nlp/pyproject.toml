@@ -6,7 +6,7 @@ authors = ["sand194 <piasekj1602@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12, <3.13"
 kagglehub = "^0.3.4"
 dask = "^2024.11.2"
 pandas = "^2.2.3"
@@ -15,6 +15,12 @@ pyarrow = "^18.1.0"
 ipython = "^8.30.0"
 jupyter = "^1.1.1"
 ipykernel = "^6.29.5"
+numpy = "1.26.0"
+tensorflow = "^2.18.0"
+transformers = "^4.47.0"
+tf-keras = "^2.18.0"
+black = "^24.10.0"
+ruff = "^0.8.2"
 
 
 [build-system]
