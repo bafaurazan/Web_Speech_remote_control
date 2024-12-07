@@ -47,35 +47,69 @@
                 <div id="przyciski">
                     <button id="btn-toggle-audio">Audio Mute</button>
                     <button id="btn-toggle-video">Video Off</button>
+                    <button id="btn-share-screen">Share Screen</button>
+                    <button id="btn-chat">Chat</button>
+                    <button id="btn-buttons-rover">Rover</button>
+                    <button id="btn-buttons-drone">Drone</button>
                 </div>
-                <div id="chat">
+
+                <div class id="chat">
                     <h3 class="chattext">CHAT</h3>
                     <div id="messages">
                         <ul id="message-list"></ul>
                     </div>
-                    <div><input id="msg"><button id="btn-send-msg">Send</button></div>
+                    <div>
+                        <input id="msg"><button id="btn-send-msg">Send</button>
+                    </div>
+                </div>
+                
+                <div id="buttons-drone" class="hidden">
+                    <div id="drone-control-panel">
+                        <button id="drone-btn-start">Start</button>
+                        <button id="drone-btn-forward">Przód</button>
+                        <button id="drone-btn-up">Do Góry</button> 
+                    
+                        <button id="drone-btn-left">Lewo</button>
+                        <button id="drone-btn-speed-up">Przyspiesz</button>
+                        <button id="drone-btn-right">Prawo</button>
+                    
+                        <button id="drone-btn-stop">Stop</button>
+                        <button id="drone-btn-backward">Tył</button>
+                        <button id="drone-btn-down">Do Dołu</button>
+                    </div>  
+                </div>
+
+                <div id="buttons-rover" class="hidden">
+                    <div id="rover-control-panel">
+                        <button id="rover-btn-start">Start</button>
+                        <button id="rover-btn-forward">Przód</button>
+                        <p></p>
+                    
+                        <button id="rover-btn-left">Lewo</button>
+                        <button id="rover-btn-speed-up">Przyspiesz</button>
+                        <button id="rover-btn-right">Prawo</button>
+                    
+                        <button id="rover-btn-stop">Stop</button>
+                        <button id="rover-btn-backward">Tył</button>
+                        <p></p>
+                    </div>  
                 </div>
             </div>
 
         </div>
         <div id="buttons">
-            <button id="btn-toggle-audio">Audio Mute</button>
-            <button id="btn-toggle-video">Video Off</button>
-            <button id="move-forward">Move Forward</button>
-            <button id="move-backward">Move Backward</button>
-            <button id="btn-share-screen">Share Screen</button>
             <button id="start-record-btn">Rozpocznij nagrywanie</button>
             <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
-        </div>
-        
-        <div>
-            <p id="recording-status"></p>
-            <h2>Rozpoznany tekst:</h2>
-            <p id="recognized-text"></p>
+            <div>
+                <p id="recording-status"></p>
+                <h2>Rozpoznany tekst:</h2>
+                <p id="recognized-text"></p>
+            </div>
         </div>
     </div>
     <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/buttons.js' %}"></script>
 </body>
 </html>

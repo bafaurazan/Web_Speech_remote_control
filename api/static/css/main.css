@@ -6,6 +6,11 @@
 }
 
 /* Ogólny styl strony */
+
+.hidden {
+    display: none;
+}
+
 body {
     font-family: Poppins;
     background-image: url('/static/images/background.png');
@@ -271,24 +276,42 @@ input:valid ~ .icon {
     height: 3em;
     margin-top: 7px;
     margin-right: 10px;
-    border: 3px solid black;
-    border-radius: 8px;
 }
 #right_panel {
+    display: flex;
+    flex-direction: column; 
     width: 30%;
     margin-bottom:1em;
 }
 
+#rover-control-panel, #drone-control-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 kolumny */
+    gap: 10px; /* Odstęp między przyciskami */
+    width: 300px; /* Szerokość całego panelu */
+    margin: auto;
+    padding: 10px;
+    border-radius: 10px;
+}
 
-.chattext{
-    font-family: Poppins;
-    color: black;
-    margin: 0 auto;
-    text-shadow: 2px 2px #653778;
+#rover-control-panel button, #drone-control-panel button {
+    padding: 10px;
+    border: 3px solid black;
+    background: linear-gradient(135deg, #653778 , #4b215d);
+    border-radius: 8px;
+    background-color: #e0e0e0;
+    font-size: 14px;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+#rover-control-panel button:hover, #drone-control-panel button:hover {
+    background-color: #d0d0d0;
 }
 
 #chat {
-    
+    max-height:327.6px;
+    flex: 1;
     margin-top:7px;
     margin-right: 10px;
     width: auto;
@@ -303,6 +326,13 @@ input:valid ~ .icon {
     animation: slideInRight 1s ease; 
 }
 
+.chattext{
+    font-family: Poppins;
+    color: black;
+    margin: 0 auto;
+    text-shadow: 2px 2px #653778;
+}
+
 #messages {
     flex-grow: 1;
     overflow-y: auto;
@@ -312,7 +342,8 @@ input:valid ~ .icon {
     animation: fadeIn 1s forwards; 
 }
 
-.messages p {
+.messages p {    
+    overflow-y: auto;
     padding: 5px;
     margin: 0;
     border-radius: 4px;
@@ -349,7 +380,7 @@ input:valid ~ .icon {
     border: 2px solid black;
     border-top-right-radius: 4px;
     border-bottom-right-radius: 4px;
-    background: linear-gradient(135deg, #653778 , #4b215d);;
+    background: linear-gradient(135deg, #653778 , #4b215d);
     color: #000;
     cursor: pointer;
     transition: transform 0.2s ease;
@@ -366,6 +397,8 @@ input:valid ~ .icon {
     width:70%;
     border: 3px solid black;
     border-radius: 4px;
+    backdrop-filter: contrast(80%);
+    padding:10px;
 }
 
 
@@ -387,44 +420,34 @@ video {
 }
 
 #btn-toggle-audio,
-#btn-toggle-video {
-    padding: 10px 20px;
-    margin: 5px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
+#btn-toggle-video,
+#btn-share-screen,
+#btn-chat,
+#btn-buttons-drone,
+#btn-buttons-rover {
+    background: linear-gradient(135deg, #653778 , #4b215d);
+    width:100%;
+    margin:1px;
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    padding: 10px; 
+    border-radius:8px;
+    border: 3px solid #000;
+    background-color: #f0f0f0; 
+    cursor: pointer; 
 }
 
 #btn-toggle-audio:hover,
-#btn-toggle-video:hover {
-    background-color: #0056b3;
+#btn-toggle-video:hover,
+#btn-share-screen:hover,
+#btn-chat:hover,
+#btn-buttons-drone:hover,
+#btn-buttons-rover:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);
 }
 
-#btn-share-screen {
-    margin-top: 10px;
-    padding: 10px 20px;
-    background-color: #17a2b8;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-}
-
-/* Przyciski ruchu */
-#move-forward,
-#move-backward {
-    padding: 10px 20px;
-    background-color: #ffc107;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin: 10px;
-}
-
-/* Sekcja nagrywania */
 #start-record-btn,
 #stop-record-btn {
     padding: 10px 20px;
