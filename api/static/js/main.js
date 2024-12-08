@@ -172,6 +172,13 @@ function sendMsgOnClick(){
     messageInput.value = '';
 }
 
+messageInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        btnSendMsg.click();
+    }
+});
+
 var moveForward = document.querySelector('#move-forward');
 
 moveForward.addEventListener('click', sendToRobotForward);

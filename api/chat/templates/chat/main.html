@@ -15,23 +15,25 @@
 </head>
 <body>
     <header>
-        <h2 class="title">Web Speech Remote Control</h2>
+        <h1 class="title">Web Speech Remote Control</h1>
     </header>
-    <div id="login">
-        <form id="form-join">
-            <h1 id="logintext">Login</h1>
-            <label for="username">Username:</label>
-            <input id="username" type="text" required>
-            <div id="loginbox">
-                <label for="password">Password:</label>
-                <img src="/static/images/lock-closed.svg" class="icon">
-                <input id="password" type="password" required>
-            </div>
-            <div id="buttonbox">
-                <button type="submit" id="btn-join">Login</button>
-            </div>
-        </form>
-        <p class="title"></p>
+    <div class="loginbox1">
+        <div id="login">
+            <form id="form-join">
+                <h1 id="logintext">Login</h1>
+                <div id="loginbox">
+                    <img src="/static/images/person-circle.svg" class="icon">
+                    <input id="username" type="text" placeholder="Username" required autocomplete="off">
+                </div>
+                <div id="loginbox">
+                    <img src="/static/images/lock-closed.svg" class="icon">
+                    <input id="password" type="password" placeholder="Password" required>
+                </div>
+                <div id="buttonbox">
+                    <button type="submit" id="btn-join">Login</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <div id="mainContent" style="display: none;">
@@ -39,38 +41,75 @@
         <div class="main-grid-container">
             <div id="video-container">
                 <div><video id="local-video" style="float: left;" autoplay playsinline></video></div>
-                <button id="btn-toggle-audio">Audio Mute</button>
-                <button id="btn-toggle-video">video Off</button>
             </div>
-
-            <div id="chat">
-                <h3>CHAT</h3>
-                <div id="messages">
-                    <ul id="message-list"></ul>
+            
+            <div id="right_panel">
+                <div id="przyciski">
+                    <button id="btn-toggle-audio">Audio Mute</button>
+                    <button id="btn-toggle-video">Video Off</button>
+                    <button id="btn-share-screen">Share Screen</button>
+                    <button id="btn-chat">Chat</button>
+                    <button id="btn-buttons-rover">Rover</button>
+                    <button id="btn-buttons-drone">Drone</button>
                 </div>
 
-                <div><input id="msg"><button id="btn-send-msg">Send Message</button></div>
+                <div class id="chat">
+                    <h3 class="chattext">CHAT</h3>
+                    <div id="messages">
+                        <ul id="message-list"></ul>
+                    </div>
+                    <div>
+                        <input id="msg"><button id="btn-send-msg">Send</button>
+                    </div>
+                </div>
                 
+                <div id="buttons-drone" class="hidden">
+                    <div id="drone-control-panel">
+                        <button id="drone-btn-start">Start</button>
+                        <button id="drone-btn-forward">Przód</button>
+                        <button id="drone-btn-up">Do Góry</button> 
+                    
+                        <button id="drone-btn-left">Lewo</button>
+                        <button id="drone-btn-speed-up">Przyspiesz</button>
+                        <button id="drone-btn-right">Prawo</button>
+                    
+                        <button id="drone-btn-stop">Stop</button>
+                        <button id="drone-btn-backward">Tył</button>
+                        <button id="drone-btn-down">Do Dołu</button>
+                    </div>  
+                </div>
+
+                <div id="buttons-rover" class="hidden">
+                    <div id="rover-control-panel">
+                        <button id="rover-btn-start">Start</button>
+                        <button id="rover-btn-forward">Przód</button>
+                        <p></p>
+                    
+                        <button id="rover-btn-left">Lewo</button>
+                        <button id="rover-btn-speed-up">Przyspiesz</button>
+                        <button id="rover-btn-right">Prawo</button>
+                    
+                        <button id="rover-btn-stop">Stop</button>
+                        <button id="rover-btn-backward">Tył</button>
+                        <p></p>
+                    </div>  
+                </div>
             </div>
+
         </div>
-        <div>
-            <button id="move-forward">Move Forward</button>
-            <button id="move-backward">Move Forward</button>
-        </div>
-        <div>
+        <div id="buttons">
             <button id="start-record-btn">Rozpocznij nagrywanie</button>
             <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
-            <p id="recording-status"></p>
-            <h2>Rozpoznany tekst:</h2>
-            <p id="recognized-text"></p>
-            <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+            <div>
+                <p id="recording-status"></p>
+                <h2>Rozpoznany tekst:</h2>
+                <p id="recognized-text"></p>
+            </div>
         </div>
-    
-        <button id="btn-share-screen">Share Screen</button>
-
-        <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
-    
     </div>
+    <script type="text/javascript" src="{% static 'js/webSpeechApi.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
+    <script type="text/javascript" src="{% static 'js/buttons.js' %}"></script>
 </body>
 </html>
