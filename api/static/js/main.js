@@ -179,7 +179,7 @@ messageInput.addEventListener('keypress', function(event) {
     }
 });
 
-var moveForward = document.querySelector('#move-forward');
+var moveForward = document.querySelector('.move-forward');
 
 moveForward.addEventListener('click', sendToRobotForward);
 
@@ -200,7 +200,7 @@ function sendToRobotForward(){
     }
 }
 
-var moveBackward = document.querySelector('#move-backward');
+var moveBackward = document.querySelector('.move-backward');
 
 moveBackward.addEventListener('click', sendToRobotBackward);
 
