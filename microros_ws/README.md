@@ -1,4 +1,4 @@
-# Setup Micro-ros
+# Setup Micro-ros for serial (old-version)
 
 ## After cloning repository
 
@@ -41,7 +41,7 @@ ros2 run micro_ros_setup build_firmware.sh
 ros2 run micro_ros_setup flash_firmware.sh
 ```
 
-#### for wifi version not serial
+# Setup Micro-ros for wifi (new/actual-version)
 
 
 [follow instruction in this tutorial](https://robofoundry.medium.com/esp32-micro-ros-actually-working-over-wifi-and-udp-transport-519a8ad52f65)
@@ -80,6 +80,27 @@ sudo chmod 666 /dev/ttyUSB0
 docker run -it --rm --user espidf --volume="/etc/timezone:/etc/timezone:ro" -v  $(pwd):/micro_ros_espidf_component -v  /dev:/dev --privileged --workdir /micro_ros_espidf_component microros/esp-idf-microros:latest /bin/bash  -c "cd examples/int32_publisher; idf.py menuconfig build flash monitor"
 
 docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
+```
+
+## my tests
+
+#### prepare
+```
+cd microros_ws
+
+cp -r blink_wifi/ ~/dev/esp32/microROS/micro_ros_espidf_component/examples
+```
+
+```
+cd ~/dev/esp32/microROS/micro_ros_espidf_component
+
+ls -l /dev/ttyUSB0
+sudo chmod 666 /dev/ttyUSB0
+
+sudo docker run -it --rm --user espidf --volume="/etc/timezone:/etc/timezone:ro" -v  $(pwd):/micro_ros_espidf_component -v  /dev:/dev --privileged --workdir /micro_ros_espidf_component microros/esp-idf-microros:latest /bin/bash  -c "cd examples/blink_wifi; idf.py menuconfig build flash monitor"
+
+sudo docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
+
 ```
 
 ### create and build micro-agent
