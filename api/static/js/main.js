@@ -172,7 +172,14 @@ function sendMsgOnClick(){
     messageInput.value = '';
 }
 
-var moveForward = document.querySelector('#move-forward');
+messageInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        btnSendMsg.click();
+    }
+});
+
+var moveForward = document.querySelector('.move-forward');
 
 moveForward.addEventListener('click', sendToRobotForward);
 
@@ -193,7 +200,7 @@ function sendToRobotForward(){
     }
 }
 
-var moveBackward = document.querySelector('#move-backward');
+var moveBackward = document.querySelector('.move-backward');
 
 moveBackward.addEventListener('click', sendToRobotBackward);
 

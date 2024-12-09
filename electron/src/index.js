@@ -81,6 +81,9 @@ app.on("ready", () => {
         ipcMain.on('move-forward', () => blink(1));
         ipcMain.on('move-backward', () => blink(0));
 
+        ipcMain.on('start_rover', () => blink(1));
+        ipcMain.on('stop_rover', () => blink(0));
+
         rclnodejs.spin(node);
     }).catch(console.error);
 });
