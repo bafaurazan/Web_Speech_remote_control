@@ -1,0 +1,10 @@
+{
+    "forward": "forward_",
+    "left": "left_",
+    "right": "right_",
+    "backward": "backward_",
+    "start": "start_",
+    "stop": "stop_",
+    "up": "up_",
+    "down": "down_"
+}

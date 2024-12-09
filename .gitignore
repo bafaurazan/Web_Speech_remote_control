@@ -1,0 +1,11 @@
+nlp_venv/
+data/
+requirements.txt
+result/
+.env
+.ipynb_checkpoints/
+node_modules/
+Modelfile
+package.json
+package-lock.json
+.ruff_cache/
