@@ -26,7 +26,7 @@ export function sendRequest(prompt) {
     .then((data) => {
       const commandActivator = data.response + selectedVehicle;
 
-      if (specificElement !== "unknown_command") {
+      if (data.response !== "unknown_command") {
         console.log(commandActivator);
       }
     })
