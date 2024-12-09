@@ -459,6 +459,16 @@ video {
     cursor: pointer;
 }
 
+#sendRequest {
+    padding: 10px 20px;
+    margin: 10px;
+    background-color: #FF5733 ;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
 #stop-record-btn:disabled {
     background-color: #b3b3b3;
     cursor: not-allowed;

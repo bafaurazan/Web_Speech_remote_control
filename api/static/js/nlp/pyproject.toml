@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "nlp"
+version = "0.1.0"
+description = "Machine Learning Natural Language Processing used in this project to match correct words transcribed by Speech to Text"
+authors = ["sand194 <piasekj1602@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12, <3.13"
+kagglehub = "^0.3.4"
+dask = "^2024.11.2"
+pandas = "^2.2.3"
+fastparquet = "^2024.11.0"
+pyarrow = "^18.1.0"
+ipython = "^8.30.0"
+jupyter = "^1.1.1"
+ipykernel = "^6.29.5"
+numpy = "1.26.0"
+tensorflow = "^2.18.0"
+transformers = "^4.47.0"
+tf-keras = "^2.18.0"
+black = "^24.10.0"
+ruff = "^0.8.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
