@@ -221,6 +221,46 @@ function sendToRobotBackward(){
     }
 }
 
+var moveRight = document.querySelector('#rover-btn-right');
+
+moveRight.addEventListener('click', sendToRobotRight);
+
+function sendToRobotRight(){
+    var message = "rover_right";
+    console.log("wysłane dane dla robota: ", message);
+    
+    var dataChannels = getDataChannels();
+
+    var dataToSend = {
+        username: username,
+        message: message
+    };
+    var jsonMessage = JSON.stringify(dataToSend);
+
+    for(index in dataChannels){
+        dataChannels[index].send(jsonMessage);
+    }
+}
+var moveLeft = document.querySelector('#rover-btn-left');
+
+moveLeft.addEventListener('click', sendToRobotLeft);
+
+function sendToRobotLeft(){
+    var message = "rover_left";
+    console.log("wysłane dane dla robota: ", message);
+    
+    var dataChannels = getDataChannels();
+
+    var dataToSend = {
+        username: username,
+        message: message
+    };
+    var jsonMessage = JSON.stringify(dataToSend);
+
+    for(index in dataChannels){
+        dataChannels[index].send(jsonMessage);
+    }
+}
 function sendSignal(action, message){
     var jsonStr = JSON.stringify({
         'peer': username,

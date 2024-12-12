@@ -84,6 +84,43 @@ app.on("ready", () => {
         ipcMain.on('start_rover', () => blink(1));
         ipcMain.on('stop_rover', () => blink(0));
 
+        const rover_node = new rclnodejs.Node('turtle_controller');
+        
+        // Tworzymy publisher dla topicu /turtle1/cmd_vel
+        const rover_pub_left = rover_node.createPublisher('geometry_msgs/msg/Twist', '/diff_drive_controller_left/cmd_vel_unstamped');
+        const rover_pub_right = rover_node.createPublisher('geometry_msgs/msg/Twist', '/diff_drive_controller_right/cmd_vel_unstamped');
+
+        // Definiujemy funkcję do kontrolowania żółwia
+        function moveRoverLeft(linear, angular) {
+            const twist = {
+                linear: { x: linear, y: 0, z: 0 },
+                angular: { x: 0, y: 0, z: angular }
+            };
+            rover_pub_left.publish(twist);
+        }
+        function moveRoverRight(linear, angular) {
+            const twist = {
+                linear: { x: linear, y: 0, z: 0 },
+                angular: { x: 0, y: 0, z: angular }
+            };
+            rover_pub_right.publish(twist);
+        }
+
+        function moveRover(linear, angular) {
+            moveRoverLeft(linear, angular);  // Uruchamiamy lewą stronę
+            moveRoverRight(linear, angular); // Uruchamiamy prawą stronę
+        }
+
+        // Obsługa eventów do ruchu żółwia na podstawie przycisków
+        ipcMain.on('move-forward', () => moveRover(2, 0));
+        ipcMain.on('rover_right', () => moveRoverLeft(1, 0));
+        ipcMain.on('rover_left', () => moveRoverRight(1, 0));
+        ipcMain.on('move-backward', () => moveRover(0, 0));
+
+        ipcMain.on('move-backward', () => moveTurtle(-1, 0));
+        ipcMain.on('turn-right', () => moveTurtle(0, 1));
+        ipcMain.on('turn-left', () => moveTurtle(0, -1));
+
         rclnodejs.spin(node);
     }).catch(console.error);
 });
