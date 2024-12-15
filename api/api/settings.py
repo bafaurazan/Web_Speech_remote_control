@@ -32,6 +32,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,6 +55,25 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+"""CORS_ALLOWED_ORIGINS = [
+    'https://rafal.tail43fbf9.ts.net',
+    'https://5fe8-37-31-36-99.ngrok-free.app',  # Allow this origin
+]"""
+
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_METHODS = [
+    'GET', 'POST', 'PUT', 'DELETE', 'OPTIONS',  # Allow these HTTP methods
+]
+
+CORS_ALLOW_HEADERS = [
+    'content-type', 'authorization', 'accept', 'origin', 'x-requested-with', 'ngrok-skip-browser-warning'
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CORS_ALLOW_CREDENTIALS = True
 
 ROOT_URLCONF = 'api.urls'
 
