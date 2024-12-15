@@ -41,3 +41,18 @@ def api_generate_view(request):
 
     # Jeśli metoda nie jest POST, zwróć błąd
     return JsonResponse({"error": "Invalid request method"}, status=400)
+
+@csrf_exempt
+def api_generate_audio(request):
+    if request.method == "POST":
+        try:
+            # Pobranie danych przesłanych w żądaniu POST
+            data = json.loads(request.body)  # Parsowanie JSON z ciała żądania
+            # Zdefiniowanie endpointu, na który dane będą wysyłane
+            return JsonResponse(data)
+        except Exception as e:
+            # Obsługa wyjątków i zwrócenie błędu
+            return JsonResponse({"error": str(e)}, status=500)
+
+    # Jeśli metoda nie jest POST, zwróć błąd
+    return JsonResponse({"error": "Invalid request method"}, status=400)

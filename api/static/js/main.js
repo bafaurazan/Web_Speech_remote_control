@@ -10,9 +10,25 @@ var title = document.querySelector('.title');
 
 var username;
 var webSocket;
+var glob;
+var startRecordBtn2 = document.querySelector('#start-record-btn');
+var startRecordBtn3 = document.querySelector('#stop-record-btn');
 
 function webSocketOnMessage(event) {
+    console.log(event.data)
     var parsedData = JSON.parse(event.data);
+    console.log(parsedData.message.content);
+
+    if(parsedData.message.content == "post_start"){
+        startRecordBtn2.click();
+
+    }
+    else if(parsedData.message.content == "post_end"){
+        startRecordBtn3.click();
+        
+    }
+
+    glob = parsedData.message.content;
 
     var peerUsername = parsedData['peer'];
     var action = parsedData['action'];
@@ -387,6 +403,7 @@ function addLocalTracks(peer){
     return;
 }
 
+
 function dcOnMessage(event){
     console.log("Received message: ", event.data);  // Dodaj to dla sprawdzenia co jest odbierane.
     var data = JSON.parse(event.data);
@@ -400,6 +417,15 @@ function dcOnMessage(event){
     }
     else if(message == "move-backward"){
         console.log("wysłane dane do robota: ", message);
+    }
+    else if(message == "post_start" || glob == "post_start"){
+        startRecordBtn2.click();
+        console.log("start_posted")
+        console.log("to jest glob", glob)
+    }
+    else if(message == "post_end"){
+        startRecordBtn3.click();
+        console.log("end_posted")
     }
     else{
         var li = document.createElement('li');
