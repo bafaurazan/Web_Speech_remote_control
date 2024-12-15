@@ -16,7 +16,7 @@ var startRecordBtn3 = document.querySelector('#stop-record-btn');
 
 function sendR(prompt) {
     const url = "https://5fe8-37-31-36-99.ngrok-free.app/query";
-
+    console.log("sendR sie wysłał")
     const data = {
       input: prompt,
     };
