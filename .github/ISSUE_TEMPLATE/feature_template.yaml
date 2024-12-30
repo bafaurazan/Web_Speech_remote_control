@@ -1,0 +1,34 @@
+name: Issue Template
+description: Create issue with this template
+title: "[Feature]: "
+labels: ["Trzeba Zapierdalać"]
+assignees:
+  - octocat
+body:
+  - type: markdown
+    attributes:
+      value: Field all required fields and provide as much detail as possible. If you have any questions, please reach out on our [Discord](https://discord.gg/9qysMJGKym).
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Context
+      description: Briefly summarize the new feature you’re proposing.
+      placeholder: Provide a short and clear description what this feature is about.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Describe the conditions that must be met for this feature to be considered complete.
+      placeholder: Provide a list of criteria that must be met for this feature to be considered complete.
+    validations:
+      required: true
+  - type: textarea
+    id: resources
+    attributes:
+      label: Resources
+      description: Provide any additional resources that might help with the implementation of this feature.
+      placeholder: Create list of resources that might help with the implementation of this feature.
+    validations:
+      required: true
