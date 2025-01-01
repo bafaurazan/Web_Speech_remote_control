@@ -34,10 +34,10 @@ let roverControlActive = false; // Zmienna przechowująca stan sterowania
 btnRoverControl.addEventListener('click', () => {
     roverControlActive = !roverControlActive; // Zmieniamy stan sterowania
     if (roverControlActive) {
-        btnRoverControl.textContent = "Wyłącz sterowanie łazikiem"; // Zmieniamy tekst przycisku
+        btnRoverControl.textContent = "Stop Rover keyboard control"; // Zmieniamy tekst przycisku
         console.log("Sterowanie łazikiem włączone");
     } else {
-        btnRoverControl.textContent = "Włącz sterowanie łazikiem"; // Zmieniamy tekst przycisku
+        btnRoverControl.textContent = "Start Rover keyboard control"; // Zmieniamy tekst przycisku
         console.log("Sterowanie łazikiem wyłączone");
     }
 });

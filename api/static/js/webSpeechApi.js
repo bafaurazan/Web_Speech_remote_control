@@ -1,7 +1,8 @@
-const startRecordBtn = document.getElementById('start-record-btn');
-const stopRecordBtn = document.getElementById('stop-record-btn');
 const recordingStatus = document.getElementById('recording-status');
 const recognizedText = document.getElementById('recognized-text');
+
+const MyRecordBtn = document.getElementById('my-record-btn');
+let isRecognizing = false; // Toggle state to track if recognition is active
 
 // Sprawdzenie dostępności Web Speech API
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -83,16 +84,18 @@ if (!SpeechRecognition) {
     recognition.onend = function() {
         recordingStatus.textContent = 'Nagrywanie zakończone.';
     };
-
-    startRecordBtn.onclick = function() {
+    
+    MyRecordBtn.addEventListener('click', () => {
+      if (!isRecognizing) {
+        recognition.isRecognizing = true; // Ensure recognition keeps running
         recognition.start();
-        startRecordBtn.disabled = true;
-        stopRecordBtn.disabled = false;
-    };
-
-    stopRecordBtn.onclick = function() {
+        isRecognizing = true;
+        MyRecordBtn.textContent = 'Stop Speech Recognition';
+      } else {
+        recognition.isRecognizing = false;
         recognition.stop();
-        startRecordBtn.disabled = false;
-        stopRecordBtn.disabled = true;
-    };
+        isRecognizing = false;
+        MyRecordBtn.textContent = 'Start Speech Recognition';
+      }
+    });
 }
