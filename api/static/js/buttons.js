@@ -51,28 +51,31 @@ document.addEventListener('keydown', (event) => {
     switch (key) {
         case 'q': // Start
             document.getElementById('rover-btn-start').click();
+            console.log('Pressed: q - start');
             break;
         case 'w': // Przód
             document.getElementById('rover-btn-forward').click();
-            console.log('rover_forward');
+            console.log('Pressed: w - forward');
             break;
         case 'e': // Stop
             document.getElementById('rover-btn-stop').click();
+            console.log('Pressed: e - stop');
             break;
         case 'a': // Lewo
             document.getElementById('rover-btn-left').click();
-            console.log('rover_left');
-
+            console.log('Pressed: a - left');
             break;
         case 's': // Tył
             document.getElementById('rover-btn-backward').click();
+            console.log('Pressed: s - backward');
             break;
         case 'd': // Prawo
             document.getElementById('rover-btn-right').click();
-            console.log('rover_right');
+            console.log('Pressed: d - right');
             break;
         case 'r': // Przyspiesz
             document.getElementById('rover-btn-speed-up').click();
+            console.log('Pressed: r - speed up');
             break;
         default:
             // Inne klawisze - brak akcji
