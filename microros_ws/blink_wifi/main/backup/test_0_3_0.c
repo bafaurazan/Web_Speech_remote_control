@@ -1,3 +1,10 @@
+/*
+ * Name: blink_pin_4_5_18_19 test with wifi
+ * Version: [0.3.0] 
+ * Autor: Rafal Bazan
+ * Date: 2024
+ */
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -66,30 +73,23 @@ void led_blink_task(void *arg)
 {
     while (1) {
         if (led_should_blink) {
-            for (int duty = 0; duty <= LEDC_MAX_DUTY; duty += 256) { // Jasność od 0 do max
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
+            for (int i = 0; i < LED_PINS_COUNT; i++) {
+                for (int duty = 0; duty <= LEDC_MAX_DUTY; duty += 256) { // Jasność od 0 do max
                     ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                }
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
                     ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
+                    vTaskDelay(pdMS_TO_TICKS(10));
                 }
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-            for (int duty = LEDC_MAX_DUTY; duty >= 0; duty -= 256) { // Jasność od max do 0
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
+                for (int duty = LEDC_MAX_DUTY; duty >= 0; duty -= 256) { // Jasność od max do 0
                     ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                }
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
                     ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
+                    vTaskDelay(pdMS_TO_TICKS(10));
                 }
-                vTaskDelay(pdMS_TO_TICKS(10));
             }
         } else {
             vTaskDelay(pdMS_TO_TICKS(100)); // Czekanie, gdy LED nie powinien migać
         }
     }
 }
-
 
 void micro_ros_task(void *arg)
 {

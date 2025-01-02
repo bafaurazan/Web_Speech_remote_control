@@ -1,3 +1,10 @@
+/*
+ * Name: controlling rover wifi with static left, right, forward, stop movement
+ * Version: [1.1.0] 
+ * Autor: Rafal Bazan
+ * Date: 2024
+ */
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -10,7 +17,7 @@
 #include <uros_network_interfaces.h>
 #include <rcl/rcl.h>
 #include <rcl/error_handling.h>
-#include <std_msgs/msg/int32.h>
+#include <geometry_msgs/msg/twist.h>
 #include <rclc/rclc.h>
 #include <rclc/executor.h>
 #include <driver/ledc.h>
@@ -40,49 +47,66 @@ const ledc_channel_t LED_CHANNELS[LED_PINS_COUNT] = {
     LEDC_CHANNEL_3
 };
 
-rcl_subscription_t subscription;
-std_msgs__msg__Int32 msg;
-bool led_should_blink = false;
+rcl_subscription_t subscription_right;
+rcl_subscription_t subscription_left;
+geometry_msgs__msg__Twist msg_right;
+geometry_msgs__msg__Twist msg_left;
+bool rover_should_move_right = false;
+bool rover_should_move_left = false;
 
-// Callback funkcja, która sprawdza wiadomość i decyduje o miganiu LED
-void subscription_callback(const void *msg_in)
+// Callback funkcja, która przetwarza wiadomości z prawego topica
+void subscription_callback_right(const void *msg_in)
 {
-    const std_msgs__msg__Int32 *received_msg = (const std_msgs__msg__Int32 *)msg_in;
-    printf("Received: %d\n", (int) received_msg->data);
+    const geometry_msgs__msg__Twist *received_msg = (const geometry_msgs__msg__Twist *)msg_in;
+    float linear_x = received_msg->linear.x;
+    printf("Received Twist (right): linear.x = %.2f, angular.z = %.2f\n", linear_x, received_msg->angular.z);
 
-    if (received_msg->data == 1) {
-        led_should_blink = true;
-    } else {
-        led_should_blink = false;
-        for (int i = 0; i < LED_PINS_COUNT; i++) {
-            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], 0); // Wyłącz LED
-            ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-        }
-    }
+    rover_should_move_right = (linear_x > 0.0);
 }
 
-// Zadanie FreeRTOS, które obsługuje miganie diody z PWM
-void led_blink_task(void *arg)
+// Callback funkcja, która przetwarza wiadomości z lewego topica
+void subscription_callback_left(const void *msg_in)
 {
-    int duty_cycle = (LEDC_MAX_DUTY * 30) / 100; // 30% maksymalnej mocy
+    const geometry_msgs__msg__Twist *received_msg = (const geometry_msgs__msg__Twist *)msg_in;
+    float linear_x = received_msg->linear.x;
+    printf("Received Twist (left): linear.x = %.2f, angular.z = %.2f\n", linear_x, received_msg->angular.z);
+
+    rover_should_move_left = (linear_x > 0.0);
+}
+
+// Zadanie FreeRTOS, które steruje silnikami łazika
+void rover_move_task(void *arg)
+{
+    int duty_cycle = (LEDC_MAX_DUTY * 100) / 100; // 50% maksymalnej mocy
 
     while (1) {
-        if (led_should_blink) {
-            for (int i = 0; i < LED_PINS_COUNT; i++) {
-                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty_cycle); // Ustaw stały PWM
-                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);         // Aktualizuj
+        if (rover_should_move_right) {
+            for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
+                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i + 2], duty_cycle); // PWM dla prawego napędu
+                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i + 2]);
             }
         } else {
-            for (int i = 0; i < LED_PINS_COUNT; i++) {
+            for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
+                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i + 2], 0); // Wyłącz PWM
+                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i + 2]);
+            }
+        }
+
+        if (rover_should_move_left) {
+            for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
+                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty_cycle); // PWM dla lewego napędu
+                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
+            }
+        } else {
+            for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
                 ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], 0); // Wyłącz PWM
                 ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
             }
         }
+
         vTaskDelay(pdMS_TO_TICKS(100)); // Czekanie, aby nie obciążać CPU
     }
 }
-
-
 
 void micro_ros_task(void *arg)
 {
@@ -125,22 +149,30 @@ void micro_ros_task(void *arg)
 
     // Tworzenie nodu
     rcl_node_t node;
-    RCCHECK(rclc_node_init_default(&node, "speed_subscriber_rclc", "", &support));
+    RCCHECK(rclc_node_init_default(&node, "twist_subscriber_rclc", "", &support));
 
-    // Tworzenie subskrypcji
+    // Tworzenie subskrypcji dla prawego napędu
     RCCHECK(rclc_subscription_init_default(
-        &subscription,
+        &subscription_right,
         &node,
-        ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-        "rover/speed"));
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        "/diff_drive_controller_right/cmd_vel_unstamped"));
+
+    // Tworzenie subskrypcji dla lewego napędu
+    RCCHECK(rclc_subscription_init_default(
+        &subscription_left,
+        &node,
+        ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+        "/diff_drive_controller_left/cmd_vel_unstamped"));
 
     // Tworzenie executor
     rclc_executor_t executor;
-    RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
-    RCCHECK(rclc_executor_add_subscription(&executor, &subscription, &msg, &subscription_callback, ON_NEW_DATA));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&executor, &subscription_right, &msg_right, &subscription_callback_right, ON_NEW_DATA));
+    RCCHECK(rclc_executor_add_subscription(&executor, &subscription_left, &msg_left, &subscription_callback_left, ON_NEW_DATA));
 
-    // Tworzenie zadania dla migania diody
-    xTaskCreate(led_blink_task, "LED_Blink_Task", 2048, NULL, 1, NULL);
+    // Tworzenie zadania dla ruchu łazika
+    xTaskCreate(rover_move_task, "Rover_Move_Task", 2048, NULL, 1, NULL);
 
     while (1) {
         rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100));
@@ -148,7 +180,8 @@ void micro_ros_task(void *arg)
     }
 
     // Zwalnianie zasobów
-    RCCHECK(rcl_subscription_fini(&subscription, &node));
+    RCCHECK(rcl_subscription_fini(&subscription_right, &node));
+    RCCHECK(rcl_subscription_fini(&subscription_left, &node));
     RCCHECK(rcl_node_fini(&node));
 
     vTaskDelete(NULL);
@@ -168,4 +201,3 @@ void app_main(void)
             CONFIG_MICRO_ROS_APP_TASK_PRIO,
             NULL);
 }
-

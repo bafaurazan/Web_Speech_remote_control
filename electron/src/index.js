@@ -128,7 +128,7 @@ app.on("ready", () => {
 
         // Obsługa eventów do ruchu żółwia na podstawie przycisków
         ipcMain.on('forward_rover', () => moveRover(2, 0));
-        ipcMain.on('backward_rover', () => moveRover(0, 0));
+        ipcMain.on('backward_rover', () => moveRover(-2, 0));
         ipcMain.on('right_rover', () => moveRoverLeft(2, 0));
         ipcMain.on('left_rover', () => moveRoverRight(2, 0));
         ipcMain.on('stop_rover', () => moveRover(0, 0));

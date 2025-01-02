@@ -1,3 +1,10 @@
+/*
+ * Name: blink_pin_2 test with wifi
+ * Version: [0.1.0] 
+ * Autor: Rafal Bazan
+ * Date: 2024
+ */
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>

@@ -1,6 +1,6 @@
 /*
- * Name: controlling rover wifi with dynamic pwm left, right, forward, stop, backward movement (backward with pins 27,26,25,33)
- * Version: [1.3.0] 
+ * Name: controlling rover wifi with dynamic pwm left, right, forward, stop movement and static backward (to fix)
+ * Version: [1.2.0] 
  * Autor: Rafal Bazan
  * Date: 2024
  */
@@ -43,16 +43,9 @@ const int LED_PINS[LED_PINS_COUNT] = {4, 5, 18, 19};
 const int REVERSE_PINS[REVERSE_PINS_COUNT] = {27, 26, 25, 33};
 
 // Funkcja pomocnicza do ustawiania stanu pinów dla ruchu wstecz
-void set_reverse_pins_right(bool enable)
+void set_reverse_pins(bool enable)
 {
-    for (int i = 0; i < REVERSE_PINS_COUNT / 2; i++) {
-        gpio_set_level(REVERSE_PINS[i + 2], enable ? 1 : 0);
-    }
-}
-
-void set_reverse_pins_left(bool enable)
-{
-    for (int i = 0; i < REVERSE_PINS_COUNT / 2; i++) {
+    for (int i = 0; i < REVERSE_PINS_COUNT; i++) {
         gpio_set_level(REVERSE_PINS[i], enable ? 1 : 0);
     }
 }
@@ -69,8 +62,8 @@ rcl_subscription_t subscription_right;
 rcl_subscription_t subscription_left;
 geometry_msgs__msg__Twist msg_right;
 geometry_msgs__msg__Twist msg_left;
-float trajectory_left = 0.0;
-float trajectory_right = 0.0;
+bool rover_should_move_right = false;
+bool rover_should_move_left = false;
 
 // [1.0.1]-Version - "slow pwm changes with backward movement- [forward, backward to fix]"
 
@@ -80,8 +73,15 @@ void subscription_callback_right(const void *msg_in)
     const geometry_msgs__msg__Twist *received_msg = (const geometry_msgs__msg__Twist *)msg_in;
     float linear_x = received_msg->linear.x;
 
+    if (linear_x < 0.0) {
+        linear_x = -linear_x; // Zamiana na wartość dodatnią
+        set_reverse_pins(true); // Aktywacja pinów ruchu wstecz
+    } else if (linear_x > 0.0) {
+        set_reverse_pins(false); // Dezaktywacja pinów ruchu wstecz
+    }
+
     printf("Received Twist (right): linear.x = %.2f, angular.z = %.2f\n", linear_x, received_msg->angular.z);
-    trajectory_right = linear_x;
+    rover_should_move_right = (linear_x > 0.0);
 }
 
 // Callback funkcja, która przetwarza wiadomości z lewego topica
@@ -90,8 +90,15 @@ void subscription_callback_left(const void *msg_in)
     const geometry_msgs__msg__Twist *received_msg = (const geometry_msgs__msg__Twist *)msg_in;
     float linear_x = received_msg->linear.x;
 
+    if (linear_x < 0.0) {
+        linear_x = -linear_x; // Zamiana na wartość dodatnią
+        set_reverse_pins(true); // Aktywacja pinów ruchu wstecz
+    } else {
+        set_reverse_pins(false); // Dezaktywacja pinów ruchu wstecz
+    }
+
     printf("Received Twist (left): linear.x = %.2f, angular.z = %.2f\n", linear_x, received_msg->angular.z);
-    trajectory_left = linear_x;
+    rover_should_move_left = (linear_x > 0.0);
 }
 
 // Zadanie FreeRTOS, które steruje silnikami łazika
@@ -102,26 +109,11 @@ void rover_move_task(void *arg)
     int current_duty_cycle_right = 0; // Aktualny duty cycle dla prawego napędu
     int current_duty_cycle_left = 0;  // Aktualny duty cycle dla lewego napędu
     const int step = 700; // Wielkość zmiany PWM na iterację
-    int set_duty_cycle_right = 0;
-    int set_duty_cycle_left = 0;
 
     while (1) {
         // Ustaw docelowy duty cycle w zależności od sygnałów sterujących
-        if (trajectory_right == 2.0) {
-            target_duty_cycle_right = LEDC_MAX_DUTY;
-        } else if (trajectory_right == -2.0) {
-            target_duty_cycle_right = -LEDC_MAX_DUTY;
-        } else {
-            target_duty_cycle_right = 0;
-        }
-
-        if (trajectory_left == 2.0) {
-            target_duty_cycle_left = LEDC_MAX_DUTY;
-        } else if (trajectory_left == -2.0) {
-            target_duty_cycle_left = -LEDC_MAX_DUTY;
-        } else {
-            target_duty_cycle_left = 0;
-        }
+        target_duty_cycle_right = rover_should_move_right ? LEDC_MAX_DUTY : 0;
+        target_duty_cycle_left = rover_should_move_left ? LEDC_MAX_DUTY : 0;
 
         // Płynna zmiana aktualnego duty cycle dla prawego napędu
         if (current_duty_cycle_right < target_duty_cycle_right) {
@@ -149,31 +141,15 @@ void rover_move_task(void *arg)
             }
         }
 
-        if (current_duty_cycle_right >= 0) {
-            set_duty_cycle_right = current_duty_cycle_right;
-            set_reverse_pins_right(false);
-        } else if (current_duty_cycle_right < 0) {
-            set_duty_cycle_right = -current_duty_cycle_right;
-            set_reverse_pins_right(true);
-        }
-
-        if (current_duty_cycle_left >= 0) {
-            set_duty_cycle_left = current_duty_cycle_left;
-            set_reverse_pins_left(false);
-        } else if (current_duty_cycle_left < 0) {
-            set_duty_cycle_left = -current_duty_cycle_left;
-            set_reverse_pins_left(true);
-        }
-
         // Zastosowanie aktualnych wartości PWM dla prawego napędu
         for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
-            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i + 2], set_duty_cycle_right);
+            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i + 2], current_duty_cycle_right);
             ledc_update_duty(LEDC_MODE, LED_CHANNELS[i + 2]);
         }
 
         // Zastosowanie aktualnych wartości PWM dla lewego napędu
         for (int i = 0; i < LED_PINS_COUNT / 2; i++) {
-            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], set_duty_cycle_left);
+            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], current_duty_cycle_left);
             ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
         }
 
