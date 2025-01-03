@@ -179,44 +179,30 @@ messageInput.addEventListener('keypress', function(event) {
     }
 });
 
-var moveForward = document.querySelector('.move-forward');
+var moveForward = document.querySelector('#rover-btn-forward');
+var moveBackward = document.querySelector('#rover-btn-backward');
+var moveRight = document.querySelector('#rover-btn-right');
+var moveLeft = document.querySelector('#rover-btn-left');
+var moveStop = document.querySelector('#rover-btn-stop');
 
-moveForward.addEventListener('click', sendToRobotForward);
+moveForward.addEventListener('click', () => sendToRobot("forward_rover"));
+moveBackward.addEventListener('click', () => sendToRobot("backward_rover"));
+moveRight.addEventListener('click', () => sendToRobot("right_rover"));
+moveLeft.addEventListener('click', () => sendToRobot("left_rover"));
+moveStop.addEventListener('click', () => sendToRobot("stop_rover"));
 
-function sendToRobotForward(){
-    var message = "move-forward";
-    console.log("wysłane dane dla robota: ", message);
-    
+function sendToRobot(command) {
+    console.log("Wysłane dane dla robota: ", command);
+
     var dataChannels = getDataChannels();
 
     var dataToSend = {
         username: username,
-        message: message
+        message: command
     };
     var jsonMessage = JSON.stringify(dataToSend);
 
-    for(index in dataChannels){
-        dataChannels[index].send(jsonMessage);
-    }
-}
-
-var moveBackward = document.querySelector('.move-backward');
-
-moveBackward.addEventListener('click', sendToRobotBackward);
-
-function sendToRobotBackward(){
-    var message = "move-backward";
-    console.log("wysłane dane dla robota: ", message);
-    
-    var dataChannels = getDataChannels();
-
-    var dataToSend = {
-        username: username,
-        message: message
-    };
-    var jsonMessage = JSON.stringify(dataToSend);
-
-    for(index in dataChannels){
+    for (let index in dataChannels) {
         dataChannels[index].send(jsonMessage);
     }
 }
@@ -355,10 +341,7 @@ function dcOnMessage(event){
     var username = data.username;
     var message = data.message;
 
-    if(message == "move-forward"){
-        console.log("wysłane dane do robota: ", message);
-    }
-    else if(message == "move-backward"){
+    if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(message)) {
         console.log("wysłane dane do robota: ", message);
     }
     else{

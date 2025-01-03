@@ -1,3 +1,10 @@
+/*
+ * Name: blink_pin_4_5_18_19 test with wifi - some fixed changes
+ * Version: [0.5.0] 
+ * Autor: Rafal Bazan
+ * Date: 2024
+ */
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -64,31 +71,24 @@ void subscription_callback(const void *msg_in)
 // Zadanie FreeRTOS, które obsługuje miganie diody z PWM
 void led_blink_task(void *arg)
 {
+    int duty_cycle = (LEDC_MAX_DUTY * 30) / 100; // 30% maksymalnej mocy
+
     while (1) {
         if (led_should_blink) {
-            for (int duty = 0; duty <= LEDC_MAX_DUTY; duty += 256) { // Jasność od 0 do max
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
-                    ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                }
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
-                    ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-                }
-                vTaskDelay(pdMS_TO_TICKS(10));
-            }
-            for (int duty = LEDC_MAX_DUTY; duty >= 0; duty -= 256) { // Jasność od max do 0
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
-                    ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                }
-                for (int i = 0; i < LED_PINS_COUNT; i++) {
-                    ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-                }
-                vTaskDelay(pdMS_TO_TICKS(10));
+            for (int i = 0; i < LED_PINS_COUNT; i++) {
+                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty_cycle); // Ustaw stały PWM
+                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);         // Aktualizuj
             }
         } else {
-            vTaskDelay(pdMS_TO_TICKS(100)); // Czekanie, gdy LED nie powinien migać
+            for (int i = 0; i < LED_PINS_COUNT; i++) {
+                ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], 0); // Wyłącz PWM
+                ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
+            }
         }
+        vTaskDelay(pdMS_TO_TICKS(100)); // Czekanie, aby nie obciążać CPU
     }
 }
+
 
 
 void micro_ros_task(void *arg)
@@ -132,14 +132,14 @@ void micro_ros_task(void *arg)
 
     // Tworzenie nodu
     rcl_node_t node;
-    RCCHECK(rclc_node_init_default(&node, "esp32_int32_subscriber", "", &support));
+    RCCHECK(rclc_node_init_default(&node, "speed_subscriber_rclc", "", &support));
 
     // Tworzenie subskrypcji
     RCCHECK(rclc_subscription_init_default(
         &subscription,
         &node,
         ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32),
-        "freertos_int32_subscriber"));
+        "rover/speed"));
 
     // Tworzenie executor
     rclc_executor_t executor;

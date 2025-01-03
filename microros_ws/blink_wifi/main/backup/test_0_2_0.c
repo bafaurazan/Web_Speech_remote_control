@@ -1,3 +1,10 @@
+/*
+ * Name: blink_pin_2 test with wifi and pwm
+ * Version: [0.2.0] 
+ * Autor: Rafal Bazan
+ * Date: 2024
+ */
+
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -22,27 +29,19 @@
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Aborting.\n",__LINE__,(int)temp_rc);vTaskDelete(NULL);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){printf("Failed status on line %d: %d. Continuing.\n",__LINE__,(int)temp_rc);}}
 
-#define LEDC_TIMER              LEDC_TIMER_0
-#define LEDC_MODE               LEDC_LOW_SPEED_MODE
-#define LEDC_DUTY_RES           LEDC_TIMER_13_BIT
-#define LEDC_FREQUENCY          5000 // 5 kHz
-#define LEDC_MAX_DUTY           ((1 << LEDC_DUTY_RES) - 1) // Maksymalna wartość dla 13-bitowego PWM
-
-// Piny LED
-#define LED_PINS_COUNT 4
-const int LED_PINS[LED_PINS_COUNT] = {4, 5, 18, 19};
-
-// Kanały PWM dla każdego pinu
-const ledc_channel_t LED_CHANNELS[LED_PINS_COUNT] = {
-    LEDC_CHANNEL_0,
-    LEDC_CHANNEL_1,
-    LEDC_CHANNEL_2,
-    LEDC_CHANNEL_3
-};
+#define LED_PIN 2
 
 rcl_subscription_t subscription;
 std_msgs__msg__Int32 msg;
 bool led_should_blink = false;
+
+// Konfiguracja PWM
+#define LEDC_TIMER              LEDC_TIMER_0
+#define LEDC_MODE               LEDC_LOW_SPEED_MODE
+#define LEDC_CHANNEL            LEDC_CHANNEL_0
+#define LEDC_DUTY_RES           LEDC_TIMER_13_BIT
+#define LEDC_FREQUENCY          5000 // 5 kHz
+#define LEDC_MAX_DUTY           ((1 << LEDC_DUTY_RES) - 1) // Maksymalna wartość dla 13-bitowego PWM
 
 // Callback funkcja, która sprawdza wiadomość i decyduje o miganiu LED
 void subscription_callback(const void *msg_in)
@@ -54,10 +53,8 @@ void subscription_callback(const void *msg_in)
         led_should_blink = true;
     } else {
         led_should_blink = false;
-        for (int i = 0; i < LED_PINS_COUNT; i++) {
-            ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], 0); // Wyłącz LED
-            ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-        }
+        ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, 0); // Wyłącz LED
+        ledc_update_duty(LEDC_MODE, LEDC_CHANNEL);
     }
 }
 
@@ -66,17 +63,16 @@ void led_blink_task(void *arg)
 {
     while (1) {
         if (led_should_blink) {
-            for (int i = 0; i < LED_PINS_COUNT; i++) {
-                for (int duty = 0; duty <= LEDC_MAX_DUTY; duty += 256) { // Jasność od 0 do max
-                    ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                    ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                }
-                for (int duty = LEDC_MAX_DUTY; duty >= 0; duty -= 256) { // Jasność od max do 0
-                    ledc_set_duty(LEDC_MODE, LED_CHANNELS[i], duty);
-                    ledc_update_duty(LEDC_MODE, LED_CHANNELS[i]);
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                }
+            for (int duty = 0; duty <= LEDC_MAX_DUTY; duty += 256) { // Jasność od 0 do max
+                ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, duty);
+                ledc_update_duty(LEDC_MODE, LEDC_CHANNEL);
+                vTaskDelay(pdMS_TO_TICKS(10)); // Szybkość wzrostu jasności
+            }
+
+            for (int duty = LEDC_MAX_DUTY; duty >= 0; duty -= 256) { // Jasność od max do 0
+                ledc_set_duty(LEDC_MODE, LEDC_CHANNEL, duty);
+                ledc_update_duty(LEDC_MODE, LEDC_CHANNEL);
+                vTaskDelay(pdMS_TO_TICKS(10));
             }
         } else {
             vTaskDelay(pdMS_TO_TICKS(100)); // Czekanie, gdy LED nie powinien migać
@@ -96,17 +92,15 @@ void micro_ros_task(void *arg)
     };
     ledc_timer_config(&ledc_timer);
 
-    for (int i = 0; i < LED_PINS_COUNT; i++) {
-        ledc_channel_config_t ledc_channel = {
-            .channel    = LED_CHANNELS[i],
-            .duty       = 0,
-            .gpio_num   = LED_PINS[i],
-            .speed_mode = LEDC_MODE,
-            .hpoint     = 0,
-            .timer_sel  = LEDC_TIMER
-        };
-        ledc_channel_config(&ledc_channel);
-    }
+    ledc_channel_config_t ledc_channel = {
+        .channel    = LEDC_CHANNEL,
+        .duty       = 0,
+        .gpio_num   = LED_PIN,
+        .speed_mode = LEDC_MODE,
+        .hpoint     = 0,
+        .timer_sel  = LEDC_TIMER
+    };
+    ledc_channel_config(&ledc_channel);
 
     rcl_allocator_t allocator = rcl_get_default_allocator();
     rclc_support_t support;

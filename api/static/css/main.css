@@ -394,7 +394,7 @@ input:valid ~ .icon {
 
 #buttons {
     margin: auto;
-    width:70%;
+    width:90%;
     border: 3px solid black;
     border-radius: 4px;
     backdrop-filter: contrast(80%);
@@ -448,11 +448,20 @@ video {
     transform: scale(1.1);
 }
 
-#start-record-btn,
-#stop-record-btn {
+#my-record-btn{
     padding: 10px 20px;
     margin: 10px;
     background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#btn-rover-control{
+    padding: 10px 20px;
+    margin: 10px;
+    background-color: green ;
     color: white;
     border: none;
     border-radius: 5px;

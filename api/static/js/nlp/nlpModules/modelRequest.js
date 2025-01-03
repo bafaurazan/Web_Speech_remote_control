@@ -28,11 +28,9 @@ export function sendRequest(prompt) {
 
       if (data.response !== "unknown_command") {
         console.log(commandActivator);
-        if (commandActivator == "start_rover") {
-          sendToRobotForward()
-        }else if (commandActivator == "stop_rover") {
-          sendToRobotBackward()
-        }
+        if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(commandActivator)) {
+          sendToRobot(commandActivator)
+      }
       }
     })
     .catch((error) => {

@@ -14,11 +14,11 @@ button.addEventListener('click', () => {
     recognition.isRecognizing = true; // Ensure recognition keeps running
     recognition.start();
     isRecognizing = true;
-    button.textContent = 'Stop Speech Recognition';
+    button.textContent = 'Stop LLM Speech Recognition';
   } else {
     recognition.isRecognizing = false;
     recognition.stop();
     isRecognizing = false;
-    button.textContent = 'Start Speech Recognition';
+    button.textContent = 'Start LLM Speech Recognition';
   }
 });

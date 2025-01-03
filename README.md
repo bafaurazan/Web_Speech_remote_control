@@ -37,3 +37,49 @@ sudo docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 
 
 8. In website test buttons
 
+9. terminal tests
+```
+ros2 topic pub /diff_drive_controller_right/cmd_vel_unstamped geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+
+ros2 topic pub /diff_drive_controller_left/cmd_vel_unstamped geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+```
+
+10. controlling rover teleop
+
+```
+cd TrailblazerML/
+source install/setup.bash
+
+ros2 launch rover_teleop_twist_joy teleop_twist_launch.py
+
+```
+
+11. running oak camera depthai_viewer
+
+```
+python3 -m depthai_viewer
+
+```
+
+12. setup depthai
+
+```
+sudo nano /etc/udev/rules.d/80-depthai.rules
+```
+SUBSYSTEM=="usb", ATTR{idVendor}=="03e7", MODE="0666"
+```
+ sudo udevadm control --reload-rules
+```
+13. opening rviz (not working)
+
+```
+ros2 launch gazebo_viz rsp.launch.py
+```
+
+14. setup gazebo 
+```
+cd ~/.gazebo/models/gazebo_viz 
+ros2 launch gazebo_viz launch_sim.launch.py 
+```

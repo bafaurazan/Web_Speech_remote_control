@@ -82,7 +82,7 @@
                 <div id="buttons-rover" class="hidden">
                     <div id="rover-control-panel">
                         <button id="rover-btn-start">Start</button>
-                        <button id="rover-btn-forward" class="move-forward">Przód</button>
+                        <button id="rover-btn-forward">Przód</button>
                         <p></p>
                     
                         <button id="rover-btn-left">Lewo</button>
@@ -90,7 +90,7 @@
                         <button id="rover-btn-right">Prawo</button>
                     
                         <button id="rover-btn-stop">Stop</button>
-                        <button id="rover-btn-backward" class="move-backward">Tył</button>
+                        <button id="rover-btn-backward">Tył</button>
                         <p></p>
                     </div>  
                 </div>
@@ -98,9 +98,10 @@
 
         </div>
         <div id="buttons">
-            <button id="start-record-btn">Rozpocznij nagrywanie</button>
-            <button id="sendRequest">Start Speech Recognition</button>
-            <button id="stop-record-btn" disabled>Zatrzymaj nagrywanie</button>
+            <button id="my-record-btn">Start Speech Recognition</button>
+            <button id="sendRequest">Start LLM Speech Recognition</button>
+            <button id="btn-rover-control">Start Rover keyboard control</button>
+
             <div>
                 <p id="recording-status"></p>
                 <h2>Rozpoznany tekst:</h2>

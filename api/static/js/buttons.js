@@ -26,41 +26,59 @@ btnChat.addEventListener('click', () => showOnly(chatDiv)); // Pokazuje czat
 btnButtonsRover.addEventListener('click', () => showOnly(buttonsRoverDiv)); // Pokazuje sekcję rover
 btnButtonsDrone.addEventListener('click', () => showOnly(buttonsDroneDiv)); // Pokazuje sekcję drone
 
-// Pobieranie przycisków
-const dronebtnStart = document.getElementById('drone-btn-start');
-const dronebtnStop = document.getElementById('drone-btn-stop');
-const dronebtnForward = document.getElementById('drone-btn-forward');
-const dronebtnBackward = document.getElementById('drone-btn-backward');
-const dronebtnLeft = document.getElementById('drone-btn-left');
-const dronebtnRight = document.getElementById('drone-btn-right');
-const dronebtnUp = document.getElementById('drone-btn-up');
-const dronebtnDown = document.getElementById('drone-btn-down');
-const dronebtnSpeedUp = document.getElementById('drone-btn-speed-up');
+// Pobieranie elementów
+const btnRoverControl = document.getElementById('btn-rover-control');
+let roverControlActive = false; // Zmienna przechowująca stan sterowania
 
-const roverbtnStart = document.getElementById('rover-btn-start');
-const roverbtnStop = document.getElementById('rover-btn-stop');
-const roverbtnForward = document.getElementById('rover-btn-forward');
-const roverbtnBackward = document.getElementById('rover-btn-backward');
-const roverbtnLeft = document.getElementById('rover-btn-left');
-const roverbtnRight = document.getElementById('rover-btn-right');
-const roverbtnSpeedUp = document.getElementById('rover-btn-speed-up');
+// Funkcja włączająca/wyłączająca sterowanie łazikiem
+btnRoverControl.addEventListener('click', () => {
+    roverControlActive = !roverControlActive; // Zmieniamy stan sterowania
+    if (roverControlActive) {
+        btnRoverControl.textContent = "Stop Rover keyboard control"; // Zmieniamy tekst przycisku
+        console.log("Sterowanie łazikiem włączone");
+    } else {
+        btnRoverControl.textContent = "Start Rover keyboard control"; // Zmieniamy tekst przycisku
+        console.log("Sterowanie łazikiem wyłączone");
+    }
+});
 
-// Przypisywanie funkcji do kliknięć
-dronebtnStart.addEventListener('click', () => console.log('Start'));
-dronebtnStop.addEventListener('click', () => console.log('Stop'));
-dronebtnForward.addEventListener('click', () => console.log('Przód'));
-dronebtnBackward.addEventListener('click', () => console.log('Tył'));
-dronebtnLeft.addEventListener('click', () => console.log('Lewo'));
-dronebtnRight.addEventListener('click', () => console.log('Prawo'));
-dronebtnUp.addEventListener('click', () => console.log('Do Góry'));
-dronebtnDown.addEventListener('click', () => console.log('Do Dołu'));
-dronebtnSpeedUp.addEventListener('click', () => console.log('Przyspiesz'));
+// Obsługa klawiszy - sterowanie dronem
+document.addEventListener('keydown', (event) => {
+    const key = event.key.toLowerCase(); // Obsługa wielkich i małych liter
 
-roverbtnStart.addEventListener('click', () => console.log('Start'));
-roverbtnStop.addEventListener('click', () => console.log('Stop'));
-roverbtnForward.addEventListener('click', () => console.log('Przód'));
-roverbtnBackward.addEventListener('click', () => console.log('Tył'));
-roverbtnLeft.addEventListener('click', () => console.log('Lewo'));
-roverbtnRight.addEventListener('click', () => console.log('Prawo'));
-roverbtnSpeedUp.addEventListener('click', () => console.log('Przyspiesz'));
+    if (!roverControlActive) return; // Jeśli sterowanie łazikiem jest wyłączone, ignorujemy naciśnięcie klawiszy
 
+    switch (key) {
+        case 'q': // Start
+            document.getElementById('rover-btn-start').click();
+            console.log('Pressed: q - start');
+            break;
+        case 'w': // Przód
+            document.getElementById('rover-btn-forward').click();
+            console.log('Pressed: w - forward');
+            break;
+        case 'e': // Stop
+            document.getElementById('rover-btn-stop').click();
+            console.log('Pressed: e - stop');
+            break;
+        case 'a': // Lewo
+            document.getElementById('rover-btn-left').click();
+            console.log('Pressed: a - left');
+            break;
+        case 's': // Tył
+            document.getElementById('rover-btn-backward').click();
+            console.log('Pressed: s - backward');
+            break;
+        case 'd': // Prawo
+            document.getElementById('rover-btn-right').click();
+            console.log('Pressed: d - right');
+            break;
+        case 'r': // Przyspiesz
+            document.getElementById('rover-btn-speed-up').click();
+            console.log('Pressed: r - speed up');
+            break;
+        default:
+            // Inne klawisze - brak akcji
+            break;
+    }
+});

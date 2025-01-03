@@ -261,13 +261,9 @@ function dcOnMessage(event){
     var username = data.username;
     var message = data.message;
 
-    if(message == "move-forward"){
-        console.log("wysłane dane: ", message);
-        ipcROS.send('move-forward');
-    }
-    else if(message == "move-backward"){
-        console.log("wysłane dane: ", message);
-        ipcROS.send('move-backward');
+    if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(message)) {
+        console.log("otrzymane dane dla robota: ", message);
+        ipcROS.send(message);
     }
     else{
         var li = document.createElement('li');
