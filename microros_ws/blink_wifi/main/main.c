@@ -101,7 +101,7 @@ void rover_move_task(void *arg)
     int target_duty_cycle_left = 0;  // Docelowy duty cycle dla lewego napędu
     int current_duty_cycle_right = 0; // Aktualny duty cycle dla prawego napędu
     int current_duty_cycle_left = 0;  // Aktualny duty cycle dla lewego napędu
-    const int step = 700; // Wielkość zmiany PWM na iterację
+    const int step = 1200; // Wielkość zmiany PWM na iterację
     int set_duty_cycle_right = 0;
     int set_duty_cycle_left = 0;
 
