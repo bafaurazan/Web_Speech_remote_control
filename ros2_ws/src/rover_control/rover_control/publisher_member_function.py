@@ -1,37 +1,58 @@
 import rclpy
 from rclpy.node import Node
 
-from std_msgs.msg import Int32  # Zmieniono typ wiadomości na Int32
+from geometry_msgs.msg import Twist
 
 
-class SpeedPublisher(Node):
+class RoverController(Node):
 
     def __init__(self):
-        super().__init__('speed_publisher')
-        self.publisher_ = self.create_publisher(Int32, 'rover/speed', 10)  # Typ wiadomości to teraz Int32
+        super().__init__('rover_controller')
+        
+        self.left_wheel_publisher = self.create_publisher(Twist, '/diff_drive_controller_left/cmd_vel_unstamped', 10)
+        self.right_wheel_publisher = self.create_publisher(Twist, '/diff_drive_controller_right/cmd_vel_unstamped', 10)
+        
+        self.state = 0
+        
         timer_period = 2.0
         self.timer = self.create_timer(timer_period, self.timer_callback)
-        self.i = 0  # Zmieniono na typ int
-
+    
     def timer_callback(self):
-        msg = Int32()
-        msg.data = self.i  # Przypisanie wartości typu int do msg.data
-        self.publisher_.publish(msg)
-        self.get_logger().info('Published: %d' % msg.data)
-        self.i += 1  # Zwiększamy wartość int
+        left_twist = Twist()
+        right_twist = Twist()
+        
+        if self.state == 0:
+            left_twist.linear.x = 2.0
+            right_twist.linear.x = -2.0
+            self.get_logger().info("State 0: Left forward, Right backward")
+        elif self.state == 1:
+            left_twist.linear.x = -2.0
+            right_twist.linear.x = 2.0
+            self.get_logger().info("State 1: Left backward, Right forward")
+        else:
+            left_twist.linear.x = 0.0
+            right_twist.linear.x = 0.0
+            self.get_logger().info("State 2: Stopping")
+        
+        self.left_wheel_publisher.publish(left_twist)
+        self.right_wheel_publisher.publish(right_twist)
+        
+        if self.state < 2:
+            self.state += 1
+        else:
+            self.timer.cancel()
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    my_speed_publisher = SpeedPublisher()
+    rover_controller = RoverController()
 
-    rclpy.spin(my_speed_publisher)
+    rclpy.spin(rover_controller)
 
-    my_speed_publisher.destroy_node()
+    rover_controller.destroy_node()
     rclpy.shutdown()
 
 
 if __name__ == '__main__':
     main()
-
