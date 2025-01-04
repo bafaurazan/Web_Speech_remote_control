@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-        	'publisher_node = rover_control.publisher_member_function:main',
+        	'test_node = rover_control.publisher_member_function:main',
         ],
     },
 )

@@ -1,30 +1,38 @@
-# electron
-This project automates app installation for me to linux and windows from scratch
+# Introduction
+
+This project integrates Electron with a Django backend and micro-ROS to provide a seamless interface for text-based chat and real-time control of a robotic system. The application serves as a bridge between web technologies and robotics, combining modern frontend capabilities with ROS 2-based backend operations. 
+
+### Key Features:
+1. **WebSocket Communication**: Enables real-time messaging and robot control via secure WebSocket connections.
+2. **Text Chat**: A synchronized chat feature allows communication between app users and a web-based interface.
+3. **ROS 2 Integration**: Controls a rover using commands sent via the Electron app, leveraging micro-ROS for lightweight communication.
+4. **Cross-Platform Compatibility**: Build and run the app on multiple platforms with Electron’s packaging capabilities.
+
+This setup requires minor code customization before installation to configure WebSocket addresses. It provides:
+- Dynamic communication using Django’s backend API.
+- Robot control capabilities using ROS 2 and micro-ROS.
+
+
+## Dependencies
+- Electron
+
+## 1. Before installation
+
+*in renderer.js code change line with your wss adress*
 
 ```
-~/electron
+var wsStart = 'wss://<wss adress>/';  // Adres WebSocket 
 ```
 
-### in renderer.js code change line with your ngrok adress 
+*in index.html code change line with your wss adress* 
 
 ```
-var wsStart = 'wss://e70f-193-19-165-84.ngrok-free.app';
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'    wss://<wss adress>/';">
 ```
 
-### in index.html code change line with your ngrok adress 
+# Testing
 
-```
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'    wss://e70f-193-19-165-84.ngrok-free.app;">
-```
-### for testing electron ros2 connection
-
-```
-ros2 run turtlesim turtlesim_node
-```
-
-and click button in electron app to move turtle
-
-### type
+## 2. Install and run project
 
 ```
 npm install
@@ -32,14 +40,19 @@ npm run build
 npm run start
 ```
 
-### log in with differents name on websites and test typing on browser
+## 3. Test text-chat
 
-#### if electron app opened on windows
+**(Dependency Django server api/ must run)**
+- log in on app and website with different names 
+- start typing on app and you will see message on website
 
-```
-start chrome
-start python
-```
+## 4. Test ROS2 controll
+
+**(Dependency Django server api/ must run)**
+**(micro-ros must be setup)**
+- log in on app and website with different names 
+- push button on app and you will see rover start moving 
+- check console.log
 
 ## to install app open 
 
@@ -53,6 +66,6 @@ somethink like that
 
 or
 
-`selected installation path`
+`select installation path`
 
 

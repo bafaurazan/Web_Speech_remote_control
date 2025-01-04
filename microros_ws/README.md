@@ -1,50 +1,29 @@
-# Setup Micro-ros for serial (old-version)
+# Introduction
 
-## After cloning repository
+This project integrates micro-ROS with ESP32 using the ESP-IDF framework and ROS 2 Humble, enabling seamless communication between embedded devices and ROS 2 environments. The ESP32 microcontroller leverages FreeRTOS, providing a robust real-time operating system for multitasking and efficient resource management. 
 
-```
-cd microros_ws
+The primary focus of this setup is controlling a rover through ROS 2 topics, with micro-ROS enabling lightweight communication between ESP32 and ROS 2 nodes. FreeRTOS ensures that tasks like communication, motor control, and sensor handling are executed predictably and concurrently.
 
-git clone -b $ROS_DISTRO https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup
+**The setup includes**:
+- Preparing the ESP32 for micro-ROS communication.
+- Flashing firmware with FreeRTOS support.
+- Publishing commands to control the rover's movements via ROS 2 topics.
+- Publishing velocity commands to individual wheels (`/diff_drive_controller_left/cmd_vel_unstamped` and `/diff_drive_controller_right/cmd_vel_unstamped`) using `geometry_msgs/Twist`.
+- Real-time communication over Wi-Fi using UDP transport.
 
-sudo apt update && rosdep update
-rosdep install --from-paths src --ignore-src -y
+**Key features**:
+- Integration of micro-ROS with ESP-IDF on ESP32.
+- Real-time task management with FreeRTOS.
+- Seamless communication using UDP transport.
+- Command publishing for rover's.
+- Docker-based setup for agent and firmware flashing.
 
-sudo apt-get install python3-pip
+## Dependencies
 
-colcon build
+- docker
 
-source install/local_setup.bash
+## 1. After cloning repository:
 
-ros2 run micro_ros_setup create_firmware_ws.sh freertos esp32
-```
-
-## Sourcing installation
-
-```
-cd microros_ws
-source install/local_setup.bash
-```
-
-## After changing file:
-
-```
-microros_ws/blink/
-```
-
-#### then
-
-```
-cp -r blink/ firmware/freertos_apps/apps/
-ros2 run micro_ros_setup configure_firmware.sh blink --transport serial
-ros2 run micro_ros_setup build_firmware.sh
-ros2 run micro_ros_setup flash_firmware.sh
-```
-
-# Setup Micro-ros for wifi (new/actual-version)
-
-
-[follow instruction in this tutorial](https://robofoundry.medium.com/esp32-micro-ros-actually-working-over-wifi-and-udp-transport-519a8ad52f65)
 ```
 # 1. Create a directory for cloning the repo for ESP-IDF component
 mkdir ~/dev/esp32/microROS
@@ -73,74 +52,42 @@ ls -l /dev/ttyUSB0
 crw-rw---- 1 root dialout 188, 0 Aug 28 19:41 /dev/ttyUSB0
 
 # 7. Run following command to grant permission to write, we will need this
-# to flash ESP32 with the example program we are going to run which is
-# examples/int32_publisher
+# to flash ESP32 with the example program we are going to run 
 sudo chmod 666 /dev/ttyUSB0
 
-docker run -it --rm --user espidf --volume="/etc/timezone:/etc/timezone:ro" -v  $(pwd):/micro_ros_espidf_component -v  /dev:/dev --privileged --workdir /micro_ros_espidf_component microros/esp-idf-microros:latest /bin/bash  -c "cd examples/int32_publisher; idf.py menuconfig build flash monitor"
-
-docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
+# 8. copy software
+cp -r ~/Web_Speech_remote_control/microros_ws/blink_wifi ~/dev/esp32/microROS/micro_ros_espidf_component/examples
 ```
 
-## my tests
+# Testing
 
-#### prepare
-```
-cd microros_ws
-
-cp -r blink_wifi/ ~/dev/esp32/microROS/micro_ros_espidf_component/examples
-```
+## 2. testing rover
 
 ```
-cd ~/dev/esp32/microROS/micro_ros_espidf_component
-
-ls -l /dev/ttyUSB0
-sudo chmod 666 /dev/ttyUSB0
-
+# 9. flash esp32
 sudo docker run -it --rm --user espidf --volume="/etc/timezone:/etc/timezone:ro" -v  $(pwd):/micro_ros_espidf_component -v  /dev:/dev --privileged --workdir /micro_ros_espidf_component microros/esp-idf-microros:latest /bin/bash  -c "cd examples/blink_wifi; idf.py menuconfig build flash monitor"
 
+# 10. connect to esp32 
+# you must connect esp32 to same wifi of your running docker and then:
 sudo docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
-
 ```
 
-### create and build micro-agent
+## 3. opening cli Publisher test
 
 ```
-ros2 run micro_ros_setup create_agent_ws.sh
-ros2 run micro_ros_setup build_agent.sh
-source install/local_setup.bash
+//start
+
+ros2 topic pub --once /diff_drive_controller_left/cmd_vel_unstamped geometry_msgs/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+ros2 topic pub --once /diff_drive_controller_right/cmd_vel_unstamped geometry_msgs/Twist "{linear: {x: -2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+//stop
+
+ros2 topic pub --once /diff_drive_controller_left/cmd_vel_unstamped geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
+
+ros2 topic pub --once /diff_drive_controller_right/cmd_vel_unstamped geometry_msgs/Twist "{linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 ```
 
-## Testing
+### Source 
 
-### opening micro-ros subscriber
-
-```
-ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0
-```
-
-### echo topic 
-
-```
-ros2 topic echo /rover/speed 
-
-```
-#### 1. opening cli Publisher test
-
-```
-ros2 topic pub /rover/speed std_msgs/msg/Int32 "{data: 1}"
-ros2 topic pub /rover/speed std_msgs/msg/Int32 "{data: 10}"
-```
-
-#### 2. opening Python Publisher (if available)
-
-```
-ros2 run rover_control publisher_node
-```
-
-
-
-### esp32 will blink:
-
-At sending odd numbers "data: 1" and will not bland at even numbers
-"data: 10"
+[follow instruction in this tutorial](https://robofoundry.medium.com/esp32-micro-ros-actually-working-over-wifi-and-udp-transport-519a8ad52f65)
