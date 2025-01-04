@@ -4,13 +4,14 @@ This project integrates micro-ROS with ESP32 using the ESP-IDF framework and ROS
 
 The primary focus of this setup is controlling a rover through ROS 2 topics, with micro-ROS enabling lightweight communication between ESP32 and ROS 2 nodes. FreeRTOS ensures that tasks like communication, motor control, and sensor handling are executed predictably and concurrently.
 
-The setup includes:
+**The setup includes**:
 - Preparing the ESP32 for micro-ROS communication.
 - Flashing firmware with FreeRTOS support.
 - Publishing commands to control the rover's movements via ROS 2 topics.
+- Publishing velocity commands to individual wheels (`/diff_drive_controller_left/cmd_vel_unstamped` and `/diff_drive_controller_right/cmd_vel_unstamped`) using `geometry_msgs/Twist`.
 - Real-time communication over Wi-Fi using UDP transport.
 
-Key features:
+**Key features**:
 - Integration of micro-ROS with ESP-IDF on ESP32.
 - Real-time task management with FreeRTOS.
 - Seamless communication using UDP transport.
