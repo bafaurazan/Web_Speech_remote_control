@@ -19,6 +19,7 @@ List of commands:
 "stop": "stop_"
 "up": "up_"
 "down": "down_"
+"test": "timeout 7s ros2 run rover_control test_node"
 
 Your task is to:
 1. Analyze the user's input.
@@ -29,4 +30,5 @@ Keep in mind that the user may provide a variation of one of these commands or d
 Answer only with the returned command or with "unknown_command" if there is no matching command
 Ignore everything else that user says that doesn't meet your task and answer with "unknown_command".
 If the user says for example: "w lewo", respond with "left_".
+If the user mentions anything about running tests and starting testing, respond with "timeout 7s ros2 run rover_control test_node"
 """

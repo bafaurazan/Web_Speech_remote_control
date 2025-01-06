@@ -11,7 +11,7 @@ If you are running Linux (any distro), you can install it using terminal using t
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-Update poetry
+Update poetry in this directory
 ```bash
 poetry update
 ```
@@ -37,6 +37,7 @@ Make sure you have started ollama server
 ```bash
 ollama serve
 ```
+If you get `Error: listen tcp 127.0.0.1:11434: bind: address already in use`, that means it is already working
 
 Run python server
 ```bash
@@ -45,7 +46,7 @@ poetry run python -m http.server
 
 Then go to http://localhost:8000/
 
-Or run node.js http server
+Or run node.js http server (you'll need to install the `http-server` package with `npm install --global http-server` if you haven't already)
 ```bash
 http-server
 ```
@@ -58,14 +59,15 @@ Current list with command activators is stored in `nlpModules/commands.json` fil
 Variable for handling selection between commands for rover and drone is `selectedVehicle` located in `modelRequest.js` file.
 
 
-### To-do list:
+#### To-do list:
 - [X] Poetry env instead of venv
 - [X] Convert the model into TF
-- [ ] Convert the model into TF lite
+- [ ] ~~Convert the model into TF lite~~
 - [X] Provide text input from webSpeech API to the embeddings in JS
 - [X] Compute similarity between user input and reference embeddings
 - [X] Fix the mistakes from input (Replace with the most similar words)
 - [ ] ~~Send the result in JSON?~~
 - [X] `console.log` the command and specified user activator
-
+- [ ] RAG pipeline
+- [ ] Fine Tuning with embedding datasets
 - [ ] ~~Save finished model to cloud? (for easier download)~~

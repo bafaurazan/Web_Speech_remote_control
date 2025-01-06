@@ -21,6 +21,8 @@ transformers = "^4.47.0"
 tf-keras = "^2.18.0"
 black = "^24.10.0"
 ruff = "^0.8.2"
+langchain-ollama = "^0.2.2"
+chromadb = "^0.6.1"
 
 
 [build-system]
