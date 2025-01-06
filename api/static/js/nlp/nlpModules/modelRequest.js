@@ -27,40 +27,44 @@ export function sendRequest(prompt) {
   }
 
   // Helper function to send data to the LLM
-  function sendToLLM(inputPrompt) {
-    data.prompt = inputPrompt;
+function sendToLLM(inputPrompt) {
+  data.prompt = inputPrompt;
 
-    fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
+  fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
     })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    .then((data) => {
+      let commandActivator; // Deklaracja zmiennej przed blokami warunków
+
+      if (data.response != "timeout 7s ros2 run rover_control test_node") {
+        commandActivator = data.response + selectedVehicle;
+      } else {
+        // Don't add vehicle suffix when running tests
+        commandActivator = data.response;
+      }
+
+      if (data.response !== "unknown_command") {
+        console.log(commandActivator);
+        if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(commandActivator)) {
+          sendToRobot(commandActivator);
         }
-        return response.json();
-      })
-      .then((data) => {
-        if (data.response != "timeout 7s ros2 run rover_control test_node") {
-          const commandActivator = data.response + selectedVehicle;
-        } else {
-          // Don't add vehicle suffix when running tests
-          const commandActivator = data.response;
-        }
-        if (data.response !== "unknown_command") {
-          console.log(commandActivator);
-          if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(commandActivator)) {
-            sendToRobot(commandActivator);
-          }
-        }
-      })
-      .catch((error) => {
-        console.error(`Error: ${error.message}`);
-      });
-  }
+      }
+    })
+    .catch((error) => {
+      console.error(`Error: ${error.message}`);
+    });
+}
+
 
   // Main time parser function logic
   const { firstPart, secondPart, duration } = parsePrompt(prompt);

@@ -53,7 +53,9 @@ def rag_pipeline_view(request):
 
     Request format (JSON):
     {
-        "query": "Your query text here"
+    "model": "wsrc_nlp",
+    "prompt": "Jedź do tyłu przez 5 sekund",
+    "stream": false
     }
 
     Response format (JSON):
@@ -65,7 +67,7 @@ def rag_pipeline_view(request):
         try:
             # Parse the incoming JSON request
             data = json.loads(request.body)
-            query_text = data.get("query")
+            query_text = data.get("prompt")
 
             if not query_text:
                 return JsonResponse({"error": "Query text is required."}, status=400)
