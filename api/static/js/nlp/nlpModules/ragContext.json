@@ -1,0 +1,132 @@
+{
+  "commands": [
+    {
+      "command": "forward_",
+      "variations": [
+        "idź do przodu",
+        "ruch do przodu",
+        "przód",
+        "naprzód"
+      ]
+    },
+    {
+      "command": "left_",
+      "variations": [
+        "w lewo",
+        "skręć w lewo",
+        "przesuń w lewo",
+        "skręt w lewo",
+        "idź w lewo"
+      ]
+    },
+    {
+      "command": "right_",
+      "variations": [
+        "w prawo",
+        "skręć w prawo",
+        "przesuń w prawo",
+        "skręt w prawo",
+        "idź w prawo"
+      ]
+    },
+    {
+      "command": "backward_",
+      "variations": [
+        "idź do tyłu",
+        "ruch do tyłu",
+        "wstecz",
+        "cofnij się"
+      ]
+    },
+    {
+      "command": "start_",
+      "variations": [
+        "start",
+        "rozpocznij",
+        "zainicjuj",
+        "włącz"
+      ]
+    },
+    {
+      "command": "stop_",
+      "variations": [
+        "zatrzymaj",
+        "stop",
+        "zakończ",
+        "przerwij"
+      ]
+    },
+    {
+      "command": "up_",
+      "variations": [
+        "idź w górę",
+        "przesuń w górę",
+        "góra",
+        "wznieś się"
+      ]
+    },
+    {
+      "command": "down_",
+      "variations": [
+        "idź w dół",
+        "przesuń w dół",
+        "dół",
+        "opuść się"
+      ]
+    },
+    {
+      "command": "timeout 7s ros2 run rover_control test_node",
+      "variations": [
+        "uruchom testy",
+        "rozpocznij testowanie",
+        "zainicjuj testowanie",
+        "testuj łazika",
+        "przeprowadź testy",
+        "rozpocznij proces testowania"
+      ]
+    }
+  ],
+  "matching_rules": {
+    "fuzzy_threshold": 0.8,
+    "use_regex": true,
+    "regex_patterns": [
+      {
+        "pattern": ".*(idź|ruch).*do przodu.*|.*naprzód.*",
+        "command": "forward_"
+      },
+      {
+        "pattern": ".*w lewo.*|.*(skręć|przesuń|idź).*w lewo.*",
+        "command": "left_"
+      },
+      {
+        "pattern": ".*w prawo.*|.*(skręć|przesuń|idź).*w prawo.*",
+        "command": "right_"
+      },
+      {
+        "pattern": ".*(idź|ruch|cofnij).*do tyłu.*|.*wstecz.*",
+        "command": "backward_"
+      },
+      {
+        "pattern": ".*start.*|.*rozpocznij.*|.*zainicjuj.*|.*włącz.*",
+        "command": "start_"
+      },
+      {
+        "pattern": ".*zatrzymaj.*|.*stop.*|.*zakończ.*|.*przerwij.*",
+        "command": "stop_"
+      },
+      {
+        "pattern": ".*(idź|przesuń).*w górę.*|.*wznieś się.*",
+        "command": "up_"
+      },
+      {
+        "pattern": ".*(idź|przesuń).*w dół.*|.*opuść się.*",
+        "command": "down_"
+      },
+      {
+        "pattern": ".*(uruchom|rozpocznij|zainicjuj|przeprowadź).*test.*",
+        "command": "timeout 7s ros2 run rover_control test_node"
+      }
+    ]
+  },
+  "fallback": "unknown_command"
+}

@@ -41,3 +41,42 @@ def api_generate_view(request):
 
     # Jeśli metoda nie jest POST, zwróć błąd
     return JsonResponse({"error": "Invalid request method"}, status=400)
+
+
+# Import the RAG pipeline functions
+from static.js.nlp.nlpModules.ragPipeline import ragPipeline
+
+@csrf_exempt
+def rag_pipeline_view(request):
+    """
+    Handle POST requests to query the RAG pipeline.
+
+    Request format (JSON):
+    {
+    "model": "wsrc_nlp",
+    "prompt": "Jedź do tyłu przez 5 sekund",
+    "stream": false
+    }
+
+    Response format (JSON):
+    {
+        "response": "Generated response from the RAG pipeline"
+    }
+    """
+    if request.method == "POST":
+        try:
+            # Parse the incoming JSON request
+            data = json.loads(request.body)
+            query_text = data.get("prompt")
+
+            if not query_text:
+                return JsonResponse({"error": "Query text is required."}, status=400)
+
+            # Call the RAG pipeline
+            response = ragPipeline(query_text)
+
+            return JsonResponse({"response": response})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    else:
+        return JsonResponse({"error": "Invalid request method"}, status=405)
