@@ -48,6 +48,7 @@
   },
   "author": "Rafał [Bafau] Bazan <rafalbe777@gmail.com>",
   "license": "MIT",
+  "homepage": "https://github.com/rafalbazan/Web_Speech_remote_control",
   "devDependencies": {
     "electron": "^19.1.9",
     "electron-builder": "^25.0.5"
