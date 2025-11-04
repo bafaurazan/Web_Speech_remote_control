@@ -61,7 +61,7 @@ formJoin.addEventListener('submit', (event) => {
     login.style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
 
-    title.innerHTML = `Logged in as: ${username}`;
+    title.innerHTML = `Logged as: ${username}`;
 
     var loc = window.location;
     var wsStart = 'ws://';
