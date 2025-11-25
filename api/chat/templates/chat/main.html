@@ -81,7 +81,7 @@
 
                 <div id="buttons-rover" class="hidden">
                     <div id="rover-control-panel">
-                        <button id="rover-btn-start">Start</button>
+                        <!-- <button id="rover-btn-start">Start</button>
                         <button id="rover-btn-forward">Przód</button>
                         <p></p>
                     
@@ -90,10 +90,13 @@
                         <button id="rover-btn-right">Prawo</button>
                     
                         <button id="rover-btn-stop">Stop</button>
-                        <button id="rover-btn-backward">Tył</button>
+                        <button id="rover-btn-backward">Tył</button> -->
                         <p></p>
+                        <div id="rover-joystick-container" style="width:200px; height:200px; margin:10px;"></div>
+                        <p>Kieruj łazikiem przeciągając joystick.</p>
                     </div>  
                 </div>
+               
             </div>
 
         </div>
@@ -117,5 +120,69 @@
     <script type="text/javascript" src="{% static 'js/share_screen.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/buttons.js' %}"></script>
+     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const joystickContainer = document.getElementById('rover-joystick-container');
+        if (joystickContainer) {
+            const joystick = nipplejs.create({
+                zone: joystickContainer,
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: 'blue'
+            });
+
+            joystick.on('move', (evt, data) => {
+                if (data && data.direction) {
+                    console.log('Kierunek:', data.direction.angle);
+                    // Tutaj można wysłać dane do serwera
+                }
+            });
+
+            joystick.on('end', () => {
+                console.log('Joystick zwolniony');
+            });
+        }
+    });
+    // Inicjalizacja joysticka
+        const joystickContainer = document.getElementById('rover-joystick-container');
+        if (joystickContainer) {
+            const joystick = nipplejs.create({
+                zone: joystickContainer,
+                mode: 'static',
+                position: { left: '50%', top: '50%' },
+                color: 'blue'
+            });
+
+            joystick.on('move', (evt, data) => {
+                if (data && data.direction) {
+                    let command = null;
+                    switch (data.direction.angle) {
+                        case 'up':
+                            command = 'forward_rover';
+                            break;
+                        case 'down':
+                            command = 'backward_rover';
+                            break;
+                        case 'left':
+                            command = 'left_rover';
+                            break;
+                        case 'right':
+                            command = 'right_rover';
+                            break;
+                    }
+                    if (command) {
+                        sendToRobot(command);
+                    }
+                }
+            });
+
+            joystick.on('end', () => {
+                sendToRobot('stop_rover');
+            });
+        }
+
+    </script>   
 </body>
 </html>
