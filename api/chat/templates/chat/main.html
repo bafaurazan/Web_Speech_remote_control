@@ -50,7 +50,6 @@
                     <button id="btn-share-screen">Share Screen</button>
                     <button id="btn-chat">Chat</button>
                     <button id="btn-buttons-rover">Rover</button>
-                    <button id="btn-buttons-drone">Drone</button>
                 </div>
 
                 <div class id="chat">
@@ -62,22 +61,7 @@
                         <input id="msg"><button id="btn-send-msg">Send</button>
                     </div>
                 </div>
-                
-                <div id="buttons-drone" class="hidden">
-                    <div id="drone-control-panel">
-                        <button id="drone-btn-start">Start</button>
-                        <button id="drone-btn-forward">Przód</button>
-                        <button id="drone-btn-up">Do Góry</button> 
-                    
-                        <button id="drone-btn-left">Lewo</button>
-                        <button id="drone-btn-speed-up">Przyspiesz</button>
-                        <button id="drone-btn-right">Prawo</button>
-                    
-                        <button id="drone-btn-stop">Stop</button>
-                        <button id="drone-btn-backward">Tył</button>
-                        <button id="drone-btn-down">Do Dołu</button>
-                    </div>  
-                </div>
+               
 
                 <div id="buttons-rover" class="hidden">
                     <div id="rover-control-panel">
@@ -121,6 +105,7 @@
     <script type="text/javascript" src="{% static 'js/main.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/buttons.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/joystick.js' %}"></script>
+    <!-- <script type="module" src="{% static 'js/webrtc-utils.js' %}"></script> -->
     <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
 </body>
 </html>

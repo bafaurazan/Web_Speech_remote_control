@@ -1,18 +1,14 @@
 // Pobieranie elementów
 const chatDiv = document.getElementById('chat');
 const buttonsRoverDiv = document.getElementById('buttons-rover');
-const buttonsDroneDiv = document.getElementById('buttons-drone');
-
 const btnChat = document.getElementById('btn-chat');
 const btnButtonsRover = document.getElementById('btn-buttons-rover');
-const btnButtonsDrone = document.getElementById('btn-buttons-drone');
 
 // Funkcja, która ukrywa wszystkie sekcje i pokazuje wybrany div
 function showOnly(selectedDiv) {
     // Ukryj wszystkie divy
     chatDiv.classList.add('hidden');
     buttonsRoverDiv.classList.add('hidden');
-    buttonsDroneDiv.classList.add('hidden');
 
     // Pokaż wybrany div
     selectedDiv.classList.remove('hidden');
@@ -24,7 +20,6 @@ showOnly(chatDiv);
 // Obsługa kliknięć przycisków
 btnChat.addEventListener('click', () => showOnly(chatDiv)); // Pokazuje czat
 btnButtonsRover.addEventListener('click', () => showOnly(buttonsRoverDiv)); // Pokazuje sekcję rover
-btnButtonsDrone.addEventListener('click', () => showOnly(buttonsDroneDiv)); // Pokazuje sekcję drone
 
 // Pobieranie elementów
 const btnRoverControl = document.getElementById('btn-rover-control');
