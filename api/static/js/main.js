@@ -263,7 +263,24 @@ function addLocalTracks(peer) {
 // Obsługa wiadomości z DataChannel
 function dcOnMessage(event) {
     const data = JSON.parse(event.data);
+
+    // 1. OBSŁUGA DANYCH Z JOYSTICKA
+    // Sprawdzamy, czy w przesłanych danych istnieje pole 'joystick'
+    if (data.joystick) {
+        console.log("Joystick command received:", data.joystick);
+        // data.joystick to np. { linear: 0.5, angular: 0.1 }
+        
+        // TUTAJ możesz dodać kod przekazujący te wartości do silników robota
+        // np. driveRobot(data.joystick.linear, data.joystick.angular);
+        
+        return; // Kończymy funkcję, żeby nie traktować tego jako czatu
+    }
+
+    // 2. OBSŁUGA KOMEND PRZYCISKÓW I CZATU (stary kod)
     const msg = data.message;
+
+    // Jeśli msg jest puste (np. błąd danych), przerywamy
+    if (!msg) return;
 
     const robotCommands = [
         "forward_rover", "backward_rover",
@@ -272,13 +289,15 @@ function dcOnMessage(event) {
     ];
 
     if (robotCommands.includes(msg)) {
-        console.log("Robot receives:", msg);
+        console.log("Robot receives command:", msg);
+        // Tutaj obsługa przycisków (przód/tył/lewo/prawo)
         return;
+    } else {
+        console.log("Received chat msg: ", msg);
+        const li = document.createElement('li');
+        li.textContent = `${data.username}: ${msg}`;
+        messageList.appendChild(li); 
     }
-
-    const li = document.createElement('li');
-    li.textContent = `${data.username}: ${msg}`;
-    messageList.appendChild(li);
 }
 
 
