@@ -1,8 +1,11 @@
 from django.urls import path
-from .views import main_view, api_generate_view, rag_pipeline_view
+from . import views
 
 urlpatterns = [
-    path('', main_view, name='main_view'),
-    path('api/generate', api_generate_view, name='api_generate_view'),  # Dodanie endpointu POST
-    path('api/query', rag_pipeline_view, name='rag_pipeline_view'), # RAG POST
+    # API endpoints
+    path('api/generate/', views.api_generate_view, name='api_generate'),
+    path('api/rag/', views.rag_pipeline_view, name='rag_pipeline'),
+    
+    # Usunęliśmy ścieżkę '' (root), ponieważ nie serwujemy już HTML z Django.
+    # React będzie obsługiwał stronę główną.
 ]

@@ -39,12 +39,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Biblioteki zewnętrzne
+    'rest_framework',
+    'corsheaders',
 
+    # Twoje aplikacje
     'chat',
     'channels',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -73,7 +80,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'api.wsgi.application'
-
+ASGI_APPLICATION = 'api.asgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -129,8 +136,6 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-ASGI_APPLICATION = 'api.asgi.application'
-
 """
 CHANNEL_LAYERS = {
     "default": {
@@ -149,3 +154,13 @@ CHANNEL_LAYERS = {
 }
 """
 """
+
+# Pozwalamy na połączenia z localhost:3000 (React default) i 5173 (Vite default)
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:3000",
+#     "http://localhost:5173",
+#     "http://127.0.0.1:3000",
+# ]
+
+# Opcjonalnie: Pozwól na wszystkie (tylko w dev!)
+CORS_ALLOW_ALL_ORIGINS = True
