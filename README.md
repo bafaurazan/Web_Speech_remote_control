@@ -41,6 +41,11 @@ This project is a comprehensive integration of modern software and hardware tech
 cd ~/Web_Speech_remote_control/api
 poetry run python manage.py runserver 0.0.0.0:8000
 ```
+1.5 setup react frontend
+```
+cd ~/Web_Speech_remote_control/frontend_ws
+npm run dev
+```
 
 2. setup tailscale
 ```
