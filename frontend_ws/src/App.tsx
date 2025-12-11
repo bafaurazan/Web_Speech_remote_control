@@ -26,7 +26,7 @@ function App() {
   const peerConnections = useRef<{ [username: string]: RTCPeerConnection }>({});
   const dataChannels = useRef<{ [username: string]: RTCDataChannel }>({});
   
-  // Przechowujemy referencję do strumienia, by mieć do niego dostęp w eventach bez zamykania w useEffect
+  // Przechowujemy referencję do strumienia
   const localStreamRef = useRef<MediaStream | null>(null);
 
   // ==========================
@@ -37,9 +37,6 @@ function App() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
       setLocalStream(stream);
-      
-      // Domyślnie wycisz lokalne wideo (by nie słyszeć echa)
-      // Uwaga: w React "muted" na tagu wideo jest obsługiwane, ale tutaj stan audio:
       stream.getAudioTracks()[0].enabled = true; 
     } catch (err) {
       console.error("Camera error:", err);
@@ -61,7 +58,7 @@ function App() {
       const parsed: SignalMessage = JSON.parse(event.data);
       const { peer, action, message } = parsed;
 
-      if (peer === user) return; // Ignore self
+      if (peer === user) return; 
 
       const receiverChannel = message.receiver_channel_name;
 
@@ -105,12 +102,11 @@ function App() {
 
     addLocalTracks(pc);
 
-    // Data Channel (Initiator)
     const dc = pc.createDataChannel('chat');
     setupDataChannel(dc, peerUsername);
 
     pc.onicecandidate = (e) => {
-      if (e.candidate) return; // Wait for gathering complete (simple impl)
+      if (e.candidate) return; 
       sendSignal('new-offer', {
         sdp: pc.localDescription,
         receiver_channel_name: receiverChannel
@@ -153,7 +149,6 @@ function App() {
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
     const [stream] = e.streams;
     setRemotePeers(prev => {
-        // Unikaj duplikatów
         if (prev.find(p => p.username === peerUsername)) return prev;
         return [...prev, { username: peerUsername, stream }];
     });
@@ -161,7 +156,6 @@ function App() {
 
   const handleIceChange = (pc: RTCPeerConnection, peerUsername: string) => {
     if(['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
-        // Clean up
         delete peerConnections.current[peerUsername];
         delete dataChannels.current[peerUsername];
         setRemotePeers(prev => prev.filter(p => p.username !== peerUsername));
@@ -175,9 +169,7 @@ function App() {
     dataChannels.current[peerUsername] = dc;
     dc.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        // Handle Chat
         if (data.message && !data.joystick) {
-            // Ignorujemy komendy robota w czacie
             const robotCmds = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"];
             if (!robotCmds.includes(data.message)) {
                 setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
@@ -185,10 +177,8 @@ function App() {
                 console.log("Robot command received:", data.message);
             }
         }
-        // Handle Joystick
         if (data.joystick) {
             console.log("Joystick data:", data.joystick);
-            // Tutaj logika dla robotów, jeśli ten klient jest robotem
         }
     };
   };
@@ -205,7 +195,7 @@ function App() {
   // ==========================
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username) { // Removed password check for simplicity or re-add if needed
+    if (username) {
       setIsLoggedIn(true);
       startCamera();
       connectWebSocket(username);
@@ -232,22 +222,18 @@ function App() {
             const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
             const screenTrack = screenStream.getVideoTracks()[0];
             
-            // Zamień tracki w PC
             Object.values(peerConnections.current).forEach(pc => {
                 const sender = pc.getSenders().find(s => s.track?.kind === 'video');
                 if (sender) sender.replaceTrack(screenTrack);
             });
 
-            // Aktualizuj lokalny podgląd
             setLocalStream(screenStream);
             setIsScreenSharing(true);
-
-            screenTrack.onended = () => toggleScreenShare(); // Auto stop
+            screenTrack.onended = () => toggleScreenShare();
         } catch (e) {
             console.error(e);
         }
     } else {
-        // Stop sharing
         if(localStreamRef.current) {
             const camTrack = localStreamRef.current.getVideoTracks()[0];
              Object.values(peerConnections.current).forEach(pc => {
@@ -326,6 +312,17 @@ function App() {
                     onStop={() => sendJoystickData(0,0)} 
                     onCommand={sendRobotCommand}
                 />
+
+                {/* --- NOWY PRZYCISK DLA NLP/RAG --- */}
+                <hr className="my-4" />
+                <button 
+                  className="w-full py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded shadow transition duration-200 flex items-center justify-center gap-2"
+                  onClick={() => alert("moduł nlp przeniesiony do frontend_ws/src/nlp i jest nieskonfigurowany")}
+                >
+                  <span>🧠</span> Start NLP / RAG
+                </button>
+                {/* ---------------------------------- */}
+
             </div>
             
             <SpeechControl onCommand={sendRobotCommand} />

@@ -49,7 +49,7 @@ npm run dev
 
 2. setup tailscale
 ```
-sudo tailscale funnel 8000
+sudo tailscale funnel 5173
 ```
 go to website
 

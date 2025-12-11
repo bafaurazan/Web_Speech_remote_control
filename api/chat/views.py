@@ -9,7 +9,11 @@ import json
 # Upewnij się, że ta ścieżka importu jest poprawna w Pythonie.
 # Zwykle importowanie z folderu 'static' jest niestandardowe, 
 # ale zostawiam to tak jak masz, zakładając, że działa.
-from static.js.nlp.nlpModules.ragPipeline import ragPipeline
+# from static.js.nlp.nlpModules.ragPipeline import ragPipeline
+
+def ragPipeline(prompt):
+    # Tutaj w przyszłości wkleisz swoją prawdziwą logikę NLP/RAG w Pythonie
+    return f"Backend otrzymał prompt: '{prompt}', ale moduł RAG jest w trakcie przenoszenia."
 
 def index_view(request):
     """
