@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rover Backend API</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent: #00d4ff;
+            --success: #00ff9d;
+            --warning: #ffca28;
+            --method-post: #ffca28;
+            --method-ws: #be63f9;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            border-bottom: 2px solid var(--card-bg);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 { margin: 0; color: var(--accent); }
+        .subtitle { color: #888; margin-top: 5px; }
+        
+        .status-badge {
+            background: rgba(0, 255, 157, 0.1);
+            color: var(--success);
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--success);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-dot {
+            width: 10px; height: 10px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h2 { margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px; font-size: 1.4em; }
+        
+        .endpoint {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #252525;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+            transition: transform 0.2s;
+        }
+        .endpoint:hover { transform: translateX(5px); }
+        
+        .method {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-right: 15px;
+            font-size: 0.8em;
+            color: #121212;
+            min-width: 50px;
+            text-align: center;
+        }
+        .post { background-color: var(--method-post); }
+        .ws { background-color: var(--method-ws); color: white; }
+        
+        .url { font-family: monospace; font-size: 1.1em; color: var(--accent); flex-grow: 1; }
+        .desc { color: #888; font-size: 0.9em; }
+        
+        code {
+            background: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #ff79c6;
+            font-family: monospace;
+            display: inline-block;
+        }
+        .cors-list {
+            list-style: none;
+            padding: 0;
+            color: #aaa;
+            font-family: monospace;
+        }
+        .cors-list li::before {
+            content: "✓";
+            color: var(--success);
+            margin-right: 10px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            color: #555;
+            font-size: 0.8em;
+            border-top: 1px solid #333;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Rover Control Backend</h1>
+                <div class="subtitle">Django REST Framework + Channels</div>
+            </div>
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                SYSTEM ONLINE
+            </div>
+        </header>
+
+        <div class="card">
+            <h2>📢 Status Serwera</h2>
+            <p>Backend działa w trybie <strong>API + WebSocket</strong>. Obsługa stron HTML została przeniesiona do aplikacji React.</p>
+            <p><strong>Baza danych:</strong> SQLite3 (Default)</p>
+            <p><strong>Channel Layer:</strong> InMemory (Development)</p>
+        </div>
+
+        <div class="card">
+            <h2>🔌 REST API Endpoints</h2>
+            <p style="font-size: 0.9em; color: #888; margin-bottom: 20px;">Endpointy obsługiwane przez <code>views.py</code> i dostępne dla aplikacji React.</p>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="url">/api/generate/</span>
+                <span class="desc">Proxy do Ollama (Generowanie tekstu)</span>
+            </div>
+
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="url">/api/rag/</span>
+                <span class="desc">RAG Pipeline (NLP -> Komendy Robota)</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⚡ WebSocket (Real-time)</h2>
+            <div class="endpoint" style="border-left-color: var(--method-ws);">
+                <span class="method ws">WS</span>
+                <span class="url">/ws/chat/</span>
+                <span class="desc">Sygnalizacja WebRTC, Czat, Telemetria</span>
+            </div>
+            <p>Pełny adres dla klienta:</p>
+            <code>ws://127.0.0.1:8000/ws/chat/</code>
+        </div>
+
+        <div class="card">
+            <h2>🛡️ Konfiguracja CORS</h2>
+            <p>Serwer akceptuje połączenia z następujących źródeł frontendowych:</p>
+            <ul class="cors-list">
+                <li>http://localhost:3000 (React Default)</li>
+                <li>http://localhost:5173 (Vite Default)</li>
+                <li>Twój adres Tailscale (jeśli dodano do settings)</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            &copy; 2025 Rover Project. Backend powered by Django REST Framework.
+        </div>
+    </div>
+</body>
+</html>

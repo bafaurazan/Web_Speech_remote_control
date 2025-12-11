@@ -1,6 +1,7 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from django.shortcuts import render
 import requests
 import json
 
@@ -10,7 +11,11 @@ import json
 # ale zostawiam to tak jak masz, zakładając, że działa.
 from static.js.nlp.nlpModules.ragPipeline import ragPipeline
 
-# Usuwamy main_view, ponieważ frontend (React) będzie serwował HTML.
+def index_view(request):
+    """
+    Wyświetla stronę startową API z dokumentacją html.
+    """
+    return render(request, 'chat/index.html')
 
 @api_view(['POST'])
 def api_generate_view(request):
