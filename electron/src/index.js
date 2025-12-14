@@ -46,102 +46,123 @@ app.on("ready", () => {
     // Inicjalizacja ROS 2 Node za pomocą rclnodejs
     rclnodejs.init().then(() => {
         
-        // --- SEKCJA TURTLE (Oryginalna) ---
-        const node = new rclnodejs.Node('turtle_controller');
-        const cmdVelPublisher = node.createPublisher('geometry_msgs/msg/Twist', '/turtle1/cmd_vel');
-
-        function moveTurtle(linear, angular) {
-            const twist = {
-                linear: { x: linear, y: 0, z: 0 },
-                angular: { x: 0, y: 0, z: angular }
-            };
-            cmdVelPublisher.publish(twist);
-        }
-
-        /* ipcMain.on('forward_rover', () => moveTurtle(1, 0));
-        ipcMain.on('backward_rover', () => moveTurtle(-1, 0));
-        // ... (zakomentowane wywołania dla turtle, jeśli nie są używane przez łazika)
-        */
-
-
-        // --- SEKCJA ROVER (Łazik) ---
-        const rover_node = new rclnodejs.Node('rover_js_controller');
+        console.log(">>> ROS 2 Node zainicjalizowany dla G1 Pilot <<<");
+        const node = new rclnodejs.Node('electron_joy_publisher');
         
-        // Publishery na lewą i prawą stronę
-        const rover_pub_left = rover_node.createPublisher('geometry_msgs/msg/Twist', '/diff_drive_controller_left/cmd_vel_unstamped');
-        const rover_pub_right = rover_node.createPublisher('geometry_msgs/msg/Twist', '/diff_drive_controller_right/cmd_vel_unstamped');
+        // Zmieniamy publisher na typ 'sensor_msgs/msg/Joy' i temat '/g1pilot/joy'
+        const joyPublisher = node.createPublisher('sensor_msgs/msg/Joy', '/g1pilot/joy');
 
-        // Funkcje pomocnicze do przycisków
-        function moveRoverLeft(linear, angular) {
-            const twist = { linear: { x: linear, y: 0, z: 0 }, angular: { x: 0, y: 0, z: angular } };
-            const twistStop = { linear: { x: 0, y: 0, z: 0 }, angular: { x: 0, y: 0, z: 0 } };
-            rover_pub_right.publish(twistStop);
-            rover_pub_left.publish(twist);
-        }
-        function moveRoverRight(linear, angular) {
-            const twist = { linear: { x: linear, y: 0, z: 0 }, angular: { x: 0, y: 0, z: angular } };
-            const twistStop = { linear: { x: 0, y: 0, z: 0 }, angular: { x: 0, y: 0, z: 0 } };
-            rover_pub_left.publish(twistStop);
-            rover_pub_right.publish(twist);
-        }
-        function moveRover(linear, angular) {
-            const twist = { linear: { x: linear, y: 0, z: 0 }, angular: { x: 0, y: 0, z: angular } };
-            rover_pub_left.publish(twist);
-            rover_pub_right.publish(twist);
+        // Funkcja pomocnicza do budowania i wysyłania wiadomości Joy
+        // Axes: [left_x, left_y, right_x, right_y, trigger_axis, ...]
+        // Buttons: [0, 1, 2, 3, 4, 5 (Stop), 6 (Balance), 7, 8 (MoveEnable), ...]
+        function publishJoy(axes, buttons) {
+            const joyMsg = {
+                header: {
+                    frame_id: 'electron_input',
+                    stamp: node.now()
+                },
+                axes: axes,
+                buttons: buttons
+            };
+            joyPublisher.publish(joyMsg);
         }
 
-        // Obsługa przycisków (Dyskretna)
-        ipcMain.on('forward_rover', () => moveRover(2, 0));
-        ipcMain.on('backward_rover', () => moveRover(-2, 0));
-        ipcMain.on('right_rover', () => moveRoverLeft(2, 0));
-        ipcMain.on('left_rover', () => moveRoverRight(2, 0));
-        ipcMain.on('stop_rover', () => moveRover(0, 0));
-
+        // Inicjalizacja tablic (rozmiary zgodne z typowym padem Xbox/PS4, bezpieczny zapas)
+        let defaultAxes = new Array(8).fill(0.0);
+        let defaultButtons = new Array(12).fill(0);
 
         // ==========================================================
-        // NOWA SEKCJA: Obsługa Joysticka (Płynna)
+        // OBSŁUGA JOYSTICKA (Płynne sterowanie)
         // ==========================================================
         ipcMain.on('robot_joystick', (event, data) => {
-            // data to obiekt: { linear: <liczba -1 do 1>, angular: <liczba -1 do 1> }
+            // data = { linear: <num>, angular: <num> }
             
-            // Maksymalna prędkość (dopasowana do przycisków = 2)
-            const MAX_SPEED = 2.0;
-            const MAX_TURN = 2.0;
+            // Kopia domyślnych tablic
+            let axes = [...defaultAxes];
+            let buttons = [...defaultButtons];
 
-            const lin = data.linear * MAX_SPEED;
-            const ang = data.angular * MAX_TURN;
+            const linear = data.linear;   // Przód/Tył (-1 do 1)
+            const angular = data.angular; // Lewo/Prawo (-1 do 1)
 
-            // Algorytm Arcade Drive (Sterowanie czołgowe/różnicowe)
-            // Mieszamy wejścia, aby uzyskać prędkości dla lewej i prawej strony.
-            // W zależności od orientacji silników, znaki (+/-) przy 'ang' mogą wymagać zamiany.
-            // Standardowo: Lewa = Przód - Obrót, Prawa = Przód + Obrót (lub odwrotnie)
-            
-            let leftSpeed = lin + ang;
-            let rightSpeed = lin - ang;
+            // MAPOWANIE DLA loco_client.py:
+            // vx  = axes[1] * -0.5  -> Aby jechać do przodu (vx > 0), axes[1] musi być UJEMNE.
+            // yaw = axes[2] * -0.5  -> Aby skręcać (yaw != 0), używamy axes[2].
 
-            // Tworzenie wiadomości Twist dla obu kontrolerów
-            const twistLeft = {
-                linear: { x: leftSpeed, y: 0, z: 0 },
-                angular: { x: 0, y: 0, z: 0 }
-            };
+            // 1. Oś Przód/Tył (Forward/Backward)
+            // Joystick Web wysyła 1.0 dla góry. My chcemy w Pythonie vx > 0.
+            // Zatem: 1.0 * -1.0 = -1.0. W Pythonie: -1.0 * -0.5 = 0.5 m/s (Do przodu).
+            axes[1] = linear * -1.0; 
 
-            const twistRight = {
-                linear: { x: rightSpeed, y: 0, z: 0 },
-                angular: { x: 0, y: 0, z: 0 }
-            };
+            // 2. Oś Skrętu (Yaw)
+            // Joystick Web wysyła 1.0 dla prawej.
+            // W Pythonie: yaw = axes[2] * -0.5.
+            axes[2] = angular; 
 
-            // Publikacja do ROS 2
-            rover_pub_left.publish(twistLeft);
-            rover_pub_right.publish(twistRight);
+            // 3. DEADMAN SWITCH (Przycisk 8)
+            // W loco_client.py ruch odbywa się TYLKO gdy msg.buttons[8] == 1.
+            // Ustawiamy go na 1, jeśli wykryto jakiekolwiek wychylenie joysticka.
+            if (Math.abs(linear) > 0.05 || Math.abs(angular) > 0.05) {
+                buttons[8] = 1;
+            } else {
+                buttons[8] = 0; // Jeśli joystick puszczony, zatrzymaj (StopMove w pythonie)
+            }
+
+            publishJoy(axes, buttons);
         });
+
         // ==========================================================
+        // OBSŁUGA PRZYCISKÓW DYSKRETNYCH (Z GUI)
+        // ==========================================================
+        
+        // 1. Przycisk "Start/Wstań" (zmapowany pod strzałkę w górę w GUI)
+        // W loco_client.py: Przycisk 6 (Rising edge) -> entering_balancing()
+        ipcMain.on('forward_rover', () => {
+            console.log("Komenda: WSTAŃ (Balancing)");
+            let btns = [...defaultButtons];
+            btns[6] = 1; // Symulujemy wciśnięcie przycisku 6
+            publishJoy(defaultAxes, btns);
 
+            // Musimy "puścić" przycisk, aby wykryć zbocze narastające przy kolejnym kliknięciu
+            // (Choć loco_client reaguje na 'rising', czyli zmianę z 0 na 1, co zrobiliśmy wyżej)
+            setTimeout(() => {
+                btns[6] = 0;
+                publishJoy(defaultAxes, btns);
+            }, 200);
+        });
 
-        // Spinujemy node (tutaj node 'turtle', ale w rclnodejs kontekst jest współdzielony, 
-        // więc publishery 'rover_node' też będą działać).
+        // 2. Przycisk "STOP" (Czerwony w GUI)
+        // W loco_client.py: Przycisk 5 (Rising edge) -> Emergency Stop / Damp
+        ipcMain.on('stop_rover', () => {
+            console.log("Komenda: EMERGENCY STOP / DAMP");
+            let btns = [...defaultButtons];
+            btns[5] = 1; // Przycisk 5 to E-Stop
+            publishJoy(defaultAxes, btns);
+            
+            setTimeout(() => {
+                btns[5] = 0;
+                publishJoy(defaultAxes, btns);
+            }, 200);
+        });
+
+        // Opcjonalnie: Strzałka w dół jako "Siad" (Damp) - to samo co Stop, lub inne zachowanie
+        ipcMain.on('backward_rover', () => {
+            console.log("Komenda: DAMP (Siad)");
+            let btns = [...defaultButtons];
+            btns[5] = 1; // Używamy tego samego co Stop dla bezpieczeństwa
+            publishJoy(defaultAxes, btns);
+            setTimeout(() => { btns[5] = 0; publishJoy(defaultAxes, btns); }, 200);
+        });
+        
+        // Pozostałe przyciski (lewo/prawo) z GUI można zignorować, 
+        // bo sterowanie kierunkiem odbywa się przez Joystick.
+        ipcMain.on('left_rover', () => console.log("Użyj joysticka do skręcania"));
+        ipcMain.on('right_rover', () => console.log("Użyj joysticka do skręcania"));
+
         rclnodejs.spin(node);
 
-    }).catch(console.error);
+    }).catch((e) => {
+        console.error("Błąd inicjalizacji ROS 2:", e);
+    });
 });
 
 app.on('window-all-closed', () => {
