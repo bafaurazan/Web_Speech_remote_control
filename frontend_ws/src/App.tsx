@@ -6,8 +6,17 @@ import { JoystickController } from './components/JoystickController';
 import { SpeechControl } from './components/SpeechControl';
 import type { ChatMessage, PeerData, SignalMessage } from './types';
 
-// WAŻNE: Adres Twojego backendu Django
-const WS_URL = 'ws://127.0.0.1:8000/ws/chat/'; 
+// --- AUTOMATYCZNE DOBIERANIE ADRESU ---
+const getWebSocketUrl = () => {
+    // 1. Sprawdź protokół (jeśli strona jest na https, użyj wss)
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    
+    // 2. Pobierz hosta (np. "rafal.tail692f2a.ts.net" lub "192.168.1.x:5173")
+    const host = window.location.host; 
+    
+    // 3. Złóż adres. Tailscale przekieruje /ws/ do Django na port 8000.
+    return `${protocol}${host}/ws`; 
+}; 
 
 function App() {
   // --- STATE ---
@@ -80,7 +89,10 @@ function App() {
   // 2. SIGNALING & WEBSOCKET
   // ==========================
   const connectWebSocket = (user: string) => {
-    ws.current = new WebSocket(WS_URL);
+    const url = getWebSocketUrl();
+    console.log("Connecting to WS:", url);
+
+    ws.current = new WebSocket(url);
     ws.current.onopen = () => {
       console.log('WS Connected');
       sendSignal('new-peer', {});

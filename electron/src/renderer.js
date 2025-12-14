@@ -50,7 +50,7 @@ btnJoin.addEventListener('click', () => {
     var labelUsername = document.querySelector('#label-username');
     labelUsername.innerHTML = username;
 
-    var wsStart = 'wss://rafal.tail692f2a.ts.net/';  // Adres WebSocket serwera
+    var wsStart = 'wss://rafal.tail692f2a.ts.net/ws';  // Adres WebSocket serwera
     webSocket = new WebSocket(wsStart);
 
     webSocket.addEventListener('open', (e) => {
@@ -145,7 +145,7 @@ function createOfferer(peerUsername, receiver_channel_name){
 
     addLocalTracks(peer);
 
-    var dc = peer.createDataChannel('channel');
+    var dc = peer.createDataChannel('chat');
     dc.addEventListener('open', () => {
         console.log('Connection opened!');
     });

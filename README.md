@@ -37,24 +37,29 @@ This project is a comprehensive integration of modern software and hardware tech
 # Testing (after initial configuration of all project components available in appropriate subfolders)
 
 1. setup django server
-```
+```bash
 cd ~/Web_Speech_remote_control/api
 poetry run python manage.py runserver 0.0.0.0:8000
 ```
 1.5 setup react frontend
-```
+```bash
 cd ~/Web_Speech_remote_control/frontend_ws
 npm run dev
 ```
 
 2. setup tailscale
+```bash
+sudo tailscale funnel --bg --set-path /ws http://127.0.0.1:8000
+sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
+
+# to turn off 
+# tailscale funnel --https=443 off
+
 ```
-sudo tailscale funnel 5173
-```
-go to website
+go to website using generated address from url with react port ...etc. https://name.tail123g3a.ts.net/
 
 3. setup electron app
-```
+```bash
 cd ~/Web_Speech_remote_control/electron
 npm run start
 ```
@@ -62,14 +67,14 @@ npm run start
 4. Turn on rover
 
 5. create wifi connection with esp32 
-```
+```bash
 sudo docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
 ```
 
 6. start testing all components
 
 7. terminal tests
-```
+```bash
 ros2 topic pub /diff_drive_controller_right/cmd_vel_unstamped geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
 
 
@@ -79,17 +84,17 @@ ros2 topic pub /diff_drive_controller_left/cmd_vel_unstamped geometry_msgs/msg/T
 
 8. setup depthai
 
-```
+```bash
 sudo nano /etc/udev/rules.d/80-depthai.rules
 ```
 SUBSYSTEM=="usb", ATTR{idVendor}=="03e7", MODE="0666"
-```
+```bash
  sudo udevadm control --reload-rules
 ```
 
 9. running oak camera depthai_viewer
 
-```
+```bash
 python3 -m depthai_viewer
 
 ```
