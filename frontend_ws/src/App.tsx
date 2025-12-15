@@ -8,13 +8,8 @@ import type { ChatMessage, PeerData, SignalMessage } from './types';
 
 // --- AUTOMATYCZNE DOBIERANIE ADRESU ---
 const getWebSocketUrl = () => {
-    // 1. Sprawdź protokół (jeśli strona jest na https, użyj wss)
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    
-    // 2. Pobierz hosta (np. "rafal.tail692f2a.ts.net" lub "192.168.1.x:5173")
     const host = window.location.host; 
-    
-    // 3. Złóż adres. Tailscale przekieruje /ws/ do Django na port 8000.
     return `${protocol}${host}/ws`; 
 }; 
 
@@ -24,7 +19,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   
-  // UI State - Domyślnie wyłączone (zgodnie z życzeniem)
+  // UI State
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -54,13 +49,10 @@ function App() {
 
   const startCamera = async () => {
     try {
-      // PRÓBA 1: Pobieramy wszystko naraz
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setupStream(stream);
     } catch (err) {
       console.warn("Błąd pobierania obu urządzeń naraz. Próbuję niezależnie...", err);
-
-      // PRÓBA 2: Fallback - pobieramy co się da
       let videoStream: MediaStream | null = null;
       let audioStream: MediaStream | null = null;
 
@@ -264,6 +256,22 @@ function App() {
     }
   };
 
+  // --- NOWA FUNKCJA: Odświeżanie strumieni ---
+  const refreshStreams = () => {
+    console.log("Ręczne odświeżanie strumieni...");
+    setRemotePeers([]); // Czyścimy widok
+    
+    // Zamykamy obecne połączenia dla pewności (wymuszenie restartu)
+    Object.keys(peerConnections.current).forEach(key => {
+        const pc = peerConnections.current[key];
+        pc.close();
+        delete peerConnections.current[key];
+    });
+
+    // Wysyłamy sygnał ponownego dołączenia
+    sendSignal('new-peer', {});
+  };
+
   // ==========================
   // RENDER
   // ==========================
@@ -300,33 +308,29 @@ function App() {
         </div>
         <div className="flex gap-2">
             
-            {/* PRZYCISK KAMERY (Zmieniona ikonka) */}
+            {/* KAMERA */}
             <button onClick={toggleVideo} className="icon-btn" title="Toggle Camera" style={{ color: isVideoStopped ? '#dc2626' : 'inherit' }}>
                  {isVideoStopped ? (
-                    // Ikonka przekreślonej kamery (SVG)
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18 7c0-1.103-.897-2-2-2H4c-1.103 0-2 .897-2 2v10c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-3.333L22 17V7l-4 3.333V7z" opacity="0.5"/>
                         <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     </svg>
                  ) : (
-                    // Ikonka włączonej kamery (SVG)
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M18 7c0-1.103-.897-2-2-2H4c-1.103 0-2 .897-2 2v10c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-3.333L22 17V7l-4 3.333V7z"/>
                     </svg>
                  )}
             </button>
 
-            {/* PRZYCISK MIKROFONU (Zmieniona ikonka) */}
+            {/* MIKROFON */}
             <button onClick={toggleAudio} className="icon-btn" title="Toggle Mic" style={{ color: isAudioMuted ? '#dc2626' : 'inherit' }}>
                  {isAudioMuted ? (
-                    // Przekreślony mikrofon
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" opacity="0.5"/>
                         <path d="M17 11c0 2.76-2.24 5-5 5-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
                         <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                     </svg>
                  ) : (
-                    // Mikrofon
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
                         <path d="M17 11c0 2.76-2.24 5-5 5-2.76 0-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
@@ -334,6 +338,14 @@ function App() {
                  )}
             </button>
 
+            {/* --- PRZYCISK ODŚWIEŻANIA (NOWY) --- */}
+            <button onClick={refreshStreams} className="icon-btn" title="Refresh Connections">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/>
+                </svg>
+            </button>
+
+            {/* SCREEN SHARE */}
             <button onClick={toggleScreenShare} className="icon-btn" title="Screen Share" style={{ color: isScreenSharing ? '#dc2626' : 'inherit' }}>
                  {isScreenSharing ? '⏹️' : '🖥️'}
             </button>
@@ -385,7 +397,7 @@ function App() {
 
         </div>
 
-        {/* PRAWA KOLUMNA (Komendy i Czat) */}
+        {/* PRAWA KOLUMNA */}
         <div className="flex flex-col gap-4">
             <div className="panel">
                 <h3 className="border-b-2 border-dashed border-purple-900 pb-1 mb-2 font-bold text-center">COMMANDS</h3>
