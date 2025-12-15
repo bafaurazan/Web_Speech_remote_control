@@ -10,24 +10,26 @@ interface JoystickProps {
 export const JoystickController: React.FC<JoystickProps> = ({ onMove, onStop, onCommand }) => {
   const joystickContainerRef = useRef<HTMLDivElement>(null);
   const [keyboardActive, setKeyboardActive] = useState(false);
+  const [isJoystickActive, setIsJoystickActive] = useState(false);
 
-  // Inicjalizacja Nipple.js
   useEffect(() => {
-    if (!joystickContainerRef.current) return;
+    if (!isJoystickActive || !joystickContainerRef.current) return;
 
-    // Upewniamy się, że kontener jest pusty przed inicjalizacją (zapobiega dublowaniu)
+    // Reset kontenera
     joystickContainerRef.current.innerHTML = '';
 
     const manager = nipplejs.create({
       zone: joystickContainerRef.current,
-      mode: 'static',
+      mode: 'static', // Tryb pół-statyczny (widoczny środek, ale łapie dotyk obok)
+      catchDistance: 150,
       position: { left: '50%', top: '50%' },
       color: '#4c1d95',
-      size: 120 
+      size: 100,
+      threshold: 0.1, 
     });
 
     manager.on('move', (_: any, data: any) => {
-      const maxDist = 60; 
+      const maxDist = 50; 
       const dist = Math.min(data.distance, maxDist);
       const angleRad = data.angle.radian;
 
@@ -47,7 +49,7 @@ export const JoystickController: React.FC<JoystickProps> = ({ onMove, onStop, on
     return () => {
       manager.destroy();
     };
-  }, [onMove, onStop]);
+  }, [isJoystickActive, onMove, onStop]);
 
   // Obsługa klawiatury
   useEffect(() => {
@@ -69,13 +71,27 @@ export const JoystickController: React.FC<JoystickProps> = ({ onMove, onStop, on
   }, [keyboardActive, onCommand]);
 
   return (
-    // Używamy własnej klasy CSS zamiast klas Tailwind
     <div className="joystick-layout">
       
-      {/* LEWA STRONA: Strefa Joysticka */}
-      <div className="joystick-zone" ref={joystickContainerRef} />
+      {/* LEWA STRONA: Wrapper Joysticka */}
+      <div className="joystick-wrapper">
+          {/* Przycisk w stylu aplikacji */}
+          <button 
+            onClick={() => setIsJoystickActive(!isJoystickActive)}
+            className="joystick-toggle-btn"
+          >
+            {isJoystickActive ? '🔄 Zresetuj Joystick' : '🕹️ Włącz Joystick'}
+          </button>
+
+          <div 
+            className={`joystick-zone ${isJoystickActive ? 'active' : 'inactive'}`} 
+            ref={joystickContainerRef}
+          >
+             {!isJoystickActive && <span className="disabled-msg">Wyłączony</span>}
+          </div>
+      </div>
       
-      {/* PRAWA STRONA: Panel przycisków */}
+      {/* PRAWA STRONA: Przyciski */}
       <div className="joystick-right-panel">
          
          <button 
@@ -85,7 +101,6 @@ export const JoystickController: React.FC<JoystickProps> = ({ onMove, onStop, on
           {keyboardActive ? '⌨️ ON' : '⌨️ Enable Keys'}
          </button>
 
-         {/* Siatka D-Pad */}
          <div className="d-pad-grid-local">
              <div></div>
              <button className="d-btn-local" onClick={() => onCommand('forward_rover')}>▲</button>
