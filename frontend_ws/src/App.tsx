@@ -374,20 +374,13 @@ function App() {
                />
             </div>
 
-            {/* PANEL JOYSTICKA - TUTAJ ZMIANA */}
-            {/* Dodano klasę 'panel-row', która wymusza układ poziomy */}
-            {/* PANEL JOYSTICKA - TUTAJ ZMIANA */}
-            <div className="panel panel-row">
-                
-                {/* 1. OWIJAMY JOYSTICK W DIVA, ŻEBY GO POSKROMIĆ */}
-                <div className="joystick-wrapper">
-                    <JoystickController 
-                        onMove={sendJoystickData} 
-                        onStop={() => sendJoystickData(0,0)} 
-                        onCommand={sendRobotCommand} 
-                    />
-                </div>
-                
+            {/* PANEL JOYSTICKA */}
+            <div className="panel">
+                <JoystickController 
+                    onMove={sendJoystickData} 
+                    onStop={() => sendJoystickData(0,0)} 
+                    onCommand={sendRobotCommand} 
+                />
             </div>
 
         </div>

@@ -27,14 +27,15 @@ html, body {
   font-size: 16px; 
 }
 
-/* --- KLUCZOWA POPRAWKA: Stylizacja #root --- */
-/* To sprawia, że główny kontener Reacta zajmuje całą szerokość i centruje zawartość */
+/* --- ROOT --- */
 #root {
   width: 100%;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  align-items: center; /* To centruje .dashboard w poziomie */
+  align-items: center; 
+  justify-content: flex-start;
+  padding-bottom: 50px;
 }
 
 img, video, canvas {
@@ -45,9 +46,8 @@ img, video, canvas {
 }
 
 /* =========================================
-   2. KLASY POMOCNICZE (z App.tsx)
+   2. KLASY POMOCNICZE
    ========================================= */
-
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
 .items-center { align-items: center; }
@@ -76,7 +76,6 @@ img, video, canvas {
 .opacity-70 { opacity: 0.7; }
 .block { display: block; }
 .self-stretch { align-self: stretch; }
-
 .hidden { display: none; }
 
 @media (min-width: 768px) {
@@ -88,19 +87,16 @@ img, video, canvas {
    3. EKRAN LOGOWANIA
    ========================================= */
 .login-container {
-  /* Position fixed ignoruje #root i centruje względem okna przeglądarki */
   position: fixed; 
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   z-index: 9999;
-  
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  
   background-color: #8b5cf6;
   padding: 20px;
   overflow-y: auto;
@@ -187,18 +183,15 @@ img, video, canvas {
 }
 
 /* =========================================
-   4. DASHBOARD - TYLKO PIONOWO & WYŚRODKOWANY
+   4. DASHBOARD
    ========================================= */
 .dashboard {
   min-height: 100vh;
   width: 100%;
   padding: 10px;
-  
   display: flex;
   flex-direction: column;
   gap: 15px;
-  
-  /* To centruje dzieci (czyli .top-bar i .main-grid) w poziomie */
   align-items: center; 
 }
 
@@ -211,10 +204,9 @@ img, video, canvas {
   justify-content: space-between; 
   align-items: center;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
-  
-  /* Szerokość responsywna, ale max 800px żeby pasowało do kolumny poniżej */
   width: 100%; 
   max-width: 800px; 
+  flex-shrink: 0;
 }
 
 .icon-btn {
@@ -238,10 +230,8 @@ img, video, canvas {
 .menu-overlay {
   position: absolute;
   top: 70px;
-  /* Menu po lewej stronie, ale względem okna, nie środka. 
-     Jeśli chcesz menu na środku, zmień left na '50%' i transform 'translateX(-50%)' */
   left: 10px; 
-  z-index: 1000; 
+  z-index: 2000; 
   width: clamp(220px, 70vw, 280px);
   background-color: #c4b5fd;
   border: 3px solid var(--dark-purple);
@@ -257,18 +247,14 @@ img, video, canvas {
   margin: 10px 0;
 }
 
-/* --- UKŁAD GŁÓWNY (MAIN GRID) --- */
+/* --- MAIN GRID --- */
 .main-grid {
   display: flex;
-  flex-direction: column; /* Zawsze jeden pod drugim */
+  flex-direction: column; 
   gap: 15px;
-  
-  /* Ważne: szerokość 100%, ale nie więcej niż 800px */
   width: 100%;
   max-width: 800px; 
-  
-  /* Jeśli align-items: center w .dashboard zawiedzie, to to jest zabezpieczenie: */
-  margin: 0 auto; 
+  margin: 0 auto;
 }
 
 @media (min-width: 768px) {
@@ -282,7 +268,7 @@ img, video, canvas {
 }
 
 /* =========================================
-   5. KOMPONENTY
+   5. KOMPONENTY I PANELE
    ========================================= */
 .panel {
   background-color: #ddd6fe;
@@ -290,17 +276,23 @@ img, video, canvas {
   border-radius: 12px;
   padding: 15px;
   box-shadow: 5px 5px 0 rgba(0,0,0,0.15);
-  
   display: flex;
   flex-direction: column;
   
-  /* Centrowanie zawartości panelu */
+  /* Ważne: pozwalamy panelowi rosnąć i układać elementy */
   align-items: center;      
   justify-content: center;  
-  text-align: center;       
   
   width: 100%;
-  overflow: hidden; 
+  overflow: visible; 
+  height: auto;
+}
+
+/* Dla panelu z joystickiem - wymusza poziom */
+.panel-row {
+  flex-direction: row; 
+  flex-wrap: wrap; 
+  gap: 20px; /* Odstęp między joystickiem a przyciskami */
 }
 
 .transcript-area {
@@ -319,46 +311,98 @@ img, video, canvas {
   text-align: center;
 }
 
-.speech-buttons-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr); 
-  gap: 8px;
-  width: 100%;
-}
-
-@media (min-width: 600px) {
-  .speech-buttons-grid {
-    grid-template-columns: repeat(3, 1fr); 
-  }
-}
-
 button {
   touch-action: manipulation;
 }
 
-/* --- FIX NA JOYSTICK I PRZYCISK OBOK SIEBIE --- */
+/* --- STYLE DLA KOMPONENTU JOYSTICKA (Zastępstwo Tailwinda) --- */
 
-.panel-row {
-  /* Wymuszamy układ poziomy */
-  display: flex !important;
-  flex-direction: row !important; 
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 20px; 
-  flex-wrap: wrap; 
+.joystick-layout {
+  display: flex;
+  flex-direction: row;      /* Układ poziomy: Joystick | Przyciski */
+  align-items: center;      /* Wyrównanie do środka w pionie */
+  justify-content: center;  /* Wyrównanie do środka w poziomie */
+  gap: 30px;                /* Odstęp między joystickiem a przyciskami */
+  width: 100%;
+  flex-wrap: wrap;          /* Na małym ekranie zawiń */
 }
 
-.joystick-wrapper {
-  /* Sztywne pudełko na joystick */
-  width: 150px; 
+/* Strefa Joysticka - musi mieć sztywne wymiary! */
+.joystick-zone {
+  width: 150px;
   height: 150px;
-  position: relative; 
-  flex-shrink: 0; 
+  background-color: rgba(196, 181, 253, 0.3); /* Jasny fiolet */
+  border: 2px solid var(--dark-purple);
+  border-radius: 50%;
+  position: relative;       /* Ważne dla biblioteki Nipple.js */
+  flex-shrink: 0;           /* Nie zgniataj tego koła */
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
 }
 
-/* Hack na element generowany przez Nipple.js */
-.joystick-wrapper > div {
-  width: 100% !important;
-  height: 100% !important;
-  position: static !important; 
+/* Prawa strona z przyciskami */
+.joystick-right-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+/* Przycisk klawiatury */
+.key-toggle-btn {
+  padding: 6px 12px;
+  border: 2px solid var(--dark-purple);
+  border-radius: 6px;
+  background-color: white;
+  color: var(--dark-purple);
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.key-toggle-btn.active {
+  background-color: #22c55e; /* Zielony */
+  color: white;
+  border-color: #15803d;
+}
+
+/* --- Poprawiona sekcja przycisków D-Pad --- */
+
+/* Lokalna siatka przycisków */
+.d-pad-grid-local {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  grid-template-rows: repeat(3, 40px);
+  gap: 5px;
+}
+
+.d-btn-local {
+  width: 100%;
+  height: 100%;
+  background-color: var(--btn-color);
+  color: white;
+  border: 1px solid var(--dark-purple);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.4rem; /* Wyraźniejsze strzałki */
+  
+  /* KLUCZOWE DLA IDEALNEGO ŚRODKA: */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+.d-btn-local.stop {
+  background-color: #ef4444; /* Czerwony */
+  font-size: 1.1rem; /* Nieco mniejszy font dla emoji, żeby nie rozpychało */
+  
+  /* MIKRO-KOREKTA DLA EMOJI STOPU */
+  /* Emoji często "wiszą" trochę za wysoko, to je obniży o 2px */
+  padding-top: 3px; 
+}
+
+.d-btn-local:active {
+  transform: translateY(2px);
 }
