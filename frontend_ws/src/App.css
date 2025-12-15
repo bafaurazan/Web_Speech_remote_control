@@ -1,83 +1,130 @@
-/* App.css */
+/* =========================================
+   1. RESET I ZMIENNE
+   ========================================= */
 @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
 
 :root {
-  --bg-color: #a78bfa;
-  --card-bg: #c4b5fd;
-  --dark-purple: #4c1d95;
-  --btn-color: #7c3aed;
+  --bg-color: #a78bfa;       
+  --card-bg: #c4b5fd;        
+  --dark-purple: #4c1d95;    
+  --btn-color: #7c3aed;      
   --btn-hover: #6d28d9;
 }
 
-body {
+* {
+  box-sizing: border-box; 
+}
+
+html, body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  overflow-x: hidden; 
   font-family: 'Patrick Hand', cursive, sans-serif;
   background-color: var(--bg-color);
   color: var(--dark-purple);
-  overflow-x: hidden;
+  font-size: 16px; 
 }
 
-/* --- EKRAN LOGOWANIA --- */
+img, video, canvas {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+}
+
+/* =========================================
+   2. KLASY POMOCNICZE (z App.tsx)
+   ========================================= */
+
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 0.5rem; }
+.gap-4 { gap: 1rem; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.m-0 { margin: 0; }
+.p-0 { padding: 0; }
+.mt-4 { margin-top: 1rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.pb-1 { padding-bottom: 0.25rem; }
+.text-xl { font-size: 1.25rem; }
+.text-sm { font-size: 0.875rem; }
+.font-bold { font-weight: 700; }
+.text-white { color: white; }
+.rounded { border-radius: 4px; }
+.shadow { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+.border-b-2 { border-bottom-width: 2px; }
+.border-dashed { border-style: dashed; }
+.border-purple-900 { border-color: var(--dark-purple); }
+.bg-purple-600 { background-color: #9333ea; }
+.bg-purple-700 { background-color: #7e22ce; }
+.opacity-70 { opacity: 0.7; }
+.block { display: block; }
+.self-stretch { align-self: stretch; }
+
+.hidden { display: none; }
+
+@media (min-width: 768px) {
+  .md\:block { display: block; } 
+  .md\:self-center { align-self: center; }
+}
+
+/* =========================================
+   3. EKRAN LOGOWANIA (NAPRAWIONY - "FIXED")
+   ========================================= */
 .login-container {
+  /* ZMIANA: position fixed gwarantuje, że kontener pokrywa całe okno przeglądarki */
+  position: fixed; 
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999; /* Zawsze na wierzchu */
+  
   display: flex;
   flex-direction: column;
-  
-  /* To centruje kartę na środku ekranu: */
-  align-items: center;
-  justify-content: center;
-  
-  min-height: 100vh;
-  /* WRACAMY DO 100vw - to gwarantuje pełną szerokość tła */
-  width: 100vw;
+  align-items: center;      /* Środek poziom */
+  justify-content: center;  /* Środek pion */
   
   background-color: #8b5cf6;
-  box-sizing: border-box;
-  padding: 10px; /* Mały odstęp bezpieczeństwa na krawędziach */
+  padding: 20px;
+  overflow-y: auto; /* W razie gdyby ekran był bardzo niski */
 }
 
 .title-header {
-  /* Zmieniamy tylko rozmiar czcionki na elastyczny */
-  font-size: clamp(2rem, 8vw, 3rem);
+  font-size: clamp(2rem, 8vw, 3.5rem); 
   text-align: center;
-  text-transform: uppercase;
   font-weight: 900;
   color: #2e1065;
-  margin-bottom: 2rem;
+  margin-bottom: 30px;
   line-height: 1.1;
-  max-width: 90%; /* Żeby napis nie wychodził poza ekran na telefonie */
+  text-transform: uppercase;
 }
 
 .login-card {
   background-color: var(--card-bg);
   border: 4px solid var(--dark-purple);
-  
-  /* Zmieniamy sztywne 2rem paddingu na elastyczne */
-  padding: clamp(1.5rem, 5vw, 2rem);
-  
-  /* Zmieniamy sztywną szerokość na maksymalną */
-  width: 100%;       /* Spróbuj zająć tyle miejsca ile się da... */
-  max-width: 320px;  /* ...ale nie więcej niż 320px (Twoja oryginalna szerokość) */
-  
-  border-radius: 4px;
-  box-shadow: 10px 10px 0px rgba(46, 16, 101, 0.2);
-  box-sizing: border-box; /* To zapobiega rozpychaniu karty przez padding */
+  padding: clamp(20px, 5vw, 40px); 
+  width: 100%;
+  max-width: 380px; 
+  border-radius: 8px;
+  box-shadow: 10px 10px 0 rgba(46, 16, 101, 0.2);
 }
 
 .login-title {
-  /* Tytuł "Login" w karcie też lekko zmniejszamy na telefonach */
-  font-size: clamp(2rem, 10vw, 2.5rem);
-  margin-top: 0;
-  margin-bottom: 1.5rem;
+  font-size: 2rem;
+  margin: 0 0 20px 0;
   text-align: center;
 }
 
-/* --- Reszta bez zmian, bo działa dobrze --- */
 .input-row {
   display: flex;
   align-items: center;
   border-bottom: 2px solid var(--dark-purple);
-  margin-bottom: 1.5rem;
+  margin-bottom: 20px;
   padding-bottom: 5px;
 }
 
@@ -93,16 +140,12 @@ body {
   flex: 1;
   background: transparent;
   border: none;
-  font-family: inherit;
   font-size: 1.2rem;
   color: var(--dark-purple);
   outline: none;
-  width: 100%;
+  font-family: inherit;
+  width: 100%; 
   min-width: 0;
-}
-
-.styled-input::placeholder {
-  color: rgba(76, 29, 149, 0.5);
 }
 
 .styled-btn {
@@ -110,13 +153,14 @@ body {
   background-color: var(--btn-color);
   color: white;
   font-family: inherit;
-  font-size: 1.5rem;
-  padding: 10px;
+  font-size: 1.4rem;
+  padding: 12px;
   border: 3px solid #2e1065;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   box-shadow: 0 4px 0 #2e1065;
   transition: transform 0.1s;
+  margin-top: 10px;
 }
 
 .styled-btn:active {
@@ -124,24 +168,25 @@ body {
   box-shadow: none;
 }
 
-/* --- GŁÓWNY DASHBOARD --- */
+/* =========================================
+   4. DASHBOARD (Bez zmian - działa dobrze)
+   ========================================= */
 .dashboard {
   min-height: 100vh;
+  width: 100%;
   padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 15px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .top-bar {
   background-color: var(--card-bg);
   border: 3px solid var(--dark-purple);
-  padding: 10px 20px;
+  padding: 8px 15px;
   border-radius: 8px;
   display: flex;
-  justify-content: space-between;
+  justify-content: space-between; 
   align-items: center;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
 }
@@ -149,112 +194,76 @@ body {
 .icon-btn {
   background: none;
   border: 2px solid var(--dark-purple);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
-  padding: 5px;
+  padding: 8px;
   margin-left: 5px;
-  font-size: 1.2rem;
-  transition: background 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s;
 }
 
 .icon-btn:hover {
-  background-color: rgba(255,255,255,0.3);
+  background-color: rgba(255,255,255,0.4);
 }
 
-/* Style Menu */
+/* --- MENU OVERLAY --- */
 .menu-overlay {
   position: absolute;
   top: 70px;
-  left: 20px;
-  width: 280px;
+  left: 10px;
+  z-index: 1000; 
+  
+  width: clamp(220px, 70vw, 280px);
+  
   background-color: #c4b5fd;
   border: 3px solid var(--dark-purple);
   padding: 15px;
-  z-index: 100;
   box-shadow: 8px 8px 0 rgba(0,0,0,0.3);
+  font-size: 0.95rem;
 }
 
-/* Przyciski w menu jako lista */
-.menu-list {
+.menu-overlay ul {
   list-style: none;
   padding: 0;
-  margin: 15px 0;
+  margin: 10px 0;
 }
 
-.menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  border-bottom: 2px dashed rgba(76, 29, 149, 0.3);
-  padding: 10px 5px;
-  font-family: inherit;
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: var(--dark-purple);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  padding-left: 10px;
-}
-
-.menu-item.active {
-  background-color: var(--dark-purple);
-  color: #fff;
-  border-radius: 4px;
-  border-bottom: none;
-}
-
-/* --- KONFIGURACJA WIDOKÓW --- */
-
-/* Główny kontener na zawartość */
-.view-container {
-  flex: 1;
+/* --- GRID LAYOUT --- */
+.main-grid {
   display: flex;
-  flex-direction: column;
+  flex-direction: column; 
   gap: 15px;
-  min-height: 0; /* Ważne dla scrollowania */
+  width: 100%;
 }
 
-/* Styl dla paneli (kontenerów) */
+@media (min-width: 768px) {
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr; 
+    align-items: start;
+  }
+  
+  .dashboard {
+    padding: 20px;
+    gap: 20px;
+  }
+}
+
+/* =========================================
+   5. KOMPONENTY
+   ========================================= */
 .panel {
   background-color: #ddd6fe;
   border: 3px solid var(--dark-purple);
   border-radius: 12px;
   padding: 15px;
-  box-shadow: 6px 6px 0 rgba(0,0,0,0.15);
+  box-shadow: 5px 5px 0 rgba(0,0,0,0.15);
   display: flex;
   flex-direction: column;
-}
-
-.panel-header {
-  border-bottom: 2px dashed var(--dark-purple);
-  padding-bottom: 5px;
-  margin-bottom: 10px;
-  font-weight: bold;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-/* Specyficzne style dla Speech Recognition */
-.speech-buttons-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-@media (min-width: 768px) {
-  .speech-buttons-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
+  width: 100%;
+  overflow: hidden; 
 }
 
 .transcript-area {
@@ -262,8 +271,27 @@ body {
   border: 2px solid var(--dark-purple);
   border-radius: 8px;
   padding: 10px;
-  min-height: 150px;
+  min-height: 100px;
+  max-height: 250px;
+  overflow-y: auto; 
   font-family: monospace;
   margin-top: 10px;
   white-space: pre-wrap;
+  font-size: 0.9rem;
+}
+
+.speech-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); 
+  gap: 8px;
+}
+
+@media (min-width: 600px) {
+  .speech-buttons-grid {
+    grid-template-columns: repeat(3, 1fr); 
+  }
+}
+
+button {
+  touch-action: manipulation;
 }
