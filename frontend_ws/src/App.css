@@ -1,5 +1,5 @@
 /* =========================================
-   1. RESET I ZMIENNE
+   1. RESET, ZMIENNE I ROOT
    ========================================= */
 @import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
 
@@ -19,11 +19,22 @@ html, body {
   margin: 0;
   padding: 0;
   width: 100%;
+  min-height: 100vh;
   overflow-x: hidden; 
   font-family: 'Patrick Hand', cursive, sans-serif;
   background-color: var(--bg-color);
   color: var(--dark-purple);
   font-size: 16px; 
+}
+
+/* --- KLUCZOWA POPRAWKA: Stylizacja #root --- */
+/* To sprawia, że główny kontener Reacta zajmuje całą szerokość i centruje zawartość */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* To centruje .dashboard w poziomie */
 }
 
 img, video, canvas {
@@ -77,6 +88,7 @@ img, video, canvas {
    3. EKRAN LOGOWANIA
    ========================================= */
 .login-container {
+  /* Position fixed ignoruje #root i centruje względem okna przeglądarki */
   position: fixed; 
   top: 0;
   left: 0;
@@ -175,15 +187,18 @@ img, video, canvas {
 }
 
 /* =========================================
-   4. DASHBOARD - TYLKO PIONOWO
+   4. DASHBOARD - TYLKO PIONOWO & WYŚRODKOWANY
    ========================================= */
 .dashboard {
   min-height: 100vh;
   width: 100%;
   padding: 10px;
+  
   display: flex;
   flex-direction: column;
   gap: 15px;
+  
+  /* To centruje dzieci (czyli .top-bar i .main-grid) w poziomie */
   align-items: center; 
 }
 
@@ -196,8 +211,10 @@ img, video, canvas {
   justify-content: space-between; 
   align-items: center;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+  
+  /* Szerokość responsywna, ale max 800px żeby pasowało do kolumny poniżej */
   width: 100%; 
-  max-width: 800px; /* Dopasowane do szerokości kolumny głównej */
+  max-width: 800px; 
 }
 
 .icon-btn {
@@ -221,7 +238,9 @@ img, video, canvas {
 .menu-overlay {
   position: absolute;
   top: 70px;
-  left: 10px;
+  /* Menu po lewej stronie, ale względem okna, nie środka. 
+     Jeśli chcesz menu na środku, zmień left na '50%' i transform 'translateX(-50%)' */
+  left: 10px; 
   z-index: 1000; 
   width: clamp(220px, 70vw, 280px);
   background-color: #c4b5fd;
@@ -238,19 +257,20 @@ img, video, canvas {
   margin: 10px 0;
 }
 
-/* --- UKŁAD GŁÓWNY (ZMIANA: ZAWSZE PIONOWO) --- */
+/* --- UKŁAD GŁÓWNY (MAIN GRID) --- */
 .main-grid {
   display: flex;
   flex-direction: column; /* Zawsze jeden pod drugim */
   gap: 15px;
-  width: 100%;
   
-  /* Ważne: żeby na PC kolumna nie była za szeroka */
+  /* Ważne: szerokość 100%, ale nie więcej niż 800px */
+  width: 100%;
   max-width: 800px; 
-  margin: 0 auto; /* Wyśrodkowanie całej kolumny */
+  
+  /* Jeśli align-items: center w .dashboard zawiedzie, to to jest zabezpieczenie: */
+  margin: 0 auto; 
 }
 
-/* Tylko zwiększamy odstępy na PC, ale NIE zmieniamy układu na grid/obok siebie */
 @media (min-width: 768px) {
   .dashboard {
     padding: 20px;
@@ -274,7 +294,7 @@ img, video, canvas {
   display: flex;
   flex-direction: column;
   
-  /* Centrowanie zawartości */
+  /* Centrowanie zawartości panelu */
   align-items: center;      
   justify-content: center;  
   text-align: center;       
@@ -324,22 +344,21 @@ button {
   flex-direction: row !important; 
   align-items: center !important;
   justify-content: center !important;
-  gap: 20px; /* Odstęp między joystickiem a przyciskiem */
-  flex-wrap: wrap; /* Jak ekran będzie bardzo mały, to spadnie niżej */
+  gap: 20px; 
+  flex-wrap: wrap; 
 }
 
-/* To jest ten nowy div, w który owinęliśmy Joystick w App.tsx */
 .joystick-wrapper {
-  /* Musimy dać mu sztywny rozmiar, inaczej Nipple.js rozepcha się na 100% */
+  /* Sztywne pudełko na joystick */
   width: 150px; 
   height: 150px;
-  position: relative; /* Ważne dla pozycjonowania joysticka wewnątrz */
-  flex-shrink: 0; /* Zapobiega zgniataniu joysticka */
+  position: relative; 
+  flex-shrink: 0; 
 }
 
-/* Hack na sam element generowany przez bibliotekę Nipple.js */
+/* Hack na element generowany przez Nipple.js */
 .joystick-wrapper > div {
   width: 100% !important;
   height: 100% !important;
-  position: static !important; /* Resetujemy dziwne pozycjonowanie biblioteki */
+  position: static !important; 
 }
