@@ -359,6 +359,8 @@ function App() {
 
       <div className="main-grid">
         <div className="flex flex-col gap-4">
+            
+            {/* PANEL WIDEO */}
             <div className="panel" style={{ flex: 1, minHeight: '300px' }}>
                <VideoGrid 
                    localStream={localStream}
@@ -371,13 +373,26 @@ function App() {
                    onShareScreen={toggleScreenShare}
                />
             </div>
-            <div className="panel flex items-center justify-center">
-                <JoystickController onMove={sendJoystickData} onStop={() => sendJoystickData(0,0)} onCommand={sendRobotCommand} />
-                <button className="mt-4 py-2 px-4 bg-purple-600 text-white font-bold rounded shadow flex items-center gap-2 self-stretch justify-center md:self-center" onClick={() => alert("moduł nlp przeniesiony do frontend_ws/src/nlp i jest nieskonfigurowany")}>
-                  Start NLP / RAG
-                </button>
+
+            {/* PANEL JOYSTICKA - TUTAJ ZMIANA */}
+            {/* Dodano klasę 'panel-row', która wymusza układ poziomy */}
+            {/* PANEL JOYSTICKA - TUTAJ ZMIANA */}
+            <div className="panel panel-row">
+                
+                {/* 1. OWIJAMY JOYSTICK W DIVA, ŻEBY GO POSKROMIĆ */}
+                <div className="joystick-wrapper">
+                    <JoystickController 
+                        onMove={sendJoystickData} 
+                        onStop={() => sendJoystickData(0,0)} 
+                        onCommand={sendRobotCommand} 
+                    />
+                </div>
+                
             </div>
+
         </div>
+
+        {/* PRAWA KOLUMNA (Komendy i Czat) */}
         <div className="flex flex-col gap-4">
             <div className="panel">
                 <h3 className="border-b-2 border-dashed border-purple-900 pb-1 mb-2 font-bold text-center">COMMANDS</h3>

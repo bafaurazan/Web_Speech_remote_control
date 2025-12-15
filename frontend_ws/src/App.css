@@ -30,6 +30,7 @@ img, video, canvas {
   max-width: 100% !important;
   height: auto !important;
   display: block;
+  margin: 0 auto; 
 }
 
 /* =========================================
@@ -73,25 +74,24 @@ img, video, canvas {
 }
 
 /* =========================================
-   3. EKRAN LOGOWANIA (NAPRAWIONY - "FIXED")
+   3. EKRAN LOGOWANIA
    ========================================= */
 .login-container {
-  /* ZMIANA: position fixed gwarantuje, że kontener pokrywa całe okno przeglądarki */
   position: fixed; 
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 9999; /* Zawsze na wierzchu */
+  z-index: 9999;
   
   display: flex;
   flex-direction: column;
-  align-items: center;      /* Środek poziom */
-  justify-content: center;  /* Środek pion */
+  align-items: center;
+  justify-content: center;
   
   background-color: #8b5cf6;
   padding: 20px;
-  overflow-y: auto; /* W razie gdyby ekran był bardzo niski */
+  overflow-y: auto;
 }
 
 .title-header {
@@ -112,12 +112,16 @@ img, video, canvas {
   max-width: 380px; 
   border-radius: 8px;
   box-shadow: 10px 10px 0 rgba(46, 16, 101, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center; 
 }
 
 .login-title {
   font-size: 2rem;
   margin: 0 0 20px 0;
   text-align: center;
+  width: 100%;
 }
 
 .input-row {
@@ -126,6 +130,7 @@ img, video, canvas {
   border-bottom: 2px solid var(--dark-purple);
   margin-bottom: 20px;
   padding-bottom: 5px;
+  width: 100%;
 }
 
 .input-icon {
@@ -146,6 +151,7 @@ img, video, canvas {
   font-family: inherit;
   width: 100%; 
   min-width: 0;
+  text-align: left;
 }
 
 .styled-btn {
@@ -169,7 +175,7 @@ img, video, canvas {
 }
 
 /* =========================================
-   4. DASHBOARD (Bez zmian - działa dobrze)
+   4. DASHBOARD - TYLKO PIONOWO
    ========================================= */
 .dashboard {
   min-height: 100vh;
@@ -178,6 +184,7 @@ img, video, canvas {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  align-items: center; 
 }
 
 .top-bar {
@@ -189,6 +196,8 @@ img, video, canvas {
   justify-content: space-between; 
   align-items: center;
   box-shadow: 4px 4px 0 rgba(0,0,0,0.1);
+  width: 100%; 
+  max-width: 800px; /* Dopasowane do szerokości kolumny głównej */
 }
 
 .icon-btn {
@@ -214,14 +223,13 @@ img, video, canvas {
   top: 70px;
   left: 10px;
   z-index: 1000; 
-  
   width: clamp(220px, 70vw, 280px);
-  
   background-color: #c4b5fd;
   border: 3px solid var(--dark-purple);
   padding: 15px;
   box-shadow: 8px 8px 0 rgba(0,0,0,0.3);
   font-size: 0.95rem;
+  text-align: center;
 }
 
 .menu-overlay ul {
@@ -230,23 +238,25 @@ img, video, canvas {
   margin: 10px 0;
 }
 
-/* --- GRID LAYOUT --- */
+/* --- UKŁAD GŁÓWNY (ZMIANA: ZAWSZE PIONOWO) --- */
 .main-grid {
   display: flex;
-  flex-direction: column; 
+  flex-direction: column; /* Zawsze jeden pod drugim */
   gap: 15px;
   width: 100%;
+  
+  /* Ważne: żeby na PC kolumna nie była za szeroka */
+  max-width: 800px; 
+  margin: 0 auto; /* Wyśrodkowanie całej kolumny */
 }
 
+/* Tylko zwiększamy odstępy na PC, ale NIE zmieniamy układu na grid/obok siebie */
 @media (min-width: 768px) {
-  .main-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr; 
-    align-items: start;
-  }
-  
   .dashboard {
     padding: 20px;
+    gap: 20px;
+  }
+  .main-grid {
     gap: 20px;
   }
 }
@@ -260,8 +270,15 @@ img, video, canvas {
   border-radius: 12px;
   padding: 15px;
   box-shadow: 5px 5px 0 rgba(0,0,0,0.15);
+  
   display: flex;
   flex-direction: column;
+  
+  /* Centrowanie zawartości */
+  align-items: center;      
+  justify-content: center;  
+  text-align: center;       
+  
   width: 100%;
   overflow: hidden; 
 }
@@ -278,12 +295,15 @@ img, video, canvas {
   margin-top: 10px;
   white-space: pre-wrap;
   font-size: 0.9rem;
+  width: 100%; 
+  text-align: center;
 }
 
 .speech-buttons-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr); 
   gap: 8px;
+  width: 100%;
 }
 
 @media (min-width: 600px) {
@@ -294,4 +314,32 @@ img, video, canvas {
 
 button {
   touch-action: manipulation;
+}
+
+/* --- FIX NA JOYSTICK I PRZYCISK OBOK SIEBIE --- */
+
+.panel-row {
+  /* Wymuszamy układ poziomy */
+  display: flex !important;
+  flex-direction: row !important; 
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 20px; /* Odstęp między joystickiem a przyciskiem */
+  flex-wrap: wrap; /* Jak ekran będzie bardzo mały, to spadnie niżej */
+}
+
+/* To jest ten nowy div, w który owinęliśmy Joystick w App.tsx */
+.joystick-wrapper {
+  /* Musimy dać mu sztywny rozmiar, inaczej Nipple.js rozepcha się na 100% */
+  width: 150px; 
+  height: 150px;
+  position: relative; /* Ważne dla pozycjonowania joysticka wewnątrz */
+  flex-shrink: 0; /* Zapobiega zgniataniu joysticka */
+}
+
+/* Hack na sam element generowany przez bibliotekę Nipple.js */
+.joystick-wrapper > div {
+  width: 100% !important;
+  height: 100% !important;
+  position: static !important; /* Resetujemy dziwne pozycjonowanie biblioteki */
 }

@@ -111,6 +111,13 @@ export const SpeechControl: React.FC<SpeechProps> = ({ onCommand }) => {
           >
             🗑️
           </button>
+          {/* 2. PRZYCISK TERAZ BĘDZIE OBOK TEGO WRAPPERA */}
+                <button 
+                  className="py-3 px-6 bg-purple-600 text-white font-bold rounded shadow hover:bg-purple-700 transition-transform active:scale-95" 
+                  onClick={() => alert("moduł nlp przeniesiony do frontend_ws/src/nlp i jest nieskonfigurowany")}
+                >
+                  Start NLP / RAG
+                </button>
       </div>
 
       {/* Obszar wyświetlania tekstu - używa klasy z Twojego CSS */}
