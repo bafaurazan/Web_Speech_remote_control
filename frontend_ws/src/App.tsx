@@ -16,8 +16,8 @@ function App() {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(true);
-  const [isVideoStopped, setIsVideoStopped] = useState(true);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isVideoStopped, setIsVideoStopped] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -28,12 +28,6 @@ function App() {
   const mapPeers = useRef<{ [username: string]: [RTCPeerConnection, RTCDataChannel?] }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const lastSentTime = useRef<number>(0);
-
-  // Funkcja pomocnicza do logowania aktualnej listy użytkowników
-  const logActivePeers = (context: string) => {
-    const peerNames = Object.keys(mapPeers.current);
-    console.log(`[PEER LOG - ${context}] Aktualnie połączeni:`, peerNames.length > 0 ? peerNames : "Brak użytkowników");
-  };
 
   useEffect(() => {
     return () => {
@@ -71,32 +65,28 @@ function App() {
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
-        console.log('%c[WS] Połączenie otwarte!', 'color: green; font-weight: bold');
+        console.log('[WS] Połączenie otwarte!');
         sendSignal('new-peer', {});
     };
 
     ws.current.onmessage = (event) => {
         const parsed: SignalMessage = JSON.parse(event.data);
-        const { peer, action, message } = parsed;
-        if (peer === currentUserName) return;
+        const { peer: peerUsername, action, message } = parsed;
+        if (peerUsername === currentUserName) return;
 
         const receiverChannel = message.receiver_channel_name;
         if (!receiverChannel) return;
 
-        console.log(`%c[WS IN] Akcja: ${action} od: ${peer}`, 'color: blue');
-
         if (action === 'new-peer') {
-            createOfferer(peer, receiverChannel);
+            createOfferer(peerUsername, receiverChannel);
         } else if (action === 'new-offer') {
-            if (message.sdp) createAnswerer(message.sdp, peer, receiverChannel);
+            if (message.sdp) createAnswerer(message.sdp, peerUsername, receiverChannel);
         } else if (action === 'new-answer') {
-            const peerData = mapPeers.current[peer];
+            const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
-                peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp))
-                    .then(() => console.log(`[WebRTC] SDP Answer ustawione dla ${peer}`));
+                peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
             }
         }
-        logActivePeers(action);
     };
   };
 
@@ -107,26 +97,27 @@ function App() {
   };
 
   // ==========================
-  // 3. WEBRTC CORE
+  // 3. WEBRTC & DATA CHANNEL
   // ==========================
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
-    dc.onopen = () => {
-        console.log(`%c[DataChannel] OTWARTY z: ${peerUsername}`, 'color: orange; font-weight: bold');
-    };
+    dc.onopen = () => console.log(`[DataChannel] OTWARTY z: ${peerUsername}`);
     dc.onmessage = (e) => {
-        console.log(`[DataChannel IN] od ${peerUsername}:`, e.data);
         const data = JSON.parse(e.data);
-        if (data.message && !data.joystick) {
+        // Obsługa joysticka i komend (logika z renderer.js)
+        if (data.joystick) {
+            console.log("Odebrano dane joysticka:", data.joystick);
+            return;
+        }
+        if (data.message) {
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
-    dc.onerror = (err) => console.error(`[DataChannel Error] ${peerUsername}:`, err);
   };
 
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
     const pc = new RTCPeerConnection();
+    // KLUCZ: DataChannel przed createOffer!
     const dc = pc.createDataChannel('chat');
-    
     mapPeers.current[peerUsername] = [pc, dc];
     setupDataChannel(dc, peerUsername);
 
@@ -183,29 +174,58 @@ function App() {
   };
 
   const handleIceChange = (pc: RTCPeerConnection, peerUsername: string) => {
-    console.log(`[ICE State] ${peerUsername}: ${pc.iceConnectionState}`);
     if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
         pc.close();
         delete mapPeers.current[peerUsername];
         setRemotePeers(prev => prev.filter(p => p.username !== peerUsername));
-        logActivePeers("rozłączono");
     }
   };
 
   // ==========================
-  // 4. DATA ACTIONS
+  // 4. ACTIONS & BROADCAST
   // ==========================
   const broadcastData = (payload: any) => {
     const json = JSON.stringify(payload);
-    let count = 0;
-    Object.entries(mapPeers.current).forEach(([peer, [_, dc]]) => {
-        if (dc?.readyState === 'open') {
-            dc.send(json);
-            count++;
-        }
+    Object.values(mapPeers.current).forEach(([_, dc]) => {
+        if (dc?.readyState === 'open') dc.send(json);
     });
-    if (count === 0 && Object.keys(mapPeers.current).length > 0) {
-        console.warn("[Broadcast] Próba wysłania danych, ale żaden DataChannel nie jest 'open'!");
+  };
+
+  const sendRobotCommand = (cmd: string) => broadcastData({ username, message: cmd });
+
+  const toggleAudio = () => {
+    const t = localStreamRef.current?.getAudioTracks()[0];
+    if(t) { t.enabled = !t.enabled; setIsAudioMuted(!t.enabled); }
+  };
+
+  const toggleVideo = () => {
+    const t = localStreamRef.current?.getVideoTracks()[0];
+    if(t) { t.enabled = !t.enabled; setIsVideoStopped(!t.enabled); }
+  };
+
+  const toggleScreenShare = async () => {
+    if (!isScreenSharing) {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            const screenTrack = stream.getVideoTracks()[0];
+            Object.values(mapPeers.current).forEach(([pc]) => {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) sender.replaceTrack(screenTrack);
+            });
+            setLocalStream(stream);
+            setIsScreenSharing(true);
+            screenTrack.onended = () => toggleScreenShare();
+        } catch (e) { console.error(e); }
+    } else {
+        const stream = await startCamera();
+        if (stream) {
+            const camTrack = stream.getVideoTracks()[0];
+            Object.values(mapPeers.current).forEach(([pc]) => {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) sender.replaceTrack(camTrack);
+            });
+            setIsScreenSharing(false);
+        }
     }
   };
 
@@ -230,22 +250,33 @@ function App() {
       ) : (
         <>
           <header className="top-bar">
-             <h1 className="text-xl font-bold">ROBOT: {username}</h1>
+             <div className="flex gap-4 items-center">
+                <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
+                <h1 className="text-xl font-bold">ROBOT: {username}</h1>
+             </div>
              <div className="flex gap-2">
-                <button onClick={() => {
-                    const t = localStreamRef.current?.getAudioTracks()[0];
-                    if(t) { t.enabled = !t.enabled; setIsAudioMuted(!t.enabled); }
-                }} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
-                <button onClick={() => {
-                    const t = localStreamRef.current?.getVideoTracks()[0];
-                    if(t) { t.enabled = !t.enabled; setIsVideoStopped(!t.enabled); }
-                }} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
+                <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
+                <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
                 <button onClick={() => sendSignal('new-peer', {})} className="icon-btn">🔄</button>
              </div>
           </header>
+
+          {showMenu && (
+            <div className="menu-overlay" onClick={() => setShowMenu(false)}>
+              <div className="menu-content" onClick={e => e.stopPropagation()}>
+                <button onClick={() => window.location.reload()} className="styled-btn">Logout</button>
+              </div>
+            </div>
+          )}
+
           <div className="main-grid">
             <div className="panel">
-               <VideoGrid localStream={localStream} remotePeers={remotePeers} isAudioMuted={isAudioMuted} isVideoStopped={isVideoStopped} onToggleAudio={()=>{}} onToggleVideo={()=>{}} onShareScreen={()=>{}} isScreenSharing={false} />
+               <VideoGrid 
+                  localStream={localStream} remotePeers={remotePeers} 
+                  isAudioMuted={isAudioMuted} isVideoStopped={isVideoStopped} 
+                  onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} 
+                  onShareScreen={toggleScreenShare} isScreenSharing={isScreenSharing} 
+               />
             </div>
             <div className="panel">
                 <JoystickController 
@@ -257,10 +288,11 @@ function App() {
                         }
                     }} 
                     onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
-                    onCommand={(cmd) => broadcastData({ username, message: cmd })} 
+                    onCommand={sendRobotCommand} 
                 />
             </div>
             <div className="panel flex-1">
+                <SpeechControl onCommand={sendRobotCommand} />
                 <Chat messages={chatMessages} onSendMessage={(msg) => {
                     setChatMessages(prev => [...prev, { username: 'Me', message: msg, isMe: true }]);
                     broadcastData({ username, message: msg });
