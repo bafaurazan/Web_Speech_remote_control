@@ -338,10 +338,10 @@ function App() {
 
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
     dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
+    
     dc.onclose = () => { 
         if(!isLoggingOut.current) {
             log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
-            // Opcjonalnie: jeśli DC padnie, też możemy usunąć peera
             removeDeadPeer(peerUsername);
         }
     };
@@ -355,11 +355,16 @@ function App() {
     dc.onmessage = (e) => {
         if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
+        
+        // Logowanie odbioru Joysticka
         if (data.joystick) {
-            log(`🕹️ [DC] Joystick od ${peerUsername}:`, data.joystick);
-            return;
+            log(`🕹️ [DC RECV] Joystick od ${peerUsername}: L=${data.joystick.linear} A=${data.joystick.angular}`);
+            return; 
         }
+        
+        // Logowanie odbioru Czatu
         if (data.message) {
+            log(`💬 [DC RECV] Chat od ${peerUsername}: "${data.message}"`);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
@@ -444,11 +449,28 @@ function App() {
   // ==========================
   const broadcastData = (payload: any) => {
     const json = JSON.stringify(payload);
+    let sentCount = 0;
+
+    // Logowanie wysyłania przed pętlą
+    if (payload.joystick) {
+        log(`🕹️ [BROADCAST SEND] Joystick: L=${payload.joystick.linear} A=${payload.joystick.angular}`);
+    } else if (payload.message) {
+        log(`💬 [BROADCAST SEND] Chat: "${payload.message}"`);
+    } else {
+        log(`📤 [BROADCAST SEND] Dane:`, payload);
+    }
+
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
             dc.send(json);
+            sentCount++;
         }
     });
+
+    // Opcjonalnie: logowanie, jeśli nikt nie odebrał
+    if (sentCount === 0) {
+        // log(`⚠️ [BROADCAST] Nie wysłano do nikogo (brak otwartych kanałów).`);
+    }
   };
 
   const sendRobotCommand = (cmd: string) => {
