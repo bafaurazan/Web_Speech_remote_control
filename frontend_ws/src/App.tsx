@@ -257,6 +257,13 @@ function App() {
               <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
               <h1 className="text-xl font-bold">ROBOT: {username}</h1>
            </div>
+           {showMenu && (
+            <div className="menu-overlay" onClick={() => setShowMenu(false)}>
+              <div className="menu-content" onClick={e => e.stopPropagation()}>
+                <button onClick={() => window.location.reload()} className="styled-btn">Logout</button>
+              </div>
+            </div>
+          )}
            <div className="flex gap-2">
               <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
               <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
@@ -274,13 +281,7 @@ function App() {
            </div>
           </header>
 
-          {showMenu && (
-            <div className="menu-overlay" onClick={() => setShowMenu(false)}>
-              <div className="menu-content" onClick={e => e.stopPropagation()}>
-                <button onClick={() => window.location.reload()} className="styled-btn">Logout</button>
-              </div>
-            </div>
-          )}
+          
 
           <div className="main-grid">
             <div className="panel">

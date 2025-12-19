@@ -196,6 +196,7 @@ img, video, canvas {
 }
 
 .top-bar {
+  position: relative; /* DODANE: Kluczowe dla pozycjonowania menu */
   background-color: var(--card-bg);
   border: 3px solid var(--dark-purple);
   padding: 8px 15px;
@@ -229,8 +230,9 @@ img, video, canvas {
 /* --- MENU OVERLAY --- */
 .menu-overlay {
   position: absolute;
-  top: 70px;
-  left: 10px; 
+  top: 100%;      /* DODANE: Menu pojawi się dokładnie pod paskiem */
+  left: 2%;        /* DODANE: Wyrównanie do lewej strony paska */
+  margin-top: 10px; /* DODANE: Odstęp od paska */
   z-index: 2000; 
   width: clamp(220px, 70vw, 280px);
   background-color: #c4b5fd;
