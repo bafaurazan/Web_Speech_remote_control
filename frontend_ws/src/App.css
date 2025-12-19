@@ -196,7 +196,7 @@ img, video, canvas {
 }
 
 .top-bar {
-  position: relative; /* DODANE: Kluczowe dla pozycjonowania menu */
+  position: relative;
   background-color: var(--card-bg);
   border: 3px solid var(--dark-purple);
   padding: 8px 15px;
@@ -230,9 +230,9 @@ img, video, canvas {
 /* --- MENU OVERLAY --- */
 .menu-overlay {
   position: absolute;
-  top: 100%;      /* DODANE: Menu pojawi się dokładnie pod paskiem */
-  left: 2%;        /* DODANE: Wyrównanie do lewej strony paska */
-  margin-top: 10px; /* DODANE: Odstęp od paska */
+  top: 100%;
+  left: 2%;
+  margin-top: 10px;
   z-index: 2000; 
   width: clamp(220px, 70vw, 280px);
   background-color: #c4b5fd;
@@ -302,8 +302,9 @@ img, video, canvas {
 }
 
 .styled-btn.logout {
-  background-color: #ef4444; /* Czerwony dla wylogowania */
+  background-color: #ef4444; 
 }
+
 /* =========================================
    5. KOMPONENTY I PANELE
    ========================================= */
@@ -318,8 +319,53 @@ img, video, canvas {
   align-items: center;      
   justify-content: center;  
   width: 100%;
-  overflow: visible; 
+  overflow: hidden; /* Zmienione na hidden dla loadera */
   height: auto;
+  position: relative; /* WAŻNE DLA LOADERA */
+}
+
+/* --- LOADER STUN --- */
+.loader-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(46, 16, 101, 0.85); /* Ciemny fiolet półprzezroczysty */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  color: white;
+  text-align: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.spinner {
+  border: 5px solid rgba(255,255,255,0.2);
+  border-radius: 50%;
+  border-top: 5px solid #a78bfa; /* Jasny fiolet */
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 15px;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.5);
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loader-text {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 5px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+.loader-subtext {
+  font-size: 0.9rem;
+  opacity: 0.8;
 }
 
 .panel-row {
@@ -362,7 +408,6 @@ button {
   flex-wrap: wrap; 
 }
 
-/* Wrapper dla lewej strony (Przycisk + Kółko) */
 .joystick-wrapper {
   display: flex;
   flex-direction: column;
@@ -370,9 +415,8 @@ button {
   gap: 10px;
 }
 
-/* --- STYL PRZYCISKU (Zgodny z resztą aplikacji) --- */
 .joystick-toggle-btn {
-  background-color: var(--btn-color); /* Fioletowy */
+  background-color: var(--btn-color);
   color: white;
   border: 2px solid var(--dark-purple);
   border-radius: 6px;
@@ -395,32 +439,26 @@ button {
   box-shadow: none;
 }
 
-/* Strefa Joysticka */
 .joystick-zone {
   width: 150px;
   height: 150px;
   border: 2px solid var(--dark-purple);
   border-radius: 50%;
-  position: relative; /* Kluczowe dla pozycjonowania joysticka */
+  position: relative; 
   flex-shrink: 0;
   box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
-  
-  /* Blokada przewijania strony na telefonie */
   touch-action: none; 
   overflow: hidden;
-  
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Joystick AKTYWNY */
 .joystick-zone.active {
   background-color: rgba(196, 181, 253, 0.3);
   cursor: default;
 }
 
-/* Joystick NIEAKTYWNY */
 .joystick-zone.inactive {
   background-color: rgba(0,0,0,0.05);
   border-style: dashed;
@@ -435,7 +473,6 @@ button {
   user-select: none;
 }
 
-/* Prawa strona */
 .joystick-right-panel {
   display: flex;
   flex-direction: column;
@@ -443,7 +480,6 @@ button {
   gap: 15px;
 }
 
-/* Przycisk Klawiatury (Ten po prawej) */
 .key-toggle-btn {
   padding: 6px 12px;
   border: 2px solid var(--dark-purple);
@@ -468,7 +504,6 @@ button {
   border-color: #15803d;
 }
 
-/* D-Pad Grid */
 .d-pad-grid-local {
   display: grid;
   grid-template-columns: repeat(3, 40px);

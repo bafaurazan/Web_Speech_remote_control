@@ -12,6 +12,51 @@ const getWebSocketUrl = () => {
     return `${protocol}${host}/ws`; 
 }; 
 
+// === KONFIGURACJA WEBRTC (STUN SERVERS) ===
+const rtcConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+    ]
+};
+
+// === POMOCNIK LOGOWANIA Z CZASEM ===
+const log = (prefix: string, ...args: any[]) => {
+    const now = new Date();
+    const time = now.toISOString().split('T')[1].slice(0, -1); // HH:MM:SS.ms
+    console.log(`[${time}] ${prefix}`, ...args);
+};
+
+// === 1. GENERATOR CZARNEGO EKRANU (DUMMY STREAM) ===
+const createBlackScreenStream = () => {
+    log("⬛ [Media] Generowanie czarnego ekranu (Dummy Stream)...");
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 640;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, 640, 480);
+        ctx.fillStyle = 'white';
+        ctx.font = '30px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('NO CAMERA', 320, 240);
+        ctx.font = '15px Arial';
+        ctx.fillText('(Audio Only / Dummy)', 320, 270);
+    }
+    
+    const videoStream = canvas.captureStream(15);
+    
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const dst = audioCtx.createMediaStreamDestination();
+    
+    const audioTrack = dst.stream.getAudioTracks()[0];
+    const videoTrack = videoStream.getVideoTracks()[0];
+    
+    return new MediaStream([videoTrack, audioTrack]);
+};
+
 function App() {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -22,6 +67,9 @@ function App() {
   const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
+  // STAN ŁADOWANIA (STATUS POŁĄCZENIA)
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<PeerData[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -30,87 +78,122 @@ function App() {
   const mapPeers = useRef<{ [username: string]: [RTCPeerConnection, RTCDataChannel?] }>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const lastSentTime = useRef<number>(0);
+  const isScreenSharingRef = useRef(false);
 
   useEffect(() => {
     return () => {
         if (ws.current) {
-            console.log("🛑 [System] Zamykanie aplikacji/komponentu - czyszczenie WS");
+            log("🛑 [System] Zamykanie aplikacji - czyszczenie WS");
             ws.current.close();
         }
         Object.values(mapPeers.current).forEach(([pc]) => pc.close());
     };
   }, []);
 
+  useEffect(() => {
+      isScreenSharingRef.current = isScreenSharing;
+  }, [isScreenSharing]);
+
   // ==========================
-  // 1. MEDIA SETUP
+  // 2. MEDIA SETUP
   // ==========================
+  const setupLocalStream = (stream: MediaStream) => {
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      
+      stream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
+      
+      const isCanvas = stream.getVideoTracks()[0].label.toLowerCase().includes('canvas') || 
+                       stream.getVideoTracks()[0].label.toLowerCase().includes('stream');
+      
+      if (!isCanvas) {
+          stream.getVideoTracks().forEach(t => t.enabled = !isVideoStopped);
+      }
+      
+      log("✅ [Media] Strumień aktywny. ID:", stream.id);
+      return stream;
+  };
+
   const startCamera = async () => {
-    console.log("📷 [Media] Próba uruchomienia kamery...");
+    log("📷 [Media] Start inicjalizacji mediów...");
+    
     try {
-        const constraints = {
+        const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true },
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } }
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        localStreamRef.current = stream;
-        setLocalStream(stream);
-        
-        stream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
-        stream.getVideoTracks().forEach(t => t.enabled = !isVideoStopped);
-        
-        console.log("✅ [Media] Kamera uruchomiona pomyślnie.");
-        return stream;
+            video: { width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+        return setupLocalStream(stream);
     } catch (err) {
-        console.error("❌ [Media] Błąd kamery:", err);
-        return null;
+        log("⚠️ [Media] Kamera niedostępna lub błąd. Przełączam na DUMMY STREAM.", err);
     }
+
+    const dummy = createBlackScreenStream();
+    return setupLocalStream(dummy);
   };
 
   // ==========================
-  // 2. SIGNALING & WS
+  // 3. SIGNALING & WS
   // ==========================
   const connectWebSocket = (currentUserName: string) => {
     const url = getWebSocketUrl();
-    console.log(`🔌 [WS] Łączenie z adresem: ${url}`);
+    log(`🔌 [WS] Próba połączenia z: ${url}`);
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
-        console.log('✅ [WS] Połączenie otwarte!');
+        log('✅ [WS] Połączenie OTWARTE!');
         sendSignal('new-peer', {});
     };
 
-    ws.current.onerror = (err) => console.error("❌ [WS] Błąd połączenia:", err);
-    ws.current.onclose = () => console.log("⚠️ [WS] Połączenie zamknięte.");
+    ws.current.onerror = (err) => log("❌ [WS] Błąd socketa:", err);
+    ws.current.onclose = (e) => log(`⚠️ [WS] Połączenie ZAMKNIĘTE (Kod: ${e.code})`);
 
     ws.current.onmessage = (event) => {
-        // Logowanie surowych danych
-        // console.log("📥 [WS RAW]", event.data); 
-
         const parsed: SignalMessage = JSON.parse(event.data);
         const { peer: peerUsername, action, message } = parsed;
         
-        // Logowanie sparsowanej wiadomości
-        console.log(`📩 [WS RECV] Od: ${peerUsername}, Akcja: ${action}`, message);
+        log(`📩 [WS RECV] Od: ${peerUsername} | Akcja: ${action}`, message);
 
         if (peerUsername === currentUserName) return;
 
         const receiverChannel = message.receiver_channel_name;
-        if (!receiverChannel) {
-            console.warn(`⚠️ [WS] Brak receiver_channel_name w wiadomości od ${peerUsername}`);
-            return;
-        }
-
+        
         if (action === 'new-peer') {
-            console.log(`🆕 [WS] New Peer: ${peerUsername} -> Tworzę Ofertę`);
+            if (!receiverChannel) {
+                log(`⚠️ [WS] Ignoruję new-peer od ${peerUsername} (brak kanału zwrotnego)`);
+                return;
+            }
+            log(`🆕 [WS] New Peer: ${peerUsername} -> Inicjuję Ofertę`);
             createOfferer(peerUsername, receiverChannel);
-        } else if (action === 'new-offer') {
-            console.log(`📜 [WS] New Offer od ${peerUsername} -> Tworzę Odpowiedź`);
-            if (message.sdp) createAnswerer(message.sdp, peerUsername, receiverChannel);
-        } else if (action === 'new-answer') {
-            console.log(`🤝 [WS] New Answer od ${peerUsername} -> Ustawiam RemoteDesc`);
+        } 
+        else if (action === 'new-offer') {
+            const existingPeer = mapPeers.current[peerUsername];
+            const targetChannel = receiverChannel || (existingPeer?.[0] as any)?.remoteChannelName;
+
+            if (existingPeer) {
+                if (message.sdp) {
+                    log(`🔄 [WebRTC] Renegocjacja (Otrzymano Offer) od ${peerUsername}`);
+                    handleRenegotiationOffer(existingPeer[0], message.sdp, peerUsername, targetChannel);
+                }
+            } else {
+                if (message.sdp && targetChannel) {
+                    log(`✨ [WebRTC] Nowe połączenie (Otrzymano Offer) od ${peerUsername} -> Tworzę Answer`);
+                    createAnswerer(message.sdp, peerUsername, targetChannel);
+                }
+            }
+        } 
+        else if (action === 'new-answer') {
             const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
-                peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
+                try {
+                    if (peerData[0].signalingState === 'stable') {
+                        log(`⚠️ [WebRTC] Ignoruję Answer od ${peerUsername} - stan już STABLE.`);
+                        return;
+                    }
+                    log(`🤝 [WebRTC] Ustawiam RemoteDesc (Answer) od ${peerUsername}`);
+                    peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
+                } catch (e) {
+                    log(`❌ [WebRTC] Błąd przy ustawianiu Answer od ${peerUsername}:`, e);
+                }
             }
         }
     };
@@ -119,87 +202,170 @@ function App() {
   const sendSignal = (action: string, message: any) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
         const payload = { peer: username, action, message };
-        console.log(`🚀 [WS SEND] ${action}`, payload);
+        log(`🚀 [WS SEND] ${action}`, payload);
         ws.current.send(JSON.stringify(payload));
     } else {
-        console.warn("⚠️ [WS] Próba wysłania, ale socket nie jest otwarty.");
+        log("⚠️ [WS] Nie mogę wysłać - socket zamknięty.");
     }
   };
 
   // ==========================
-  // 3. WEBRTC & DATA CHANNEL
+  // 4. WEBRTC LOGIC & OBSERVERS
   // ==========================
+  
+  // Funkcja dodająca nasłuchiwacze na PeerConnection (Z OBSŁUGĄ LOADINGU)
+  const addPcListeners = (pc: RTCPeerConnection, peerName: string) => {
+      // Śledzenie stanu ICE (Checking, Connected, Failed)
+      pc.oniceconnectionstatechange = () => {
+          const state = pc.iceConnectionState;
+          log(`🧊 [ICE State] ${peerName}: ${state}`);
+          
+          if (state === 'checking') {
+              setConnectionStatus(`Łączenie z ${peerName}... (NAT/Firewall)`);
+          } else if (state === 'connected' || state === 'completed') {
+              setConnectionStatus(null); // UKRYJ LOADER
+              log(`🟢 [ICE] Połączenie z ${peerName} USTABILIZOWANE!`);
+          } else if (state === 'failed') {
+              setConnectionStatus(`Błąd połączenia z ${peerName}`);
+              log(`⚠️ [ICE] Połączenie z ${peerName} zerwane/nieudane.`);
+              // Po 3 sekundach ukryj błąd, żeby nie zasłaniał wszystkiego
+              setTimeout(() => setConnectionStatus(null), 3000);
+          } else if (state === 'disconnected') {
+               // Disconnected to czasem stan przejściowy (np. przy renegocjacji)
+               // Możemy pokazać loader, ale krótko.
+               setConnectionStatus(`Utracono sygnał z ${peerName}...`);
+          }
+      };
+
+      pc.onsignalingstatechange = () => {
+          log(`🚦 [Signaling State] ${peerName}: ${pc.signalingState}`);
+      };
+
+      // Śledzenie zbierania kandydatów STUN
+      pc.onicegatheringstatechange = () => {
+          const state = pc.iceGatheringState;
+          log(`🕵️ [ICE Gathering] ${peerName}: ${state}`);
+          if (state === 'gathering') {
+               setConnectionStatus(`STUN: Szukanie trasy do ${peerName}...`);
+          }
+      };
+
+      pc.onnegotiationneeded = () => {
+          log(`🔔 [Negotiation Needed] ${peerName} - wymagana renegocjacja.`);
+      };
+  };
+
+  const renegotiate = async (pc: RTCPeerConnection, peerUsername: string, receiverChannel: string) => {
+      log(`🔄 [Renegotiation] Start (JA -> ${peerUsername})`);
+      setConnectionStatus("Renegocjacja strumienia..."); // Pokaż loader przy zmianie
+      try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
+      } catch (e) {
+          log(`❌ [Renegotiation] Błąd:`, e);
+          setConnectionStatus(null);
+      }
+  };
+
+  const handleRenegotiationOffer = async (pc: RTCPeerConnection, sdp: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
+      try {
+          log(`📥 [Renegotiation] Przetwarzam Ofertę od ${peerUsername}...`);
+          
+          if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer' && pc.signalingState !== 'have-remote-offer') {
+               log(`⚠️ [Renegotiation] Ryzykowny stan PC: ${pc.signalingState}`);
+          }
+
+          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          sendSignal('new-answer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
+      } catch (e) {
+          log(`❌ [Renegotiation Handler] Błąd przy ${peerUsername}:`, e);
+      }
+  };
+
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
-    dc.onopen = () => console.log(`✅ [DataChannel] OTWARTY z: ${peerUsername}`);
-    dc.onclose = () => console.log(`❌ [DataChannel] ZAMKNIĘTY z: ${peerUsername}`);
-    dc.onerror = (err) => console.error(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, err);
+    dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
+    dc.onclose = () => log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
+    dc.onerror = (e) => log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
 
     dc.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        
-        // Logowanie WSZYSTKIEGO co przychodzi
         if (data.joystick) {
-            console.log(`🕹️ [DC RECV] Joystick od ${peerUsername}:`, data.joystick);
+            log(`🕹️ [DC RECV] Joystick od ${peerUsername}:`, data.joystick);
             return;
         }
         if (data.message) {
-            console.log(`💬 [DC RECV] Chat od ${peerUsername}:`, data.message);
+            log(`💬 [DC RECV] Chat od ${peerUsername}:`, data.message);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
-        } else {
-            console.log(`📦 [DC RECV] Inne dane od ${peerUsername}:`, data);
         }
     };
   };
 
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
-    console.log(`🛠️ [WebRTC] Tworzenie Offerer dla ${peerUsername}`);
-    const pc = new RTCPeerConnection();
+    log(`🛠️ [WebRTC] Tworzę PeerConnection (Offerer) dla ${peerUsername}`);
+    setConnectionStatus(`Inicjalizacja wideo z ${peerUsername}...`); // LOADER
+
+    const pc = new RTCPeerConnection(rtcConfig); 
+    (pc as any).remoteChannelName = receiverChannel;
+    addPcListeners(pc, peerUsername);
+
     const dc = pc.createDataChannel('chat');
+    log(`🛠️ [DataChannel] Utworzono kanał 'chat' dla ${peerUsername}`);
     mapPeers.current[peerUsername] = [pc, dc];
     setupDataChannel(dc, peerUsername);
 
     if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
+        localStreamRef.current.getTracks().forEach(t => {
+            log(`➕ [Track] Dodaję lokalny track ${t.kind} do PC ${peerUsername}`);
+            pc.addTrack(t, localStreamRef.current!);
+        });
     }
 
     pc.onicecandidate = (e) => {
         if (!e.candidate) {
-            console.log(`❄️ [ICE] Zebrano kandydatów (Offer) dla ${peerUsername}`);
+            log(`❄️ [ICE] Zbieranie zakończone. Wysyłam OFFER do ${peerUsername}`);
             sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
         }
     };
 
     pc.ontrack = (e) => handleRemoteTrack(e, peerUsername);
-    pc.oniceconnectionstatechange = () => handleIceChange(pc, peerUsername);
-
+    
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
   };
 
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
-    console.log(`🛠️ [WebRTC] Tworzenie Answerer dla ${peerUsername}`);
-    const pc = new RTCPeerConnection();
+    log(`🛠️ [WebRTC] Tworzę PeerConnection (Answerer) dla ${peerUsername}`);
+    setConnectionStatus(`Odbieranie wideo od ${peerUsername}...`); // LOADER
+
+    const pc = new RTCPeerConnection(rtcConfig);
+    (pc as any).remoteChannelName = receiverChannel;
+    addPcListeners(pc, peerUsername);
     
     pc.ondatachannel = (e) => {
-        console.log(`🔗 [WebRTC] Otrzymano DataChannel od ${peerUsername}`);
+        log(`🔗 [WebRTC] Otrzymano DataChannel od ${peerUsername}`);
         const dc = e.channel;
         mapPeers.current[peerUsername] = [pc, dc];
         setupDataChannel(dc, peerUsername);
     };
 
     if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
+        localStreamRef.current.getTracks().forEach(t => {
+            log(`➕ [Track] Dodaję lokalny track ${t.kind} do PC ${peerUsername}`);
+            pc.addTrack(t, localStreamRef.current!);
+        });
     }
 
     pc.onicecandidate = (e) => {
         if (!e.candidate) {
-            console.log(`❄️ [ICE] Zebrano kandydatów (Answer) dla ${peerUsername}`);
+            log(`❄️ [ICE] Zbieranie zakończone. Wysyłam ANSWER do ${peerUsername}`);
             sendSignal('new-answer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
         }
     };
 
     pc.ontrack = (e) => handleRemoteTrack(e, peerUsername);
-    pc.oniceconnectionstatechange = () => handleIceChange(pc, peerUsername);
 
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await pc.createAnswer();
@@ -207,7 +373,7 @@ function App() {
   };
 
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
-    console.log(`🎥 [WebRTC] Odebrano TRACK (Video/Audio) od ${peerUsername}`);
+    log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}. Tracks: ${e.streams[0]?.getTracks().length}`);
     const [stream] = e.streams;
     setRemotePeers(prev => {
         if (prev.find(p => p.username === peerUsername)) return prev;
@@ -215,33 +381,26 @@ function App() {
     });
   };
 
-  const handleIceChange = (pc: RTCPeerConnection, peerUsername: string) => {
-    console.log(`🧊 [ICE STATE] ${peerUsername}: ${pc.iceConnectionState}`);
-    if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
-        console.warn(`⚠️ [ICE] Utracono połączenie z ${peerUsername}. Czyszczenie.`);
-        pc.close();
-        delete mapPeers.current[peerUsername];
-        setRemotePeers(prev => prev.filter(p => p.username !== peerUsername));
-    }
-  };
-
   // ==========================
-  // 4. ACTIONS & BROADCAST
+  // 5. ACTIONS & BROADCAST
   // ==========================
   const broadcastData = (payload: any) => {
-    console.log(`📤 [Broadcast] Wysyłanie danych do wszystkich peerów:`, payload);
+    if (payload.joystick) {
+        log(`🕹️ [BROADCAST] Joystick: L=${payload.joystick.linear}, A=${payload.joystick.angular}`);
+    } else {
+        log(`📤 [BROADCAST] Dane:`, payload);
+    }
+
     const json = JSON.stringify(payload);
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
-             dc.send(json);
-        } else {
-             console.warn(`⚠️ [Broadcast] Kanał nie jest otwarty (state: ${dc?.readyState})`);
+            dc.send(json);
         }
     });
   };
 
   const sendRobotCommand = (cmd: string) => {
-      console.log(`🤖 [Command] Wysyłanie komendy: ${cmd}`);
+      log(`🤖 [Command] Wysyłam komendę: ${cmd}`);
       broadcastData({ username, message: cmd });
   };
 
@@ -250,7 +409,7 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsAudioMuted(!t.enabled); 
-        console.log(`🎤 Audio przełączone: ${t.enabled ? 'ON' : 'OFF'}`);
+        log(`🎤 Mikrofon przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
@@ -259,44 +418,103 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsVideoStopped(!t.enabled); 
-        console.log(`📷 Wideo przełączone: ${t.enabled ? 'ON' : 'OFF'}`);
+        log(`📷 Wideo przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
-  const toggleScreenShare = async () => {
-    console.log("🖥️ [ScreenShare] Przełączanie udostępniania ekranu...");
-    if (!isScreenSharing) {
-        try {
-            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-            const screenTrack = stream.getVideoTracks()[0];
-            Object.values(mapPeers.current).forEach(([pc]) => {
-                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) sender.replaceTrack(screenTrack);
-            });
-            setLocalStream(stream);
-            setIsScreenSharing(true);
-            console.log("🖥️ [ScreenShare] Rozpoczęto.");
-            screenTrack.onended = () => toggleScreenShare();
-        } catch (e) { console.error("❌ [ScreenShare] Błąd:", e); }
-    } else {
-        const stream = await startCamera();
-        if (stream) {
-            const camTrack = stream.getVideoTracks()[0];
-            Object.values(mapPeers.current).forEach(([pc]) => {
-                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
-                if (sender) sender.replaceTrack(camTrack);
-            });
-            setIsScreenSharing(false);
-            console.log("🖥️ [ScreenShare] Zatrzymano -> Powrót do kamery.");
-        }
-    }
+  // --- SCREEN SHARE ---
+  const startScreenShare = async () => {
+      log("🖥️ [ScreenShare] Próba uruchomienia...");
+      try {
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          const screenTrack = screenStream.getVideoTracks()[0];
+          
+          log(`🖥️ [ScreenShare] Otrzymano strumień ekranu: ${screenTrack.label}`);
+
+          Object.values(mapPeers.current).forEach(([pc]) => {
+              const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+              if (videoSender) {
+                  log("🖥️ [ScreenShare] Zastępowanie tracka wideo...");
+                  videoSender.replaceTrack(screenTrack).catch(e => log("❌ ReplaceTrack error:", e));
+              } else {
+                  log("🖥️ [ScreenShare] Dodawanie nowego tracka...");
+                  pc.addTrack(screenTrack, screenStream);
+                  const channelName = (pc as any).remoteChannelName;
+                  if(channelName) renegotiate(pc, "peer", channelName);
+              }
+          });
+
+          setLocalStream(screenStream);
+          setIsScreenSharing(true);
+          setIsVideoStopped(false); 
+
+          screenTrack.onended = () => {
+              log("🛑 [ScreenShare] Zatrzymano z UI przeglądarki (pasek).");
+              if (isScreenSharingRef.current) {
+                  stopScreenShare();
+              }
+          };
+
+      } catch (e: any) {
+          if (e.name === 'NotAllowedError') {
+              log("🛑 [ScreenShare] Anulowano przez użytkownika.");
+          } else {
+              log("❌ [ScreenShare] Błąd startu:", e);
+          }
+          setIsScreenSharing(false);
+      }
+  };
+
+  const stopScreenShare = async () => {
+      log("🖥️ [ScreenShare] Zatrzymywanie...");
+      setIsScreenSharing(false);
+
+      if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(t => {
+              log(`🛑 [ScreenShare] Zatrzymuję lokalny track ekranu: ${t.label}`);
+              t.stop();
+          });
+      }
+
+      const camStream = await startCamera(); 
+      
+      Object.values(mapPeers.current).forEach(([pc]) => {
+          const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (videoSender && camStream) {
+               const videoTrack = camStream.getVideoTracks()[0];
+               try {
+                   log("📷 [ScreenShare] Przywracanie kamery/dummy...");
+                   videoSender.replaceTrack(videoTrack).catch(e => log("⚠️ RevertTrack warn:", e));
+               } catch(e) {}
+          }
+      });
+  };
+
+  const toggleScreenShare = () => {
+      if (isScreenSharing) {
+          stopScreenShare();
+      } else {
+          startScreenShare();
+      }
+  };
+
+  const handleRefreshPeers = () => {
+      log("🔄 [System] Ręczne odświeżanie. Czyszczę stare połączenia...");
+      setConnectionStatus("Resetowanie połączeń...");
+      
+      Object.values(mapPeers.current).forEach(([pc]) => pc.close());
+      mapPeers.current = {};
+      setRemotePeers([]);
+
+      sendSignal('new-peer', {});
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
-      console.log(`👤 [Login] Logowanie jako: ${username}`);
+      log(`👤 [Login] Logowanie jako: ${username}`);
       setIsLoggedIn(true);
+      
       const stream = await startCamera();
       if (stream) connectWebSocket(username);
     }
@@ -343,16 +561,22 @@ function App() {
                 {isScreenSharing ? '⏹️ Stop Share' : '🖥️ Share'}
               </button>
               
-              <button onClick={() => sendSignal('new-peer', {})} className="icon-btn">🔄</button>
+              <button onClick={handleRefreshPeers} className="icon-btn">🔄</button>
            </div>
           </header>
 
           <div className="main-grid">
-
-            {/* SEKCOJA 1: PILOT */}
             {activeTab === 'operator' && (
               <div className="view-section operator-view">
                 <div className="panel">
+                {/* LOADER OVERLAY - POKAZUJE SIĘ GDY TRWA ŁĄCZENIE */}
+                {connectionStatus && (
+                    <div className="loader-overlay">
+                        <div className="spinner"></div>
+                        <div className="loader-text">{connectionStatus}</div>
+                        <div className="loader-subtext">Czekam na odpowiedź STUN...</div>
+                    </div>
+                )}
                 <VideoGrid 
                     localStream={localStream} 
                     remotePeers={remotePeers} 
@@ -367,7 +591,6 @@ function App() {
                       onMove={(l, a) => {
                           const now = Date.now();
                           if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
-                              // LOGOWANIE ODBYWA SIĘ W broadcastData
                               broadcastData({ username, joystick: { linear: l, angular: a } });
                               lastSentTime.current = now;
                           }
@@ -379,10 +602,16 @@ function App() {
               </div>
             )}
             
-            {/* SEKCJA 2: HUB */}
+            {/* W INNYCH ZAKŁADKACH TEŻ DODAJEMY LOADER */}
             {activeTab === 'hub' && (
               <div className="view-section operator-view">
                 <div className="panel">
+                {connectionStatus && (
+                    <div className="loader-overlay">
+                        <div className="spinner"></div>
+                        <div>{connectionStatus}</div>
+                    </div>
+                )}
                 <VideoGrid 
                     localStream={localStream} 
                     remotePeers={remotePeers} 
@@ -401,10 +630,15 @@ function App() {
               </div>
             )}
 
-            {/* SEKCJA 3: AI */}
             {activeTab === 'ai' && (
               <div className="view-section ai-view">
                 <div className="panel">
+                  {connectionStatus && (
+                      <div className="loader-overlay">
+                          <div className="spinner"></div>
+                          <div>{connectionStatus}</div>
+                      </div>
+                  )}
                   <VideoGrid 
                     localStream={localStream} 
                     remotePeers={remotePeers} 
