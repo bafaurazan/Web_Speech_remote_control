@@ -328,7 +328,7 @@ img, video, canvas {
 .loader-overlay {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(46, 16, 101, 0.85); /* Ciemny fiolet półprzezroczysty */
+  background: rgba(46, 16, 101, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -338,6 +338,7 @@ img, video, canvas {
   text-align: center;
   padding: 20px;
   backdrop-filter: blur(4px);
+  border-radius: 10px; /* Dopasowanie do panelu */
 }
 
 .spinner {

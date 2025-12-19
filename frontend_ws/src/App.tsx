@@ -12,12 +12,16 @@ const getWebSocketUrl = () => {
     return `${protocol}${host}/ws`; 
 }; 
 
-// === KONFIGURACJA WEBRTC (STUN SERVERS) ===
-const rtcConfig = {
+// === DEFINICJE KONFIGURACJI ===
+const STUN_CONFIG = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:global.stun.twilio.com:3478' }
     ]
+};
+
+const NO_STUN_CONFIG = {
+    iceServers: [] // Pusta lista - tylko sieć lokalna (LAN/Localhost)
 };
 
 // === POMOCNIK LOGOWANIA Z CZASEM ===
@@ -63,6 +67,10 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
   
+  // Konfiguracja STUN (Checkbox)
+  const [useStun, setUseStun] = useState(true);
+  const useStunRef = useRef(true);
+
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -79,6 +87,10 @@ function App() {
   const localStreamRef = useRef<MediaStream | null>(null);
   const lastSentTime = useRef<number>(0);
   const isScreenSharingRef = useRef(false);
+  
+  // --- POPRAWKA TYPU ---
+  // Zamiast NodeJS.Timeout używamy ReturnType<typeof setTimeout> co działa wszędzie
+  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -93,6 +105,12 @@ function App() {
   useEffect(() => {
       isScreenSharingRef.current = isScreenSharing;
   }, [isScreenSharing]);
+
+  const handleStunChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUseStun(e.target.checked);
+      useStunRef.current = e.target.checked;
+      log(`🔧 [Config] STUN ustawiony na: ${e.target.checked ? 'ON (Internet)' : 'OFF (Local Only)'}`);
+  };
 
   // ==========================
   // 2. MEDIA SETUP
@@ -213,27 +231,36 @@ function App() {
   // 4. WEBRTC LOGIC & OBSERVERS
   // ==========================
   
-  // Funkcja dodająca nasłuchiwacze na PeerConnection (Z OBSŁUGĄ LOADINGU)
+  const clearStatusTimeout = () => {
+      if (statusTimeoutRef.current) {
+          clearTimeout(statusTimeoutRef.current);
+          statusTimeoutRef.current = null;
+      }
+  };
+
   const addPcListeners = (pc: RTCPeerConnection, peerName: string) => {
-      // Śledzenie stanu ICE (Checking, Connected, Failed)
       pc.oniceconnectionstatechange = () => {
           const state = pc.iceConnectionState;
           log(`🧊 [ICE State] ${peerName}: ${state}`);
           
+          clearStatusTimeout();
+
           if (state === 'checking') {
-              setConnectionStatus(`Łączenie z ${peerName}... (NAT/Firewall)`);
-          } else if (state === 'connected' || state === 'completed') {
-              setConnectionStatus(null); // UKRYJ LOADER
+              setConnectionStatus(`Łączenie z ${peerName}...`);
+          } 
+          else if (state === 'connected' || state === 'completed') {
+              setConnectionStatus(null);
               log(`🟢 [ICE] Połączenie z ${peerName} USTABILIZOWANE!`);
-          } else if (state === 'failed') {
-              setConnectionStatus(`Błąd połączenia z ${peerName}`);
-              log(`⚠️ [ICE] Połączenie z ${peerName} zerwane/nieudane.`);
-              // Po 3 sekundach ukryj błąd, żeby nie zasłaniał wszystkiego
-              setTimeout(() => setConnectionStatus(null), 3000);
-          } else if (state === 'disconnected') {
-               // Disconnected to czasem stan przejściowy (np. przy renegocjacji)
-               // Możemy pokazać loader, ale krótko.
-               setConnectionStatus(`Utracono sygnał z ${peerName}...`);
+          } 
+          else if (state === 'failed' || state === 'disconnected') {
+              const msg = `Utracono połączenie z ${peerName}...`;
+              log(`⚠️ [ICE] ${msg} (Stan: ${state})`);
+              setConnectionStatus(msg);
+
+              statusTimeoutRef.current = setTimeout(() => {
+                  log(`⏰ [System] Upłynął czas oczekiwania na ${peerName}. Ukrywam komunikat.`);
+                  setConnectionStatus(null); 
+              }, 5000);
           }
       };
 
@@ -241,12 +268,11 @@ function App() {
           log(`🚦 [Signaling State] ${peerName}: ${pc.signalingState}`);
       };
 
-      // Śledzenie zbierania kandydatów STUN
       pc.onicegatheringstatechange = () => {
           const state = pc.iceGatheringState;
           log(`🕵️ [ICE Gathering] ${peerName}: ${state}`);
           if (state === 'gathering') {
-               setConnectionStatus(`STUN: Szukanie trasy do ${peerName}...`);
+               setConnectionStatus(`Szukanie trasy (STUN) do ${peerName}...`);
           }
       };
 
@@ -255,9 +281,13 @@ function App() {
       };
   };
 
+  const getCurrentConfig = () => {
+      return useStunRef.current ? STUN_CONFIG : NO_STUN_CONFIG;
+  };
+
   const renegotiate = async (pc: RTCPeerConnection, peerUsername: string, receiverChannel: string) => {
       log(`🔄 [Renegotiation] Start (JA -> ${peerUsername})`);
-      setConnectionStatus("Renegocjacja strumienia..."); // Pokaż loader przy zmianie
+      setConnectionStatus("Renegocjacja strumienia...");
       try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -304,10 +334,11 @@ function App() {
   };
 
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
-    log(`🛠️ [WebRTC] Tworzę PeerConnection (Offerer) dla ${peerUsername}`);
-    setConnectionStatus(`Inicjalizacja wideo z ${peerUsername}...`); // LOADER
+    const config = getCurrentConfig();
+    log(`🛠️ [WebRTC] Tworzę Offerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
+    setConnectionStatus(`Inicjalizacja wideo z ${peerUsername}...`);
 
-    const pc = new RTCPeerConnection(rtcConfig); 
+    const pc = new RTCPeerConnection(config); 
     (pc as any).remoteChannelName = receiverChannel;
     addPcListeners(pc, peerUsername);
 
@@ -337,10 +368,11 @@ function App() {
   };
 
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
-    log(`🛠️ [WebRTC] Tworzę PeerConnection (Answerer) dla ${peerUsername}`);
-    setConnectionStatus(`Odbieranie wideo od ${peerUsername}...`); // LOADER
+    const config = getCurrentConfig();
+    log(`🛠️ [WebRTC] Tworzę Answerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
+    setConnectionStatus(`Odbieranie wideo od ${peerUsername}...`);
 
-    const pc = new RTCPeerConnection(rtcConfig);
+    const pc = new RTCPeerConnection(config);
     (pc as any).remoteChannelName = receiverChannel;
     addPcListeners(pc, peerUsername);
     
@@ -501,6 +533,7 @@ function App() {
   const handleRefreshPeers = () => {
       log("🔄 [System] Ręczne odświeżanie. Czyszczę stare połączenia...");
       setConnectionStatus("Resetowanie połączeń...");
+      clearStatusTimeout();
       
       Object.values(mapPeers.current).forEach(([pc]) => pc.close());
       mapPeers.current = {};
@@ -512,7 +545,7 @@ function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
-      log(`👤 [Login] Logowanie jako: ${username}`);
+      log(`👤 [Login] Logowanie jako: ${username} | STUN: ${useStun}`);
       setIsLoggedIn(true);
       
       const stream = await startCamera();
@@ -525,7 +558,24 @@ function App() {
       {!isLoggedIn ? (
         <div className="login-container">
           <form onSubmit={handleLogin} className="login-card">
-            <input className="styled-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+            <h2 className="title-header">LOGIN</h2>
+            
+            <div className="input-row">
+                 <input className="styled-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+            </div>
+
+            <div className="flex items-center gap-2 mb-2" style={{width: '100%', justifyContent: 'center'}}>
+                <label className="switch-label flex items-center gap-2" style={{cursor: 'pointer', fontWeight: 'bold', color: '#4c1d95'}}>
+                    <input 
+                        type="checkbox" 
+                        checked={useStun} 
+                        onChange={handleStunChange} 
+                        style={{width: '20px', height: '20px'}}
+                    />
+                    <span>Używaj serwerów STUN (Internet)</span>
+                </label>
+            </div>
+
             <button type="submit" className="styled-btn">Login</button>
           </form>
         </div>
@@ -569,14 +619,15 @@ function App() {
             {activeTab === 'operator' && (
               <div className="view-section operator-view">
                 <div className="panel">
-                {/* LOADER OVERLAY - POKAZUJE SIĘ GDY TRWA ŁĄCZENIE */}
+                
                 {connectionStatus && (
                     <div className="loader-overlay">
                         <div className="spinner"></div>
                         <div className="loader-text">{connectionStatus}</div>
-                        <div className="loader-subtext">Czekam na odpowiedź STUN...</div>
+                        {connectionStatus.includes('STUN') && <div className="loader-subtext">To może chwilę potrwać...</div>}
                     </div>
                 )}
+                
                 <VideoGrid 
                     localStream={localStream} 
                     remotePeers={remotePeers} 
@@ -602,7 +653,6 @@ function App() {
               </div>
             )}
             
-            {/* W INNYCH ZAKŁADKACH TEŻ DODAJEMY LOADER */}
             {activeTab === 'hub' && (
               <div className="view-section operator-view">
                 <div className="panel">
