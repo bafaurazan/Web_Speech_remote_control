@@ -16,8 +16,10 @@ function App() {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [isAudioMuted, setIsAudioMuted] = useState(false);
-  const [isVideoStopped, setIsVideoStopped] = useState(false);
+  
+  // Zmiana stanów początkowych na true, aby mikrofon i kamera były OFF na starcie
+  const [isAudioMuted, setIsAudioMuted] = useState(true);
+  const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -48,8 +50,11 @@ function App() {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         localStreamRef.current = stream;
         setLocalStream(stream);
+        
+        // Ścieżki zostaną wyłączone na starcie, ponieważ !true = false
         stream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
         stream.getVideoTracks().forEach(t => t.enabled = !isVideoStopped);
+        
         return stream;
     } catch (err) {
         console.error("Błąd kamery:", err);
@@ -103,7 +108,6 @@ function App() {
     dc.onopen = () => console.log(`[DataChannel] OTWARTY z: ${peerUsername}`);
     dc.onmessage = (e) => {
         const data = JSON.parse(e.data);
-        // Obsługa joysticka i komend (logika z renderer.js)
         if (data.joystick) {
             console.log("Odebrano dane joysticka:", data.joystick);
             return;
@@ -116,7 +120,6 @@ function App() {
 
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
     const pc = new RTCPeerConnection();
-    // KLUCZ: DataChannel przed createOffer!
     const dc = pc.createDataChannel('chat');
     mapPeers.current[peerUsername] = [pc, dc];
     setupDataChannel(dc, peerUsername);
