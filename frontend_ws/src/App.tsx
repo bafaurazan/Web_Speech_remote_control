@@ -18,7 +18,6 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
   
-  // Zmiana stanów początkowych na true, aby mikrofon i kamera były OFF na starcie
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
@@ -34,7 +33,10 @@ function App() {
 
   useEffect(() => {
     return () => {
-        if (ws.current) ws.current.close();
+        if (ws.current) {
+            console.log("🛑 [System] Zamykanie aplikacji/komponentu - czyszczenie WS");
+            ws.current.close();
+        }
         Object.values(mapPeers.current).forEach(([pc]) => pc.close());
     };
   }, []);
@@ -43,6 +45,7 @@ function App() {
   // 1. MEDIA SETUP
   // ==========================
   const startCamera = async () => {
+    console.log("📷 [Media] Próba uruchomienia kamery...");
     try {
         const constraints = {
             audio: { echoCancellation: true, noiseSuppression: true },
@@ -52,13 +55,13 @@ function App() {
         localStreamRef.current = stream;
         setLocalStream(stream);
         
-        // Ścieżki zostaną wyłączone na starcie, ponieważ !true = false
         stream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
         stream.getVideoTracks().forEach(t => t.enabled = !isVideoStopped);
         
+        console.log("✅ [Media] Kamera uruchomiona pomyślnie.");
         return stream;
     } catch (err) {
-        console.error("Błąd kamery:", err);
+        console.error("❌ [Media] Błąd kamery:", err);
         return null;
     }
   };
@@ -68,26 +71,43 @@ function App() {
   // ==========================
   const connectWebSocket = (currentUserName: string) => {
     const url = getWebSocketUrl();
+    console.log(`🔌 [WS] Łączenie z adresem: ${url}`);
     ws.current = new WebSocket(url);
 
     ws.current.onopen = () => {
-        console.log('[WS] Połączenie otwarte!');
+        console.log('✅ [WS] Połączenie otwarte!');
         sendSignal('new-peer', {});
     };
 
+    ws.current.onerror = (err) => console.error("❌ [WS] Błąd połączenia:", err);
+    ws.current.onclose = () => console.log("⚠️ [WS] Połączenie zamknięte.");
+
     ws.current.onmessage = (event) => {
+        // Logowanie surowych danych
+        // console.log("📥 [WS RAW]", event.data); 
+
         const parsed: SignalMessage = JSON.parse(event.data);
         const { peer: peerUsername, action, message } = parsed;
+        
+        // Logowanie sparsowanej wiadomości
+        console.log(`📩 [WS RECV] Od: ${peerUsername}, Akcja: ${action}`, message);
+
         if (peerUsername === currentUserName) return;
 
         const receiverChannel = message.receiver_channel_name;
-        if (!receiverChannel) return;
+        if (!receiverChannel) {
+            console.warn(`⚠️ [WS] Brak receiver_channel_name w wiadomości od ${peerUsername}`);
+            return;
+        }
 
         if (action === 'new-peer') {
+            console.log(`🆕 [WS] New Peer: ${peerUsername} -> Tworzę Ofertę`);
             createOfferer(peerUsername, receiverChannel);
         } else if (action === 'new-offer') {
+            console.log(`📜 [WS] New Offer od ${peerUsername} -> Tworzę Odpowiedź`);
             if (message.sdp) createAnswerer(message.sdp, peerUsername, receiverChannel);
         } else if (action === 'new-answer') {
+            console.log(`🤝 [WS] New Answer od ${peerUsername} -> Ustawiam RemoteDesc`);
             const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
                 peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
@@ -98,7 +118,11 @@ function App() {
 
   const sendSignal = (action: string, message: any) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
-        ws.current.send(JSON.stringify({ peer: username, action, message }));
+        const payload = { peer: username, action, message };
+        console.log(`🚀 [WS SEND] ${action}`, payload);
+        ws.current.send(JSON.stringify(payload));
+    } else {
+        console.warn("⚠️ [WS] Próba wysłania, ale socket nie jest otwarty.");
     }
   };
 
@@ -106,20 +130,29 @@ function App() {
   // 3. WEBRTC & DATA CHANNEL
   // ==========================
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
-    dc.onopen = () => console.log(`[DataChannel] OTWARTY z: ${peerUsername}`);
+    dc.onopen = () => console.log(`✅ [DataChannel] OTWARTY z: ${peerUsername}`);
+    dc.onclose = () => console.log(`❌ [DataChannel] ZAMKNIĘTY z: ${peerUsername}`);
+    dc.onerror = (err) => console.error(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, err);
+
     dc.onmessage = (e) => {
         const data = JSON.parse(e.data);
+        
+        // Logowanie WSZYSTKIEGO co przychodzi
         if (data.joystick) {
-            console.log("Odebrano dane joysticka:", data.joystick);
+            console.log(`🕹️ [DC RECV] Joystick od ${peerUsername}:`, data.joystick);
             return;
         }
         if (data.message) {
+            console.log(`💬 [DC RECV] Chat od ${peerUsername}:`, data.message);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
+        } else {
+            console.log(`📦 [DC RECV] Inne dane od ${peerUsername}:`, data);
         }
     };
   };
 
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
+    console.log(`🛠️ [WebRTC] Tworzenie Offerer dla ${peerUsername}`);
     const pc = new RTCPeerConnection();
     const dc = pc.createDataChannel('chat');
     mapPeers.current[peerUsername] = [pc, dc];
@@ -131,6 +164,7 @@ function App() {
 
     pc.onicecandidate = (e) => {
         if (!e.candidate) {
+            console.log(`❄️ [ICE] Zebrano kandydatów (Offer) dla ${peerUsername}`);
             sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
         }
     };
@@ -143,9 +177,11 @@ function App() {
   };
 
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
+    console.log(`🛠️ [WebRTC] Tworzenie Answerer dla ${peerUsername}`);
     const pc = new RTCPeerConnection();
     
     pc.ondatachannel = (e) => {
+        console.log(`🔗 [WebRTC] Otrzymano DataChannel od ${peerUsername}`);
         const dc = e.channel;
         mapPeers.current[peerUsername] = [pc, dc];
         setupDataChannel(dc, peerUsername);
@@ -157,6 +193,7 @@ function App() {
 
     pc.onicecandidate = (e) => {
         if (!e.candidate) {
+            console.log(`❄️ [ICE] Zebrano kandydatów (Answer) dla ${peerUsername}`);
             sendSignal('new-answer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
         }
     };
@@ -170,6 +207,7 @@ function App() {
   };
 
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
+    console.log(`🎥 [WebRTC] Odebrano TRACK (Video/Audio) od ${peerUsername}`);
     const [stream] = e.streams;
     setRemotePeers(prev => {
         if (prev.find(p => p.username === peerUsername)) return prev;
@@ -178,7 +216,9 @@ function App() {
   };
 
   const handleIceChange = (pc: RTCPeerConnection, peerUsername: string) => {
+    console.log(`🧊 [ICE STATE] ${peerUsername}: ${pc.iceConnectionState}`);
     if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
+        console.warn(`⚠️ [ICE] Utracono połączenie z ${peerUsername}. Czyszczenie.`);
         pc.close();
         delete mapPeers.current[peerUsername];
         setRemotePeers(prev => prev.filter(p => p.username !== peerUsername));
@@ -189,25 +229,42 @@ function App() {
   // 4. ACTIONS & BROADCAST
   // ==========================
   const broadcastData = (payload: any) => {
+    console.log(`📤 [Broadcast] Wysyłanie danych do wszystkich peerów:`, payload);
     const json = JSON.stringify(payload);
     Object.values(mapPeers.current).forEach(([_, dc]) => {
-        if (dc?.readyState === 'open') dc.send(json);
+        if (dc?.readyState === 'open') {
+             dc.send(json);
+        } else {
+             console.warn(`⚠️ [Broadcast] Kanał nie jest otwarty (state: ${dc?.readyState})`);
+        }
     });
   };
 
-  const sendRobotCommand = (cmd: string) => broadcastData({ username, message: cmd });
+  const sendRobotCommand = (cmd: string) => {
+      console.log(`🤖 [Command] Wysyłanie komendy: ${cmd}`);
+      broadcastData({ username, message: cmd });
+  };
 
   const toggleAudio = () => {
     const t = localStreamRef.current?.getAudioTracks()[0];
-    if(t) { t.enabled = !t.enabled; setIsAudioMuted(!t.enabled); }
+    if(t) { 
+        t.enabled = !t.enabled; 
+        setIsAudioMuted(!t.enabled); 
+        console.log(`🎤 Audio przełączone: ${t.enabled ? 'ON' : 'OFF'}`);
+    }
   };
 
   const toggleVideo = () => {
     const t = localStreamRef.current?.getVideoTracks()[0];
-    if(t) { t.enabled = !t.enabled; setIsVideoStopped(!t.enabled); }
+    if(t) { 
+        t.enabled = !t.enabled; 
+        setIsVideoStopped(!t.enabled); 
+        console.log(`📷 Wideo przełączone: ${t.enabled ? 'ON' : 'OFF'}`);
+    }
   };
 
   const toggleScreenShare = async () => {
+    console.log("🖥️ [ScreenShare] Przełączanie udostępniania ekranu...");
     if (!isScreenSharing) {
         try {
             const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -218,8 +275,9 @@ function App() {
             });
             setLocalStream(stream);
             setIsScreenSharing(true);
+            console.log("🖥️ [ScreenShare] Rozpoczęto.");
             screenTrack.onended = () => toggleScreenShare();
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("❌ [ScreenShare] Błąd:", e); }
     } else {
         const stream = await startCamera();
         if (stream) {
@@ -229,6 +287,7 @@ function App() {
                 if (sender) sender.replaceTrack(camTrack);
             });
             setIsScreenSharing(false);
+            console.log("🖥️ [ScreenShare] Zatrzymano -> Powrót do kamery.");
         }
     }
   };
@@ -236,6 +295,7 @@ function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
+      console.log(`👤 [Login] Logowanie jako: ${username}`);
       setIsLoggedIn(true);
       const stream = await startCamera();
       if (stream) connectWebSocket(username);
@@ -275,7 +335,6 @@ function App() {
               <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
               <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
               
-              {/* NOWY PRZYCISK W APP.TSX */}
               <button 
                 onClick={toggleScreenShare} 
                 className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}
@@ -288,11 +347,9 @@ function App() {
            </div>
           </header>
 
-          
-
           <div className="main-grid">
 
-            {/* SEKCOJA 1: PILOT (Tylko lokalna kamera i joystick) */}
+            {/* SEKCOJA 1: PILOT */}
             {activeTab === 'operator' && (
               <div className="view-section operator-view">
                 <div className="panel">
@@ -310,6 +367,7 @@ function App() {
                       onMove={(l, a) => {
                           const now = Date.now();
                           if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
+                              // LOGOWANIE ODBYWA SIĘ W broadcastData
                               broadcastData({ username, joystick: { linear: l, angular: a } });
                               lastSentTime.current = now;
                           }
@@ -321,7 +379,7 @@ function App() {
               </div>
             )}
             
-            {/* SEKCJA 2: HUB (Wszystkie kamery i czat) */}
+            {/* SEKCJA 2: HUB */}
             {activeTab === 'hub' && (
               <div className="view-section operator-view">
                 <div className="panel">
@@ -343,7 +401,7 @@ function App() {
               </div>
             )}
 
-            {/* SEKCJA 3: AI (Głos i monitoring) */}
+            {/* SEKCJA 3: AI */}
             {activeTab === 'ai' && (
               <div className="view-section ai-view">
                 <div className="panel">
