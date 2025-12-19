@@ -253,15 +253,25 @@ function App() {
       ) : (
         <>
           <header className="top-bar">
-             <div className="flex gap-4 items-center">
-                <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
-                <h1 className="text-xl font-bold">ROBOT: {username}</h1>
-             </div>
-             <div className="flex gap-2">
-                <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
-                <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
-                <button onClick={() => sendSignal('new-peer', {})} className="icon-btn">🔄</button>
-             </div>
+           <div className="flex gap-4 items-center">
+              <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
+              <h1 className="text-xl font-bold">ROBOT: {username}</h1>
+           </div>
+           <div className="flex gap-2">
+              <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
+              <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
+              
+              {/* NOWY PRZYCISK W APP.TSX */}
+              <button 
+                onClick={toggleScreenShare} 
+                className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}
+                title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
+              >
+                {isScreenSharing ? '⏹️ Stop Share' : '🖥️ Share'}
+              </button>
+              
+              <button onClick={() => sendSignal('new-peer', {})} className="icon-btn">🔄</button>
+           </div>
           </header>
 
           {showMenu && (
@@ -275,10 +285,12 @@ function App() {
           <div className="main-grid">
             <div className="panel">
                <VideoGrid 
-                  localStream={localStream} remotePeers={remotePeers} 
-                  isAudioMuted={isAudioMuted} isVideoStopped={isVideoStopped} 
-                  onToggleAudio={toggleAudio} onToggleVideo={toggleVideo} 
-                  onShareScreen={toggleScreenShare} isScreenSharing={isScreenSharing} 
+                  localStream={localStream} 
+                  remotePeers={remotePeers} 
+                  isAudioMuted={isAudioMuted} 
+                  isVideoStopped={isVideoStopped} 
+                  onToggleAudio={toggleAudio} 
+                  onToggleVideo={toggleVideo} 
                />
             </div>
             <div className="panel">

@@ -8,8 +8,6 @@ interface VideoGridProps {
   isVideoStopped: boolean;
   onToggleAudio: () => void;
   onToggleVideo: () => void;
-  onShareScreen: () => void;
-  isScreenSharing: boolean;
 }
 
 const VideoPlayer: React.FC<{ stream: MediaStream; muted?: boolean; label: string }> = ({ stream, muted, label }) => {
@@ -40,12 +38,6 @@ const VideoPlayer: React.FC<{ stream: MediaStream; muted?: boolean; label: strin
 export const VideoGrid: React.FC<VideoGridProps> = ({
   localStream,
   remotePeers,
-  isAudioMuted,
-  isVideoStopped,
-  onToggleAudio,
-  onToggleVideo,
-  onShareScreen,
-  isScreenSharing
 }) => {
   return (
     <div className="flex flex-col gap-4">
@@ -59,18 +51,6 @@ export const VideoGrid: React.FC<VideoGridProps> = ({
         {remotePeers.map((peer) => (
           <VideoPlayer key={peer.username} stream={peer.stream} label={peer.username} />
         ))}
-      </div>
-
-      <div className="flex gap-2 justify-center">
-        <button onClick={onToggleAudio} className="btn-primary">
-          {isAudioMuted ? 'Unmute Mic' : 'Mute Mic'}
-        </button>
-        <button onClick={onToggleVideo} className="btn-primary">
-          {isVideoStopped ? 'Camera On' : 'Camera Off'}
-        </button>
-        <button onClick={onShareScreen} className={`btn-primary ${isScreenSharing ? 'bg-red-600' : ''}`}>
-          {isScreenSharing ? 'Stop Sharing' : 'Share Screen'}
-        </button>
       </div>
     </div>
   );
