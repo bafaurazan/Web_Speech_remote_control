@@ -49,8 +49,22 @@ function App() {
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setupStream(stream);
+        // ZMNIEJSZ rozdzielczość i klatkarz dla mniejszego opóźnienia
+        const constraints = {
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+            },
+            video: {
+                width: { ideal: 640 },   // Mniejsza rozdzielczość (np. 480p lub 640p)
+                height: { ideal: 480 },
+                frameRate: { ideal: 15, max: 20 } // 15-20 FPS wystarczy do sterowania, 60 FPS to zbędny narzut
+            }
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setupStream(stream);
     } catch (err) {
       console.warn("Błąd pobierania obu urządzeń naraz. Próbuję niezależnie...", err);
       let videoStream: MediaStream | null = null;
@@ -201,7 +215,18 @@ function App() {
     broadcastData({ username, message: msg });
   };
   const sendRobotCommand = (cmd: string) => broadcastData({ username, message: cmd });
-  const sendJoystickData = (lin: number, ang: number) => broadcastData({ username, joystick: { linear: lin, angular: ang } });
+  // Dodaj ref do przechowywania czasu ostatniego wysłania
+  const lastSentTime = useRef<number>(0);
+
+  const sendJoystickData = (lin: number, ang: number) => {
+      const now = Date.now();
+      // Wysyłaj max co 100ms (lub 50ms jeśli sieć jest dobra)
+      // Wyjątek: Jeśli lin i ang to 0 (stop), wyślij natychmiast
+      if ((lin === 0 && ang === 0) || (now - lastSentTime.current > 100)) {
+          broadcastData({ username, joystick: { linear: lin, angular: ang } });
+          lastSentTime.current = now;
+      }
+  };
 
   // --- TOGGLES (SAFE) ---
   const toggleAudio = () => {
