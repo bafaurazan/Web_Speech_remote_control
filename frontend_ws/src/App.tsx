@@ -16,6 +16,7 @@ function App() {
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
   
   // Zmiana stanów początkowych na true, aby mikrofon i kamera były OFF na starcie
   const [isAudioMuted, setIsAudioMuted] = useState(true);
@@ -258,12 +259,18 @@ function App() {
               <h1 className="text-xl font-bold">ROBOT: {username}</h1>
            </div>
            {showMenu && (
-            <div className="menu-overlay" onClick={() => setShowMenu(false)}>
-              <div className="menu-content" onClick={e => e.stopPropagation()}>
-                <button onClick={() => window.location.reload()} className="styled-btn">Logout</button>
+              <div className="menu-overlay" onClick={() => setShowMenu(false)}>
+                <div className="menu-content" onClick={e => e.stopPropagation()}>
+                  <div className="menu-group">
+                    <button onClick={() => { setActiveTab('operator'); setShowMenu(false); }} className="menu-btn">🎮 Pilot</button>
+                    <button onClick={() => { setActiveTab('hub'); setShowMenu(false); }} className="menu-btn">🌐 Chat</button>
+                    <button onClick={() => { setActiveTab('ai'); setShowMenu(false); }} className="menu-btn">🧠 AI Voice</button>
+                  </div>
+                  <hr className="menu-divider" />
+                  <button onClick={() => window.location.reload()} className="styled-btn logout">Wyloguj</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
            <div className="flex gap-2">
               <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
               <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
@@ -284,36 +291,76 @@ function App() {
           
 
           <div className="main-grid">
-            <div className="panel">
-               <VideoGrid 
-                  localStream={localStream} 
-                  remotePeers={remotePeers} 
-                  isAudioMuted={isAudioMuted} 
-                  isVideoStopped={isVideoStopped} 
-                  onToggleAudio={toggleAudio} 
-                  onToggleVideo={toggleVideo} 
-               />
-            </div>
-            <div className="panel">
-                <JoystickController 
-                    onMove={(l, a) => {
-                        const now = Date.now();
-                        if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
-                            broadcastData({ username, joystick: { linear: l, angular: a } });
-                            lastSentTime.current = now;
-                        }
-                    }} 
-                    onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
-                    onCommand={sendRobotCommand} 
-                />
-            </div>
-            <div className="panel flex-1">
-                <SpeechControl onCommand={sendRobotCommand} />
-                <Chat messages={chatMessages} onSendMessage={(msg) => {
-                    setChatMessages(prev => [...prev, { username: 'Me', message: msg, isMe: true }]);
-                    broadcastData({ username, message: msg });
-                }} />
-            </div>
+
+            {/* SEKCOJA 1: PILOT (Tylko lokalna kamera i joystick) */}
+            {activeTab === 'operator' && (
+              <div className="view-section operator-view">
+                <div className="panel">
+                <VideoGrid 
+                    localStream={localStream} 
+                    remotePeers={remotePeers} 
+                    isAudioMuted={isAudioMuted} 
+                    isVideoStopped={isVideoStopped} 
+                    onToggleAudio={toggleAudio} 
+                    onToggleVideo={toggleVideo} 
+                    />
+              </div>
+              <div className="panel">
+                  <JoystickController 
+                      onMove={(l, a) => {
+                          const now = Date.now();
+                          if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
+                              broadcastData({ username, joystick: { linear: l, angular: a } });
+                              lastSentTime.current = now;
+                          }
+                      }} 
+                      onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
+                      onCommand={sendRobotCommand} 
+                  />
+              </div>
+              </div>
+            )}
+            
+            {/* SEKCJA 2: HUB (Wszystkie kamery i czat) */}
+            {activeTab === 'hub' && (
+              <div className="view-section operator-view">
+                <div className="panel">
+                <VideoGrid 
+                    localStream={localStream} 
+                    remotePeers={remotePeers} 
+                    isAudioMuted={isAudioMuted} 
+                    isVideoStopped={isVideoStopped} 
+                    onToggleAudio={toggleAudio} 
+                    onToggleVideo={toggleVideo} 
+                    />
+              </div>
+                <div className="panel flex-1">
+                  <Chat messages={chatMessages} onSendMessage={(msg) => {
+                      setChatMessages(prev => [...prev, { username: 'Me', message: msg, isMe: true }]);
+                      broadcastData({ username, message: msg });
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {/* SEKCJA 3: AI (Głos i monitoring) */}
+            {activeTab === 'ai' && (
+              <div className="view-section ai-view">
+                <div className="panel">
+                  <VideoGrid 
+                    localStream={localStream} 
+                    remotePeers={remotePeers} 
+                    isAudioMuted={isAudioMuted} 
+                    isVideoStopped={isVideoStopped} 
+                    onToggleAudio={toggleAudio} 
+                    onToggleVideo={toggleVideo} 
+                    />
+                </div>
+                <div className="panel flex-1">
+                  <SpeechControl onCommand={sendRobotCommand} />
+              </div>
+              </div>
+            )}
           </div>
         </>
       )}
