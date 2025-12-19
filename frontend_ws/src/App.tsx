@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css'; 
 import { VideoGrid } from './components/VideoGrid';
 import { Chat } from './components/Chat';
@@ -12,7 +12,7 @@ const getWebSocketUrl = () => {
     return `${protocol}${host}/ws`; 
 }; 
 
-// === DEFINICJE KONFIGURACJI ===
+// === KONFIGURACJA WEBRTC ===
 const STUN_CONFIG = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -21,20 +21,18 @@ const STUN_CONFIG = {
 };
 
 const NO_STUN_CONFIG = {
-    iceServers: [] // Pusta lista - tylko sieć lokalna (LAN/Localhost)
+    iceServers: [] 
 };
 
-// === POMOCNIK LOGOWANIA Z CZASEM ===
 const log = (prefix: string, ...args: any[]) => {
     const now = new Date();
-    const time = now.toISOString().split('T')[1].slice(0, -1); // HH:MM:SS.ms
+    const time = now.toISOString().split('T')[1].slice(0, -1); 
     console.log(`[${time}] ${prefix}`, ...args);
 };
 
-// === 1. GENERATOR CZARNEGO EKRANU (DUMMY STREAM) ===
+// === DUMMY STREAM ===
 const createBlackScreenStream = () => {
-    log("⬛ [Media] Generowanie czarnego ekranu (Dummy Stream)...");
-    
+    log("⬛ [Media] Generowanie czarnego ekranu (Dummy)...");
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 480;
@@ -46,18 +44,14 @@ const createBlackScreenStream = () => {
         ctx.font = '30px Arial';
         ctx.textAlign = 'center';
         ctx.fillText('NO CAMERA', 320, 240);
-        ctx.font = '15px Arial';
-        ctx.fillText('(Audio Only / Dummy)', 320, 270);
+        ctx.font = '16px Arial';
+        ctx.fillText('(Audio Only)', 320, 270);
     }
-    
     const videoStream = canvas.captureStream(15);
-    
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const dst = audioCtx.createMediaStreamDestination();
-    
     const audioTrack = dst.stream.getAudioTracks()[0];
     const videoTrack = videoStream.getVideoTracks()[0];
-    
     return new MediaStream([videoTrack, audioTrack]);
 };
 
@@ -67,7 +61,6 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
   
-  // Konfiguracja STUN (Checkbox)
   const [useStun, setUseStun] = useState(true);
   const useStunRef = useRef(true);
 
@@ -75,7 +68,6 @@ function App() {
   const [isVideoStopped, setIsVideoStopped] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
-  // STAN ŁADOWANIA (STATUS POŁĄCZENIA)
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
@@ -88,19 +80,71 @@ function App() {
   const lastSentTime = useRef<number>(0);
   const isScreenSharingRef = useRef(false);
   
-  // --- POPRAWKA TYPU ---
-  // Zamiast NodeJS.Timeout używamy ReturnType<typeof setTimeout> co działa wszędzie
-  const statusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Flaga blokująca logi przy wylogowywaniu
+  const isLoggingOut = useRef(false);
+
+  // === 1. FUNKCJA WYLOGOWANIA (TYLKO DLA CIEBIE) ===
+  const handleLogout = useCallback(() => {
+      isLoggingOut.current = true;
+      log("👋 [System] Wylogowywanie użytkownika...");
+
+      if (ws.current) {
+          ws.current.close(); 
+          ws.current = null;
+      }
+
+      Object.values(mapPeers.current).forEach(([pc, dc]) => {
+          try {
+              if (dc) dc.close();
+              pc.close();
+          } catch(e) {}
+      });
+      mapPeers.current = {};
+
+      if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(t => t.stop());
+          localStreamRef.current = null;
+          setLocalStream(null);
+      }
+
+      setIsLoggedIn(false);
+      setConnectionStatus(null);
+      setRemotePeers([]);
+      setUsername('');
+
+      window.location.reload();
+  }, []);
+
+  // === 2. FUNKCJA USUWANIA MARTWEGO PEERA ===
+  const removeDeadPeer = useCallback((peerName: string) => {
+      if (isLoggingOut.current) return;
+
+      log(`🗑️ [System] Usuwanie martwego peera: ${peerName}`);
+      
+      // 1. Zamknij połączenie lokalnie
+      const peerData = mapPeers.current[peerName];
+      if (peerData) {
+          const [pc, dc] = peerData;
+          if (dc) dc.close();
+          pc.close();
+          delete mapPeers.current[peerName];
+      }
+
+      // 2. Usuń z listy wideo (To usunie "wiszące okienko")
+      setRemotePeers(prev => prev.filter(p => p.username !== peerName));
+
+      // 3. Wyczyść status (jeśli dotyczył tego peera)
+      setConnectionStatus(prev => (prev && prev.includes(peerName)) ? null : prev);
+
+  }, []);
 
   useEffect(() => {
     return () => {
-        if (ws.current) {
-            log("🛑 [System] Zamykanie aplikacji - czyszczenie WS");
-            ws.current.close();
-        }
+        isLoggingOut.current = true;
+        if (ws.current) ws.current.close();
         Object.values(mapPeers.current).forEach(([pc]) => pc.close());
     };
-  }, []);
+  }, [handleLogout]);
 
   useEffect(() => {
       isScreenSharingRef.current = isScreenSharing;
@@ -113,28 +157,21 @@ function App() {
   };
 
   // ==========================
-  // 2. MEDIA SETUP
+  // MEDIA SETUP
   // ==========================
   const setupLocalStream = (stream: MediaStream) => {
       localStreamRef.current = stream;
       setLocalStream(stream);
-      
       stream.getAudioTracks().forEach(t => t.enabled = !isAudioMuted);
-      
-      const isCanvas = stream.getVideoTracks()[0].label.toLowerCase().includes('canvas') || 
-                       stream.getVideoTracks()[0].label.toLowerCase().includes('stream');
-      
+      const isCanvas = stream.getVideoTracks()[0].label.toLowerCase().includes('canvas');
       if (!isCanvas) {
           stream.getVideoTracks().forEach(t => t.enabled = !isVideoStopped);
       }
-      
-      log("✅ [Media] Strumień aktywny. ID:", stream.id);
       return stream;
   };
 
   const startCamera = async () => {
     log("📷 [Media] Start inicjalizacji mediów...");
-    
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true },
@@ -142,15 +179,49 @@ function App() {
         });
         return setupLocalStream(stream);
     } catch (err) {
-        log("⚠️ [Media] Kamera niedostępna lub błąd. Przełączam na DUMMY STREAM.", err);
+        log("⚠️ [Media] Kamera niedostępna. Fallback do Dummy.", err);
     }
-
-    const dummy = createBlackScreenStream();
-    return setupLocalStream(dummy);
+    return setupLocalStream(createBlackScreenStream());
   };
 
   // ==========================
-  // 3. SIGNALING & WS
+  // OBSŁUGA STANU WEBRTC
+  // ==========================
+  
+  const getCurrentConfig = () => useStunRef.current ? STUN_CONFIG : NO_STUN_CONFIG;
+
+  const addPcListeners = (pc: RTCPeerConnection, peerName: string) => {
+      pc.oniceconnectionstatechange = () => {
+          if (isLoggingOut.current) return;
+
+          const state = pc.iceConnectionState;
+          log(`🧊 [ICE State] ${peerName}: ${state}`);
+
+          if (state === 'checking') {
+              setConnectionStatus(`Łączenie z ${peerName}...`);
+          } 
+          else if (state === 'connected' || state === 'completed') {
+              setConnectionStatus(null);
+          } 
+          else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+              // === ZMIANA: ZAMIAST WYLOGOWYWAĆ NAS, USUWAMY PEERA ===
+              log(`⚠️ [ICE] Utracono połączenie z ${peerName}. Usuwam go z listy.`);
+              removeDeadPeer(peerName);
+          }
+      };
+
+      pc.onicegatheringstatechange = () => {
+          if (isLoggingOut.current) return;
+          if (pc.iceGatheringState === 'gathering') {
+               setConnectionStatus(`STUN: Szukanie trasy do ${peerName}...`);
+          } else if (pc.iceGatheringState === 'complete') {
+               // setConnectionStatus(null); // Opcjonalnie
+          }
+      };
+  };
+
+  // ==========================
+  // SIGNALING
   // ==========================
   const connectWebSocket = (currentUserName: string) => {
     const url = getWebSocketUrl();
@@ -162,10 +233,17 @@ function App() {
         sendSignal('new-peer', {});
     };
 
-    ws.current.onerror = (err) => log("❌ [WS] Błąd socketa:", err);
-    ws.current.onclose = (e) => log(`⚠️ [WS] Połączenie ZAMKNIĘTE (Kod: ${e.code})`);
+    ws.current.onerror = (err) => {
+        if(!isLoggingOut.current) log("❌ [WS] Błąd socketa:", err);
+    };
+    
+    ws.current.onclose = (e) => {
+        if(!isLoggingOut.current) log(`⚠️ [WS] Połączenie ZAMKNIĘTE (Kod: ${e.code})`);
+    };
 
     ws.current.onmessage = (event) => {
+        if (isLoggingOut.current) return;
+
         const parsed: SignalMessage = JSON.parse(event.data);
         const { peer: peerUsername, action, message } = parsed;
         
@@ -220,7 +298,6 @@ function App() {
   const sendSignal = (action: string, message: any) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
         const payload = { peer: username, action, message };
-        log(`🚀 [WS SEND] ${action}`, payload);
         ws.current.send(JSON.stringify(payload));
     } else {
         log("⚠️ [WS] Nie mogę wysłać - socket zamknięty.");
@@ -228,72 +305,18 @@ function App() {
   };
 
   // ==========================
-  // 4. WEBRTC LOGIC & OBSERVERS
+  // WEBRTC CORE
   // ==========================
-  
-  const clearStatusTimeout = () => {
-      if (statusTimeoutRef.current) {
-          clearTimeout(statusTimeoutRef.current);
-          statusTimeoutRef.current = null;
-      }
-  };
-
-  const addPcListeners = (pc: RTCPeerConnection, peerName: string) => {
-      pc.oniceconnectionstatechange = () => {
-          const state = pc.iceConnectionState;
-          log(`🧊 [ICE State] ${peerName}: ${state}`);
-          
-          clearStatusTimeout();
-
-          if (state === 'checking') {
-              setConnectionStatus(`Łączenie z ${peerName}...`);
-          } 
-          else if (state === 'connected' || state === 'completed') {
-              setConnectionStatus(null);
-              log(`🟢 [ICE] Połączenie z ${peerName} USTABILIZOWANE!`);
-          } 
-          else if (state === 'failed' || state === 'disconnected') {
-              const msg = `Utracono połączenie z ${peerName}...`;
-              log(`⚠️ [ICE] ${msg} (Stan: ${state})`);
-              setConnectionStatus(msg);
-
-              statusTimeoutRef.current = setTimeout(() => {
-                  log(`⏰ [System] Upłynął czas oczekiwania na ${peerName}. Ukrywam komunikat.`);
-                  setConnectionStatus(null); 
-              }, 5000);
-          }
-      };
-
-      pc.onsignalingstatechange = () => {
-          log(`🚦 [Signaling State] ${peerName}: ${pc.signalingState}`);
-      };
-
-      pc.onicegatheringstatechange = () => {
-          const state = pc.iceGatheringState;
-          log(`🕵️ [ICE Gathering] ${peerName}: ${state}`);
-          if (state === 'gathering') {
-               setConnectionStatus(`Szukanie trasy (STUN) do ${peerName}...`);
-          }
-      };
-
-      pc.onnegotiationneeded = () => {
-          log(`🔔 [Negotiation Needed] ${peerName} - wymagana renegocjacja.`);
-      };
-  };
-
-  const getCurrentConfig = () => {
-      return useStunRef.current ? STUN_CONFIG : NO_STUN_CONFIG;
-  };
 
   const renegotiate = async (pc: RTCPeerConnection, peerUsername: string, receiverChannel: string) => {
       log(`🔄 [Renegotiation] Start (JA -> ${peerUsername})`);
-      setConnectionStatus("Renegocjacja strumienia...");
+      setConnectionStatus(`Renegocjacja z ${peerUsername}...`);
       try {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
       } catch (e) {
-          log(`❌ [Renegotiation] Błąd:`, e);
+          log(`❌ [Renegotiation] Błąd przy ${peerUsername}:`, e);
           setConnectionStatus(null);
       }
   };
@@ -301,11 +324,9 @@ function App() {
   const handleRenegotiationOffer = async (pc: RTCPeerConnection, sdp: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
       try {
           log(`📥 [Renegotiation] Przetwarzam Ofertę od ${peerUsername}...`);
-          
           if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer' && pc.signalingState !== 'have-remote-offer') {
-               log(`⚠️ [Renegotiation] Ryzykowny stan PC: ${pc.signalingState}`);
+               log(`⚠️ [Renegotiation] Ryzykowny stan PC przy ${peerUsername}: ${pc.signalingState}`);
           }
-
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -317,17 +338,28 @@ function App() {
 
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
     dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
-    dc.onclose = () => log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
-    dc.onerror = (e) => log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
+    dc.onclose = () => { 
+        if(!isLoggingOut.current) {
+            log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
+            // Opcjonalnie: jeśli DC padnie, też możemy usunąć peera
+            removeDeadPeer(peerUsername);
+        }
+    };
+    
+    dc.onerror = (e: any) => {
+        if (isLoggingOut.current) return;
+        if (e.error?.message?.includes('User-Initiated Abort') || e.error?.name === 'OperationError') return;
+        log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
+    };
 
     dc.onmessage = (e) => {
+        if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
         if (data.joystick) {
-            log(`🕹️ [DC RECV] Joystick od ${peerUsername}:`, data.joystick);
+            log(`🕹️ [DC] Joystick od ${peerUsername}:`, data.joystick);
             return;
         }
         if (data.message) {
-            log(`💬 [DC RECV] Chat od ${peerUsername}:`, data.message);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
@@ -343,15 +375,11 @@ function App() {
     addPcListeners(pc, peerUsername);
 
     const dc = pc.createDataChannel('chat');
-    log(`🛠️ [DataChannel] Utworzono kanał 'chat' dla ${peerUsername}`);
     mapPeers.current[peerUsername] = [pc, dc];
     setupDataChannel(dc, peerUsername);
 
     if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => {
-            log(`➕ [Track] Dodaję lokalny track ${t.kind} do PC ${peerUsername}`);
-            pc.addTrack(t, localStreamRef.current!);
-        });
+        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
     }
 
     pc.onicecandidate = (e) => {
@@ -384,10 +412,7 @@ function App() {
     };
 
     if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => {
-            log(`➕ [Track] Dodaję lokalny track ${t.kind} do PC ${peerUsername}`);
-            pc.addTrack(t, localStreamRef.current!);
-        });
+        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
     }
 
     pc.onicecandidate = (e) => {
@@ -408,21 +433,16 @@ function App() {
     log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}. Tracks: ${e.streams[0]?.getTracks().length}`);
     const [stream] = e.streams;
     setRemotePeers(prev => {
+        // Unikamy duplikatów
         if (prev.find(p => p.username === peerUsername)) return prev;
         return [...prev, { username: peerUsername, stream }];
     });
   };
 
   // ==========================
-  // 5. ACTIONS & BROADCAST
+  // ACTIONS & BROADCAST
   // ==========================
   const broadcastData = (payload: any) => {
-    if (payload.joystick) {
-        log(`🕹️ [BROADCAST] Joystick: L=${payload.joystick.linear}, A=${payload.joystick.angular}`);
-    } else {
-        log(`📤 [BROADCAST] Dane:`, payload);
-    }
-
     const json = JSON.stringify(payload);
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
@@ -463,7 +483,7 @@ function App() {
           
           log(`🖥️ [ScreenShare] Otrzymano strumień ekranu: ${screenTrack.label}`);
 
-          Object.values(mapPeers.current).forEach(([pc]) => {
+          Object.entries(mapPeers.current).forEach(([peerName, [pc]]) => {
               const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
               if (videoSender) {
                   log("🖥️ [ScreenShare] Zastępowanie tracka wideo...");
@@ -472,7 +492,7 @@ function App() {
                   log("🖥️ [ScreenShare] Dodawanie nowego tracka...");
                   pc.addTrack(screenTrack, screenStream);
                   const channelName = (pc as any).remoteChannelName;
-                  if(channelName) renegotiate(pc, "peer", channelName);
+                  if(channelName) renegotiate(pc, peerName, channelName);
               }
           });
 
@@ -533,7 +553,6 @@ function App() {
   const handleRefreshPeers = () => {
       log("🔄 [System] Ręczne odświeżanie. Czyszczę stare połączenia...");
       setConnectionStatus("Resetowanie połączeń...");
-      clearStatusTimeout();
       
       Object.values(mapPeers.current).forEach(([pc]) => pc.close());
       mapPeers.current = {};
@@ -545,6 +564,7 @@ function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim()) {
+      isLoggingOut.current = false; 
       log(`👤 [Login] Logowanie jako: ${username} | STUN: ${useStun}`);
       setIsLoggedIn(true);
       
@@ -595,7 +615,7 @@ function App() {
                     <button onClick={() => { setActiveTab('ai'); setShowMenu(false); }} className="menu-btn">🧠 AI Voice</button>
                   </div>
                   <hr className="menu-divider" />
-                  <button onClick={() => window.location.reload()} className="styled-btn logout">Wyloguj</button>
+                  <button onClick={handleLogout} className="styled-btn logout">Wyloguj</button>
                 </div>
               </div>
             )}
