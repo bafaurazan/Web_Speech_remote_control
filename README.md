@@ -3,6 +3,8 @@
 This project is a comprehensive integration of modern software and hardware technologies, designed to control a robotic rover using a combination of Python, Electron, ROS 2, Django, and micro-ROS. The system bridges web technologies, embedded systems, and robotics to enable real-time communication, advanced robot control, and seamless collaboration. By leveraging tools like FreeRTOS and Tailscale, it ensures efficiency, scalability, and robust remote access.
 
 ![](diagrams/connection_diagram/connection_diagram.png)
+<img width="1831" height="1032" alt="image" src="https://github.com/user-attachments/assets/01a11f1f-c1e7-4e91-ad73-cbb7b1e43815" />
+
 
 ## Key Components and Features:
 ### Python-Based ROS 2 Package:
