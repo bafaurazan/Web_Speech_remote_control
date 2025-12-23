@@ -1,59 +1,26 @@
+// 1. Biblioteki zewnętrzne (React)
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import './App.css'; 
+
+// 2. Typy (często daje się je wysoko, lub zaraz przed użyciem)
+import type { ChatMessage, PeerData, SignalMessage } from './types';
+
+// 3. Funkcje pomocnicze (Utils)
+import { 
+  getWebSocketUrl, 
+  STUN_CONFIG, 
+  NO_STUN_CONFIG, 
+  log, 
+  createBlackScreenStream 
+} from './utils/helpers';
+
+// 4. Komponenty (UI)
 import { VideoGrid } from './components/VideoGrid';
 import { Chat } from './components/Chat';
 import { JoystickController } from './components/JoystickController';
 import { SpeechControl } from './components/SpeechControl';
-import type { ChatMessage, PeerData, SignalMessage } from './types';
 
-const getWebSocketUrl = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const host = window.location.host; 
-    return `${protocol}${host}/ws`; 
-}; 
-
-// === KONFIGURACJA WEBRTC ===
-const STUN_CONFIG = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
-    ]
-};
-
-const NO_STUN_CONFIG = {
-    iceServers: [] 
-};
-
-const log = (prefix: string, ...args: any[]) => {
-    const now = new Date();
-    const time = now.toISOString().split('T')[1].slice(0, -1); 
-    console.log(`[${time}] ${prefix}`, ...args);
-};
-
-// === DUMMY STREAM ===
-const createBlackScreenStream = () => {
-    log("⬛ [Media] Generowanie czarnego ekranu (Dummy)...");
-    const canvas = document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, 640, 480);
-        ctx.fillStyle = 'white';
-        ctx.font = '30px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('NO CAMERA', 320, 240);
-        ctx.font = '16px Arial';
-        ctx.fillText('(Audio Only)', 320, 270);
-    }
-    const videoStream = canvas.captureStream(15);
-    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const dst = audioCtx.createMediaStreamDestination();
-    const audioTrack = dst.stream.getAudioTracks()[0];
-    const videoTrack = videoStream.getVideoTracks()[0];
-    return new MediaStream([videoTrack, audioTrack]);
-};
+// 5. Style (Side-effects)
+import './App.css';
 
 function App() {
   const [username, setUsername] = useState('');

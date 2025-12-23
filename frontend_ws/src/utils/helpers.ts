@@ -1,3 +1,22 @@
+/**
+ * PLIK: helpers.ts
+ * OPIS: Funkcje pomocnicze dla całej aplikacji.
+ * - getWebSocketUrl: dynamiczne określanie adresu WS.
+ * - log: ujednolicony format logowania z timestampem.
+ * - createBlackScreenStream: generuje "pusty" strumień wideo, gdy kamera jest niedostępna.
+ */
+
+export const STUN_CONFIG = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+    ]
+};
+
+export const NO_STUN_CONFIG = {
+    iceServers: [] 
+};
+
 export const getWebSocketUrl = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
     const host = window.location.host; 
@@ -10,7 +29,6 @@ export const log = (prefix: string, ...args: any[]) => {
     console.log(`[${time}] ${prefix}`, ...args);
 };
 
-// Generowanie czarnego ekranu (Dummy Stream)
 export const createBlackScreenStream = () => {
     log("⬛ [Media] Generowanie czarnego ekranu (Dummy)...");
     const canvas = document.createElement('canvas');
