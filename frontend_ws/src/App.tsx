@@ -23,6 +23,35 @@ import { SpeechControl } from './components/SpeechControl';
 import './App.css';
 
 function App() {
+    const teardownConnections = () => {
+    log("🧹 [Teardown] Zamykanie WS + WebRTC");
+
+    // 1. WebSocket
+    if (ws.current) {
+        ws.current.onopen = null;
+        ws.current.onmessage = null;
+        ws.current.onerror = null;
+        ws.current.onclose = null;
+        ws.current.close();
+        ws.current = null;
+    }
+
+    // 2. WebRTC
+    Object.values(mapPeers.current).forEach(([pc, dc]) => {
+        try {
+            dc?.close();
+            pc.onicecandidate = null;
+            pc.ontrack = null;
+            pc.oniceconnectionstatechange = null;
+            pc.close();
+        } catch {}
+    });
+
+    mapPeers.current = {};
+    setRemotePeers([]);
+    setConnectionStatus(null);
+    };
+
   const [username, setUsername] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -52,35 +81,21 @@ function App() {
 
   // === 1. FUNKCJA WYLOGOWANIA (TYLKO DLA CIEBIE) ===
   const handleLogout = useCallback(() => {
-      isLoggingOut.current = true;
-      log("👋 [System] Wylogowywanie użytkownika...");
+    isLoggingOut.current = true;
+    log("👋 [System] Wylogowywanie");
 
-      if (ws.current) {
-          ws.current.close(); 
-          ws.current = null;
-      }
+    teardownConnections();
 
-      Object.values(mapPeers.current).forEach(([pc, dc]) => {
-          try {
-              if (dc) dc.close();
-              pc.close();
-          } catch(e) {}
-      });
-      mapPeers.current = {};
+    if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+        localStreamRef.current = null;
+        setLocalStream(null);
+    }
 
-      if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(t => t.stop());
-          localStreamRef.current = null;
-          setLocalStream(null);
-      }
+    setIsLoggedIn(false);
+    setUsername('');
+    }, []); 
 
-      setIsLoggedIn(false);
-      setConnectionStatus(null);
-      setRemotePeers([]);
-      setUsername('');
-
-      window.location.reload();
-  }, []);
 
   // === 2. FUNKCJA USUWANIA MARTWEGO PEERA ===
   const removeDeadPeer = useCallback((peerName: string) => {
@@ -539,16 +554,15 @@ function App() {
       }
   };
 
-  const handleRefreshPeers = () => {
-      log("🔄 [System] Ręczne odświeżanie. Czyszczę stare połączenia...");
-      setConnectionStatus("Resetowanie połączeń...");
-      
-      Object.values(mapPeers.current).forEach(([pc]) => pc.close());
-      mapPeers.current = {};
-      setRemotePeers([]);
+  const handleRefreshPeers = async () => {
+    log("🔄 [System] Refresh → pełny reset połączeń");
 
-      sendSignal('new-peer', {});
-  };
+    teardownConnections();
+
+    // WebSocket + signaling od nowa
+    connectWebSocket(username);
+};
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
