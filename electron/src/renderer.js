@@ -50,7 +50,7 @@ btnJoin.addEventListener('click', () => {
     var labelUsername = document.querySelector('#label-username');
     labelUsername.innerHTML = username;
 
-    var wsStart = 'wss://rafal.tail692f2a.ts.net/';  // Adres WebSocket serwera
+    var wsStart = 'wss://rafal.tail692f2a.ts.net/ws';
     webSocket = new WebSocket(wsStart);
 
     webSocket.addEventListener('open', (e) => {
@@ -145,7 +145,7 @@ function createOfferer(peerUsername, receiver_channel_name){
 
     addLocalTracks(peer);
 
-    var dc = peer.createDataChannel('channel');
+    var dc = peer.createDataChannel('chat');
     dc.addEventListener('open', () => {
         console.log('Connection opened!');
     });
@@ -173,7 +173,6 @@ function createOfferer(peerUsername, receiver_channel_name){
     peer.addEventListener('icecandidate', (event) => {
         if(event.candidate){
             console.log('New ice candidate: ', JSON.stringify(peer.localDescription));
-
             return;
         }
 
@@ -225,7 +224,6 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
     peer.addEventListener('icecandidate', (event) => {
         if(event.candidate){
             console.log('New ice candidate: ', JSON.stringify(peer.localDescription));
-
             return;
         }
 
@@ -238,12 +236,10 @@ function createAnswerer(offer, peerUsername, receiver_channel_name){
     peer.setRemoteDescription(offer)
     .then(() => {
         console.log('Remote description set successfully for %s.', peerUsername);
-
         return peer.createAnswer();
     })
     .then(a => {
         console.log('Answer created!');
-
         peer.setLocalDescription(a);
     })
 }
@@ -252,52 +248,67 @@ function addLocalTracks(peer){
     localStream.getTracks().forEach(track => {
         peer.addTrack(track, localStream);
     });
-
     return;
 }
 
+// ==========================================================
+// MODIFIED dcOnMessage FUNCTION FOR JOYSTICK SUPPORT
+// ==========================================================
 function dcOnMessage(event){
-    var data = JSON.parse(event.data);
-    var username = data.username;
-    var message = data.message;
+    try {
+        console.log("Odebrano wiadomość (raw):", event.data); // LOG DIAGNOSTYCZNY
+        
+        var data = JSON.parse(event.data);
+        var username = data.username;
 
-    if (["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"].includes(message)) {
-        console.log("otrzymane dane dla robota: ", message);
-        ipcROS.send(message);
+        // 1. JOYSTICK
+        if (data.joystick) {
+            console.log("Wykryto dane joysticka:", data.joystick);
+            ipc.send("robot_joystick", data.joystick);
+            return;
+        }
+
+        // 2. WIADOMOŚCI / KOMENDY
+        if (data.message) {
+            var message = data.message;
+            var robotCommands = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"];
+
+            if (robotCommands.includes(message)) {
+                console.log("Wykryto komendę przycisku:", message);
+                ipc.send("forward_rover", message); // UWAGA: wysyłamy na konkretny kanał lub jeden ogólny
+                // W twoim index.js nasłuchujesz na konkretne, więc tutaj trzeba zrobić switch/case
+                // LUB po prostu wysłać na ten sam kanał co nazwa wiadomości:
+                ipc.send(message); 
+            }
+            else {
+                // Czat / Terminal
+                var li = document.createElement('li');
+                li.appendChild(document.createTextNode(username + ': ' + message));
+                messageList.appendChild(li);
+                console.log("Wykryto komendę terminala:", message);
+                ipc.send("terminal.executeCommand", message);  
+            }
+        }
+    } catch (e) {
+        console.error("Błąd w dcOnMessage:", e);
     }
-    else{
-        var li = document.createElement('li');
-        li.appendChild(document.createTextNode(username + ': ' + message));
-        messageList.appendChild(li);
-        console.log("wysłane dane: ", message);
-        ipc.send("terminal.executeCommand", message);  
-    }
-    
 }
 
 function createVideo(peerUsername){
     var videoContainer = document.querySelector('#video-container');
-
     var remoteVideo = document.createElement('video');
-
     remoteVideo.id = peerUsername + '-video';
     remoteVideo.autoplay = true;
     remoteVideo.playsInline = true;
-
     var videoWrapper = document.createElement('div');
-
     videoContainer.appendChild(videoWrapper);
-
     videoWrapper.appendChild(remoteVideo);
-
     return remoteVideo;
 }
 
 function setOnTrack(peer, remoteVideo){
     var remoteStream = new MediaStream();
-
     remoteVideo.srcObject = remoteStream;
-
     peer.addEventListener('track', async (event) => {
         remoteStream.addTrack(event.track, remoteStream);
     });
@@ -305,16 +316,13 @@ function setOnTrack(peer, remoteVideo){
 
 function removeVideo(video){
     var videoWrapper = video.parentNode;
-
     videoWrapper.parentNode.removeChild(videoWrapper);
 }
 
 function getDataChannels(){
     var dataChannels = [];
-
     for(peerUsername in mapPeers){
         var dataChannel = mapPeers[peerUsername][1];
-
         dataChannels.push(dataChannel);
     }
     return dataChannels;
