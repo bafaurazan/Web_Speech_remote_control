@@ -18,8 +18,23 @@ This project provides a Python-based backend API designed for integration with a
 
 ## 1. After cloning repository:
 
+#### install python 3.12
+```bash
+python3 --version #must be ^3.12
+
+#if python version below then:
+sudo add-apt-repository ppa:deadsnakes/ppa  # Jeśli nie masz najnowszego Ubuntu
+sudo apt update
+sudo apt install python3.12 python3.12-venv python3.12-dev
 ```
+
+```bash
 cd api
+sudo apt update
+sudo apt install pipx
+pipx ensurepath
+pipx install poetry
+source ~/.bashrc
 poetry install
 ```
 
