@@ -66,37 +66,10 @@ cd ~/Web_Speech_remote_control/electron
 npm run start
 ```
 
-4. Turn on rover
-
-5. create wifi connection with esp32 
+4. run teleop_bringup
 ```bash
-sudo docker run -it --rm --net=host microros/micro-ros-agent:humble udp4 --port 8888 -v6
+cd ~/Web_Speech_remote_control/teleop_bringup/
+source install/setup.bash
+ros2 launch teleop_bringup twist_joy_g1.launch.py 
 ```
 
-6. start testing all components
-
-7. terminal tests
-```bash
-ros2 topic pub /diff_drive_controller_right/cmd_vel_unstamped geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
-
-
-ros2 topic pub /diff_drive_controller_left/cmd_vel_unstamped geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}"
-
-```
-
-8. setup depthai
-
-```bash
-sudo nano /etc/udev/rules.d/80-depthai.rules
-```
-SUBSYSTEM=="usb", ATTR{idVendor}=="03e7", MODE="0666"
-```bash
- sudo udevadm control --reload-rules
-```
-
-9. running oak camera depthai_viewer
-
-```bash
-python3 -m depthai_viewer
-
-```
