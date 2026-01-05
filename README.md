@@ -73,3 +73,9 @@ source install/setup.bash
 ros2 launch teleop_bringup twist_joy_g1.launch.py 
 ```
 
+5. run unity simulation
+```bash
+cd ~/ros2_projects_ws
+./scripts/distrobox 
+ros2 launch knml_bringup sim_basic.launch.py 
+```
