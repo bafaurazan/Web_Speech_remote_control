@@ -57,8 +57,8 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
   
-  const [useStun, setUseStun] = useState(true);
-  const useStunRef = useRef(true);
+  const [useStun, setUseStun] = useState(false);
+  const useStunRef = useRef(false);
 
   const [isAudioMuted, setIsAudioMuted] = useState(true);
   const [isVideoStopped, setIsVideoStopped] = useState(true);
