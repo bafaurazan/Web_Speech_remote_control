@@ -24,14 +24,16 @@ from asyncio import create_subprocess_shell, subprocess
 SIGNALING_URL = os.getenv('SIGNALING_URL', 'wss://rafal.tail692f2a.ts.net/ws')
 ROBOT_ID = os.getenv('ROBOT_ID', 'robot_1')
 CAMERA_DEVICE = '/dev/video0'
-# Zmniejszamy FPS dla stabilności i dodajemy flagi low-latency
+
+# POPRAWIONA KONFIGURACJA (Low Latency + Compatibility)
 CAMERA_OPTIONS = {
-    "framerate": "20",          # 20 FPS jest stabilniejsze dla CPU niż 30
+    "framerate": "30",          # ZOSTAWIAMY 30 FPS (Wiele kamer nie działa przy 20!)
     "video_size": "640x480",
-    "pixel_format": "mjpeg",    # MJPEG jest standardem dla kamer USB
-    "fflags": "nobuffer",       # KLUCZOWE: Nie buforuj klatek (redukcja laga)
-    "flags": "low_delay",       # KLUCZOWE: Tryb niskiego opóźnienia
-    "strict": "experimental"    # Pozwala na więcej formatów
+    "pixel_format": "mjpeg",    # Wymagane dla USB 2.0
+    "fflags": "nobuffer",       # KLUCZOWE: Wyłącza buforowanie (likwiduje narastający lag)
+    "flags": "low_delay",       # Optymalizacja kodeka pod czas rzeczywisty
+    "probesize": "32",          # Przyspiesza start (mniej danych do analizy na początku)
+    "analyzeduration": "0",     # Nie analizuj strumienia w nieskończoność
 }
 
 logging.basicConfig(level=logging.INFO)
@@ -63,11 +65,9 @@ class ROS2BridgeNode(Node):
         axes = list(self.default_axes)
         buttons = list(self.default_buttons)
 
-        # Mapowanie osi
         axes[1] = linear * -1.0 
         axes[2] = angular
 
-        # Deadman switch
         if abs(linear) > 0.05 or abs(angular) > 0.05:
             buttons[8] = 1
         else:
@@ -102,7 +102,7 @@ class WebRTCClient:
 
     async def run(self):
         async with aiohttp.ClientSession() as session:
-            while True: # Pętla reconnectu WebSocket
+            while True:
                 try:
                     logger.info(f"Łączenie z WebSocket: {SIGNALING_URL}")
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
@@ -146,14 +146,20 @@ class WebRTCClient:
         pc = RTCPeerConnection()
         self.peers[peer_username] = pc
 
-        # 1. KAMERA Z OPTYMALIZACJĄ LATENCJI
+        # 1. KAMERA (POPRAWIONA IMPLEMENTACJA)
         if os.path.exists(CAMERA_DEVICE):
             try:
-                # Używamy v4l2 na Linuxie z naszymi flagami "nobuffer"
-                player = MediaPlayer(CAMERA_DEVICE, format="v4l2", options=CAMERA_OPTIONS)
+                # Używamy nowych opcji CAMERA_OPTIONS zdefiniowanych na górze
+                if platform.system() == "Linux":
+                     player = MediaPlayer(CAMERA_DEVICE, format="v4l2", options=CAMERA_OPTIONS)
+                elif platform.system() == "Darwin": # Mac (do testów)
+                     player = MediaPlayer("default:none", format="avfoundation", options={"framerate": "30", "video_size": "640x480"})
+                else: # Windows (do testów)
+                     player = MediaPlayer("video=Integrated Camera", format="dshow", options={"framerate": "30", "video_size": "640x480"})
+
                 if player.video:
                     pc.addTrack(player.video)
-                    logger.info(f"Kamera aktywna (20fps, nobuffer)")
+                    logger.info(f"Kamera aktywna: {CAMERA_DEVICE} (Low Latency Mode)")
             except Exception as e:
                 logger.error(f"Błąd kamery: {e}")
         
@@ -201,10 +207,8 @@ class WebRTCClient:
                     await self.ros_node.handle_joystick_data(data['joystick'])
                 elif 'message' in data:
                     msg = data['message']
-                    # Komendy robotyczne
                     if msg in ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]:
                          await self.ros_node.handle_button_command(msg)
-                    # Komendy systemowe (Terminal)
                     else:
                         logger.warning(f"Terminal CMD: {msg}")
                         asyncio.create_task(self.run_shell(msg))
