@@ -60,10 +60,15 @@ sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
 ```
 go to website using generated address from url with react port ...etc. https://name.tail123g3a.ts.net/
 
-3. setup electron app
+3. setup electron app or ros2_webrtc_bridge
 ```bash
+#electron
 cd ~/Web_Speech_remote_control/electron
 npm run start
+
+#bridge
+cd ~/Web_Speech_remote_control/ros2_webrtc_bridge
+python3 bridge.py
 ```
 
 4. run teleop_bringup

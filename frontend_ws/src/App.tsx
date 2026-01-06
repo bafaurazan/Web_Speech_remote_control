@@ -367,6 +367,9 @@ function App() {
 
     if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
+    } else {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
     }
 
     pc.onicecandidate = (e) => {
