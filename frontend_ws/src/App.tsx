@@ -157,7 +157,11 @@ function App() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true },
-            video: { width: { ideal: 640 }, height: { ideal: 480 } }
+            video: {
+                width: { ideal: 320 },  // Zmniejszone z 640
+                height: { ideal: 240 }, // Zmniejszone z 480
+                frameRate: { ideal: 20, max: 30 } // Ograniczenie klatkarzu Twojej kamery
+            }
         });
         return setupLocalStream(stream);
     } catch (err) {

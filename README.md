@@ -57,6 +57,7 @@ sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
 # to turn off 
 # tailscale funnel --https=443 off
 
+# turn tailscale on device to control the robot
 ```
 go to website using generated address from url with react port ...etc. https://name.tail123g3a.ts.net/
 
@@ -67,7 +68,8 @@ cd ~/Web_Speech_remote_control/electron
 npm run start
 
 #bridge
-cd ~/Web_Speech_remote_control/ros2_webrtc_bridge
+cd ~/Web_Speech_remote_control/teleop_bringup/
+export ROBOT_ID=g1pilot
 python3 bridge.py
 ```
 
@@ -80,7 +82,12 @@ ros2 launch teleop_bringup twist_joy_g1.launch.py
 
 5. run unity simulation
 ```bash
+## automated distrobox command
 cd ~/ros2_projects_ws
-./scripts/distrobox 
+./scripts/distrobox
+## in new distrobox terminal run simulation
 ros2 launch knml_bringup sim_basic.launch.py 
+
+#simple run simulation
+cd ~/ros2_projects_ws && distrobox enter kalman_ws -- bash -c "source install/setup.bash && ros2 launch knml_bringup sim_basic.launch.py"
 ```
