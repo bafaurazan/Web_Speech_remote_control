@@ -32,29 +32,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Bridge")
 
 class RealTimeOpenCVTrack(VideoStreamTrack):
-    """
-    Track wideo (OpenCV) startujący natychmiast.
-    """
     def __init__(self):
         super().__init__()
         self.cap = None
         self._start_time = None
         self.running = False
-        
-        # Przygotuj czarną klatkę
-        black_bgr = np.zeros((CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=np.uint8)
-        self.black_frame = VideoFrame.from_ndarray(black_bgr, format="bgr24").reformat(format="yuv420p")
-        
-        # Start kamery od razu
+        self.black_frame_data = np.zeros((CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=np.uint8)
         self._open_camera_immediately()
 
     def _open_camera_immediately(self):
         try:
             logger.info(f"⚡ [HARDWARE] Próba otwarcia kamery: {CAMERA_DEVICE}...")
-            # Backend V4L2
             self.cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
-            
-            # Zero Latency
             self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
@@ -66,12 +55,10 @@ class RealTimeOpenCVTrack(VideoStreamTrack):
 
             self.running = True
             self._start_time = time.time()
-            logger.info(f"✅ [HARDWARE] KAMERA URUCHOMIONA FIZYCZNIE! (Dioda powinna świecić)")
-            
-            self.cap.read() # Rozgrzewka
-            
+            logger.info(f"✅ [HARDWARE] KAMERA URUCHOMIONA FIZYCZNIE!")
+            self.cap.read() 
         except Exception as e:
-            logger.error(f"❌ [HARDWARE] Wyjątek przy starcie kamery: {e}")
+            logger.error(f"❌ [HARDWARE] Wyjątek: {e}")
 
     async def recv(self):
         if self._start_time is None:
@@ -81,24 +68,18 @@ class RealTimeOpenCVTrack(VideoStreamTrack):
         pts = int(timestamp * 90000)
         time_base = fractions.Fraction(1, 90000)
 
-        frame_to_send = None
-
         if self.running and self.cap and self.cap.isOpened():
             ret, frame = self.cap.read()
             if ret:
                 video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
                 frame_to_send = video_frame.reformat(format="yuv420p")
-                frame_to_send.pts = pts
-                frame_to_send.time_base = time_base
             else:
-                frame_to_send = self.black_frame
-                frame_to_send.pts = pts
-                frame_to_send.time_base = time_base
+                frame_to_send = VideoFrame.from_ndarray(self.black_frame_data, format="bgr24").reformat(format="yuv420p")
         else:
-            frame_to_send = self.black_frame
-            frame_to_send.pts = pts
-            frame_to_send.time_base = time_base
+            frame_to_send = VideoFrame.from_ndarray(self.black_frame_data, format="bgr24").reformat(format="yuv420p")
 
+        frame_to_send.pts = pts
+        frame_to_send.time_base = time_base
         return frame_to_send
 
     def stop_hardware(self):
@@ -153,55 +134,34 @@ class WebRTCClient:
         self.peers = {} 
         
         logger.info("🎬 [INIT] TWORZENIE KLIENTA...")
-
-        # 1. WIDEO (OpenCV)
         self.video_track = RealTimeOpenCVTrack()
-
-        # 2. AUDIO (MediaPlayer - ALSA)
         self.audio_track = None
+        
         try:
-            logger.info("⚡ [HARDWARE] Otwieranie mikrofonu (ALSA)...")
-            # Używamy backendu ALSA (domyślny na Linuxie) bez PulseAudio
+            logger.info("⚡ [HARDWARE] Otwieranie mikrofonu...")
             self.audio_player = MediaPlayer('default', format='alsa', options={"fflags": "nobuffer", "flags": "low_delay"})
-            
             if self.audio_player.audio:
                  self.audio_track = self.audio_player.audio
                  logger.info("✅ [HARDWARE] MIKROFON AKTYWNY.")
-            else:
-                 logger.warning("⚠️ Mikrofon otwarty, ale brak ścieżki audio.")
-        except Exception as e:
-            logger.warning(f"⚠️ Problem z mikrofonem: {e}")
-            logger.info("ℹ️ Działam w trybie TYLKO WIDEO.")
-
-        logger.info("🆗 SPRZĘT GOTOWY. TERAZ CZEKAMY.")
+        except Exception:
+             logger.info("ℹ️ Audio niedostępne (Video Only).")
 
     async def run(self):
-        # SZTUCZNE OPÓŹNIENIE (Kamery działają)
-        WAIT_SECONDS = 10
-        logger.info(f"⏳ [SYSTEM] Czekam {WAIT_SECONDS} sekund przed zalogowaniem...")
-        
-        for i in range(WAIT_SECONDS, 0, -1):
-            await asyncio.sleep(1)
-            if i % 2 == 0: logger.info(f"⏳ ... {i}s")
-
-        logger.info("🚀 [SYSTEM] Czas minął! Łączenie z WebSocket...")
-
+        logger.info("🚀 [SYSTEM] Łączenie z siecią natychmiast...")
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    logger.info(f"☁️ Łączenie: {SIGNALING_URL}")
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
                         await self.send_signal("new-peer", {})
-                        logger.info("✅ ZALOGOWANO!")
-                        
+                        logger.info("✅ ZALOGOWANO DO SIECI!")
                         async for msg in ws:
                             if msg.type == aiohttp.WSMsgType.TEXT:
                                 await self.handle_signaling_message(json.loads(msg.data))
                             elif msg.type == aiohttp.WSMsgType.ERROR:
                                 break
                 except Exception as e:
-                    logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam...")
+                    logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam za 2s...")
                     await asyncio.sleep(2)
 
     async def send_signal(self, action, message):
@@ -214,9 +174,34 @@ class WebRTCClient:
         if peer_username == self.username: return
 
         if action == 'new-peer':
+            # Ktoś wszedł -> My jesteśmy OFFEREREM (To działa dobrze!)
+            logger.info(f"🆕 Nowy peer {peer_username} -> OFFERER")
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
+        
         elif action == 'new-offer':
-            await self.create_peer_connection(peer_username, initiator=False, offer_sdp=data['message']['sdp'], receiver_channel=data['message']['receiver_channel_name'])
+            # Ktoś dzwoni -> My jesteśmy ANSWEREREM (To nie działa z wideo).
+            # STRATEGIA: Odrzucamy rolę Answerera i wymuszamy bycie Offererem.
+            
+            logger.info(f"📩 Otrzymałem ofertę od {peer_username}. IGNORUJĘ JĄ.")
+            logger.info("🔄 Wymuszam restart, abym to JA był dzwoniącym (Offerer).")
+            
+            # Czekamy chwilę, żeby nie zrobić pętli komunikatów od razu
+            await asyncio.sleep(1.0)
+            
+            # Wysyłamy sygnał "new-peer" ponownie. 
+            # Strona React odbierze to i (miejmy nadzieję) zresetuje stan, 
+            # ale co ważniejsze - my przygotujemy się do bycia Offererem przy kolejnej interakcji?
+            # NIE - jeśli wyślemy new-peer, to React spróbuje ZNOWU wysłać ofertę (bo React myśli: "O, nowy peer, dzwonię!").
+            # To zrobi nieskończoną pętlę.
+            
+            # NOWA STRATEGIA: Musimy oszukać system.
+            # Zamiast czekać na Reacta, my PROAKTYWNIE wysyłamy ofertę TERAZ,
+            # ignorując fakt, że dostaliśmy ofertę.
+            # To spowoduje "Glare" (kolizję ofert), ale jeśli React jest dobrze napisany, może obsłuży nową ofertę.
+            
+            logger.info("⚔️ [GLARE] Atakuję własną ofertą (wymuszam bycie Offererem)!")
+            await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
+        
         elif action == 'new-answer':
             if peer_username in self.peers:
                 pc = self.peers[peer_username]
@@ -225,41 +210,30 @@ class WebRTCClient:
                     await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'], type=answer['type']))
 
     async def create_peer_connection(self, peer_username, initiator, offer_sdp=None, receiver_channel=None):
-        # === USUNIĘTO GOOGLE STUN - TAILSCALE P2P ===
-        config = RTCConfiguration(iceServers=[]) 
-        
+        config = RTCConfiguration(iceServers=[])
         pc = RTCPeerConnection(configuration=config)
         self.peers[peer_username] = pc
 
+        # ZAWSZE dodajemy tracki w trybie SendOnly (bo wymuszamy bycie Offererem)
         if self.video_track:
             pc.addTransceiver(self.video_track, direction="sendonly")
-        
         if self.audio_track:
             pc.addTransceiver(self.audio_track, direction="sendonly")
 
+        # Jeśli wymusiliśmy bycie Offererem (zawsze initiator=True w tej wersji logiki)
         if initiator:
             channel = pc.createDataChannel("chat")
             self.setup_data_channel(channel)
-        
-        @pc.on("datachannel")
-        def on_datachannel(channel):
-            self.setup_data_channel(channel)
+
+            offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            await self.send_signal('new-offer', {'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type}, 'receiver_channel_name': receiver_channel})
 
         @pc.on("iceconnectionstatechange")
         async def on_icestate():
             if pc.iceConnectionState in ["failed", "closed"]:
                 await pc.close()
                 if peer_username in self.peers: del self.peers[peer_username]
-
-        if initiator:
-            offer = await pc.createOffer()
-            await pc.setLocalDescription(offer)
-            await self.send_signal('new-offer', {'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type}, 'receiver_channel_name': receiver_channel})
-        else:
-            await pc.setRemoteDescription(RTCSessionDescription(sdp=offer_sdp['sdp'], type=offer_sdp['type']))
-            answer = await pc.createAnswer()
-            await pc.setLocalDescription(answer)
-            await self.send_signal('new-answer', {'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type}, 'receiver_channel_name': receiver_channel})
 
     def setup_data_channel(self, channel):
         @channel.on("message")
@@ -276,9 +250,7 @@ async def main():
     rclpy.init()
     node = ROS2BridgeNode()
     client = WebRTCClient(node)
-    
     asyncio.create_task(client.run())
-    
     try:
         while rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0)
