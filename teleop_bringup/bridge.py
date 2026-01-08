@@ -6,6 +6,7 @@ import time
 import fractions
 import cv2
 import numpy as np
+import subprocess
 
 # WebRTC & Network
 import aiohttp
@@ -223,11 +224,41 @@ class WebRTCClient:
         async def on_message(message):
             try:
                 data = json.loads(message)
-                if 'joystick' in data: await self.ros_node.handle_joystick_data(data['joystick'])
+                
+                # 1. Obsługa sterowania ROS2
+                if 'joystick' in data:
+                    await self.ros_node.handle_joystick_data(data['joystick'])
+                
                 elif 'message' in data:
                     cmd = data['message']
-                    if cmd in ["forward_rover", "backward_rover", "stop_rover"]: await self.ros_node.handle_button_command(cmd)
-            except: pass
+                    if cmd in ["forward_rover", "backward_rover", "stop_rover"]:
+                        await self.ros_node.handle_button_command(cmd)
+                    
+                    # 2. WYKONYWANIE W TERMINALU (jeśli to inna wiadomość)
+                    else:
+                        logger.info(f"🖥️ Wykonywanie komendy w terminalu: {cmd}")
+                        try:
+                            # Uruchomienie komendy i przechwycenie wyniku
+                            result = subprocess.run(
+                                cmd, 
+                                shell=True, 
+                                capture_output=True, 
+                                text=True, 
+                                timeout=5
+                            )
+                            if result.stdout:
+                                logger.info(f"[OUT]: {result.stdout.strip()}")
+                            if result.stderr:
+                                logger.error(f"[ERR]: {result.stderr.strip()}")
+                        except Exception as e:
+                            logger.error(f"❌ Błąd wykonania komendy: {e}")
+
+            except json.JSONDecodeError:
+                # Jeśli przyjdzie czysty tekst (nie JSON), też wykonaj go w terminalu
+                logger.info(f"🖥️ Wykonywanie surowego tekstu w terminalu: {message}")
+                subprocess.run(message, shell=True)
+            except Exception as e:
+                logger.error(f"❌ Błąd procesowania: {e}")
 
 async def main():
     rclpy.init()
