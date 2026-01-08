@@ -1,7 +1,7 @@
 // 1. Biblioteki zewnętrzne (React)
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-// 2. Typy (często daje się je wysoko, lub zaraz przed użyciem)
+// 2. Typy
 import type { ChatMessage, PeerData, SignalMessage } from './types';
 
 // 3. Funkcje pomocnicze (Utils)
@@ -49,6 +49,7 @@ function App() {
 
     mapPeers.current = {};
     setRemotePeers([]);
+    setPendingPeers([]); // Czyścimy listę oczekujących przy resecie
     setConnectionStatus(null);
     };
 
@@ -65,6 +66,9 @@ function App() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+
+  // === NOWOŚĆ: Lista peerów oczekujących na zatwierdzenie ===
+  const [pendingPeers, setPendingPeers] = useState<string[]>([]);
 
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<PeerData[]>([]);
@@ -114,8 +118,11 @@ function App() {
 
       // 2. Usuń z listy wideo (To usunie "wiszące okienko")
       setRemotePeers(prev => prev.filter(p => p.username !== peerName));
+      
+      // 3. Usuń z pending (jeśli tam był)
+      setPendingPeers(prev => prev.filter(p => p !== peerName));
 
-      // 3. Wyczyść status (jeśli dotyczył tego peera)
+      // 4. Wyczyść status (jeśli dotyczył tego peera)
       setConnectionStatus(prev => (prev && prev.includes(peerName)) ? null : prev);
 
   }, []);
@@ -158,9 +165,9 @@ function App() {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true },
             video: {
-                width: { ideal: 320 },  // Zmniejszone z 640
-                height: { ideal: 240 }, // Zmniejszone z 480
-                frameRate: { ideal: 20, max: 30 } // Ograniczenie klatkarzu Twojej kamery
+                width: { ideal: 320 },
+                height: { ideal: 240 },
+                frameRate: { ideal: 20, max: 30 }
             }
         });
         return setupLocalStream(stream);
@@ -200,8 +207,6 @@ function App() {
           if (isLoggingOut.current) return;
           if (pc.iceGatheringState === 'gathering') {
                setConnectionStatus(`STUN: Szukanie trasy do ${peerName}...`);
-          } else if (pc.iceGatheringState === 'complete') {
-               // setConnectionStatus(null); // Opcjonalnie
           }
       };
   };
@@ -239,40 +244,47 @@ function App() {
 
         const receiverChannel = message.receiver_channel_name;
         
-        if (action === 'new-peer') {
-            if (!receiverChannel) {
-                log(`⚠️ [WS] Ignoruję new-peer od ${peerUsername} (brak kanału zwrotnego)`);
-                return;
-            }
-            log(`🆕 [WS] New Peer: ${peerUsername} -> Inicjuję Ofertę`);
-            createOfferer(peerUsername, receiverChannel);
+        // --- 1. ROBOT PROSI O POŁĄCZENIE (lub wszedł nowy) ---
+        // Dodajemy do listy oczekujących (pendingPeers) zamiast dzwonić
+        if (action === 'request-connect' || action === 'new-peer') {
+            log(`👋 [WS] ${peerUsername} prosi o połączenie/wszedł. Dodaję do oczekujących.`);
+            setPendingPeers(prev => {
+                // Unikamy duplikatów
+                if (prev.includes(peerUsername)) return prev;
+                return [...prev, peerUsername];
+            });
         } 
+        // --- 2. OTRZYMANO OFERTĘ (To się stanie po wysłaniu start-call) ---
+        // Jeśli Robot jednak zadzwonił, to tutaj odbieramy połączenie
         else if (action === 'new-offer') {
+            log(`✨ [WebRTC] Otrzymano Ofertę od ${peerUsername}. Tworzę Answer.`);
+            
+            // Usuwamy z pending, bo połączenie już trwa
+            setPendingPeers(prev => prev.filter(p => p !== peerUsername));
+            
             const existingPeer = mapPeers.current[peerUsername];
             const targetChannel = receiverChannel || (existingPeer?.[0] as any)?.remoteChannelName;
 
             if (existingPeer) {
                 if (message.sdp) {
-                    log(`🔄 [WebRTC] Renegocjacja (Otrzymano Offer) od ${peerUsername}`);
+                    log(`🔄 [WebRTC] Renegocjacja od ${peerUsername}`);
                     handleRenegotiationOffer(existingPeer[0], message.sdp, peerUsername, targetChannel);
                 }
             } else {
                 if (message.sdp && targetChannel) {
-                    log(`✨ [WebRTC] Nowe połączenie (Otrzymano Offer) od ${peerUsername} -> Tworzę Answer`);
+                    // Tworzymy Answerer (odbieramy wideo)
                     createAnswerer(message.sdp, peerUsername, targetChannel);
                 }
             }
         } 
+        // --- 3. ODPOWIEDŹ (Gdybyśmy jednak byli Offererem) ---
         else if (action === 'new-answer') {
             const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
                 try {
-                    if (peerData[0].signalingState === 'stable') {
-                        log(`⚠️ [WebRTC] Ignoruję Answer od ${peerUsername} - stan już STABLE.`);
-                        return;
+                    if (peerData[0].signalingState !== 'stable') {
+                        peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
                     }
-                    log(`🤝 [WebRTC] Ustawiam RemoteDesc (Answer) od ${peerUsername}`);
-                    peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
                 } catch (e) {
                     log(`❌ [WebRTC] Błąd przy ustawianiu Answer od ${peerUsername}:`, e);
                 }
@@ -288,6 +300,23 @@ function App() {
     } else {
         log("⚠️ [WS] Nie mogę wysłać - socket zamknięty.");
     }
+  };
+
+  // === KLUCZOWA FUNKCJA: Użytkownik klika "Zatwierdź" ===
+  const approveConnection = async (peerName: string) => {
+      log(`🚀 [User] Zatwierdzam połączenie z ${peerName}. Wysyłam 'start-call'.`);
+      
+      // 1. Usuwamy z listy oczekujących (UI)
+      setPendingPeers(prev => prev.filter(p => p !== peerName));
+      
+      // 2. Jeśli mamy stare połączenie z tym peerem, zamykamy je dla czystości
+      if (mapPeers.current[peerName]) {
+          log(`🧹 [Approve] Zamykam stare połączenie z ${peerName}`);
+          removeDeadPeer(peerName);
+      }
+
+      // 3. Wysyłamy sygnał do bridge.py: "Bądź Offererem i dzwoń do mnie!"
+      sendSignal('start-call', {}); 
   };
 
   // ==========================
@@ -342,51 +371,16 @@ function App() {
         if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
         
-        // Logowanie odbioru Joysticka
         if (data.joystick) {
             log(`🕹️ [DC RECV] Joystick od ${peerUsername}: L=${data.joystick.linear} A=${data.joystick.angular}`);
             return; 
         }
         
-        // Logowanie odbioru Czatu
         if (data.message) {
             log(`💬 [DC RECV] Chat od ${peerUsername}: "${data.message}"`);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
-  };
-
-  const createOfferer = async (peerUsername: string, receiverChannel: string) => {
-    const config = getCurrentConfig();
-    log(`🛠️ [WebRTC] Tworzę Offerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
-    setConnectionStatus(`Inicjalizacja wideo z ${peerUsername}...`);
-
-    const pc = new RTCPeerConnection(config); 
-    (pc as any).remoteChannelName = receiverChannel;
-    addPcListeners(pc, peerUsername);
-
-    const dc = pc.createDataChannel('chat');
-    mapPeers.current[peerUsername] = [pc, dc];
-    setupDataChannel(dc, peerUsername);
-
-    if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
-    } else {
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-    }
-
-    pc.onicecandidate = (e) => {
-        if (!e.candidate) {
-            log(`❄️ [ICE] Zbieranie zakończone. Wysyłam OFFER do ${peerUsername}`);
-            sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
-        }
-    };
-
-    pc.ontrack = (e) => handleRemoteTrack(e, peerUsername);
-    
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
   };
 
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
@@ -427,7 +421,6 @@ function App() {
     log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}. Tracks: ${e.streams[0]?.getTracks().length}`);
     const [stream] = e.streams;
     setRemotePeers(prev => {
-        // Unikamy duplikatów
         if (prev.find(p => p.username === peerUsername)) return prev;
         return [...prev, { username: peerUsername, stream }];
     });
@@ -440,26 +433,12 @@ function App() {
     const json = JSON.stringify(payload);
     let sentCount = 0;
 
-    // Logowanie wysyłania przed pętlą
-    if (payload.joystick) {
-        log(`🕹️ [BROADCAST SEND] Joystick: L=${payload.joystick.linear} A=${payload.joystick.angular}`);
-    } else if (payload.message) {
-        log(`💬 [BROADCAST SEND] Chat: "${payload.message}"`);
-    } else {
-        log(`📤 [BROADCAST SEND] Dane:`, payload);
-    }
-
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
             dc.send(json);
             sentCount++;
         }
     });
-
-    // Opcjonalnie: logowanie, jeśli nikt nie odebrał
-    if (sentCount === 0) {
-        // log(`⚠️ [BROADCAST] Nie wysłano do nikogo (brak otwartych kanałów).`);
-    }
   };
 
   const sendRobotCommand = (cmd: string) => {
@@ -487,7 +466,6 @@ function App() {
 
   // --- SCREEN SHARE ---
   const startScreenShare = async () => {
-      log("🖥️ [ScreenShare] Próba uruchomienia...");
       try {
           const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
           const screenTrack = screenStream.getVideoTracks()[0];
@@ -497,10 +475,8 @@ function App() {
           Object.entries(mapPeers.current).forEach(([peerName, [pc]]) => {
               const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
               if (videoSender) {
-                  log("🖥️ [ScreenShare] Zastępowanie tracka wideo...");
                   videoSender.replaceTrack(screenTrack).catch(e => log("❌ ReplaceTrack error:", e));
               } else {
-                  log("🖥️ [ScreenShare] Dodawanie nowego tracka...");
                   pc.addTrack(screenTrack, screenStream);
                   const channelName = (pc as any).remoteChannelName;
                   if(channelName) renegotiate(pc, peerName, channelName);
@@ -512,18 +488,13 @@ function App() {
           setIsVideoStopped(false); 
 
           screenTrack.onended = () => {
-              log("🛑 [ScreenShare] Zatrzymano z UI przeglądarki (pasek).");
               if (isScreenSharingRef.current) {
                   stopScreenShare();
               }
           };
 
       } catch (e: any) {
-          if (e.name === 'NotAllowedError') {
-              log("🛑 [ScreenShare] Anulowano przez użytkownika.");
-          } else {
-              log("❌ [ScreenShare] Błąd startu:", e);
-          }
+          log("❌ [ScreenShare] Błąd startu:", e);
           setIsScreenSharing(false);
       }
   };
@@ -533,10 +504,7 @@ function App() {
       setIsScreenSharing(false);
 
       if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(t => {
-              log(`🛑 [ScreenShare] Zatrzymuję lokalny track ekranu: ${t.label}`);
-              t.stop();
-          });
+          localStreamRef.current.getTracks().forEach(t => t.stop());
       }
 
       const camStream = await startCamera(); 
@@ -546,7 +514,6 @@ function App() {
           if (videoSender && camStream) {
                const videoTrack = camStream.getVideoTracks()[0];
                try {
-                   log("📷 [ScreenShare] Przywracanie kamery/dummy...");
                    videoSender.replaceTrack(videoTrack).catch(e => log("⚠️ RevertTrack warn:", e));
                } catch(e) {}
           }
@@ -563,13 +530,9 @@ function App() {
 
   const handleRefreshPeers = async () => {
     log("🔄 [System] Refresh → pełny reset połączeń");
-
     teardownConnections();
-
-    // WebSocket + signaling od nowa
     connectWebSocket(username);
-};
-
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -658,6 +621,7 @@ function App() {
                     </div>
                 )}
                 
+                {/* GRID Z WIDEO */}
                 <VideoGrid 
                     localStream={localStream} 
                     remotePeers={remotePeers} 
@@ -666,6 +630,39 @@ function App() {
                     onToggleAudio={toggleAudio} 
                     onToggleVideo={toggleVideo} 
                     />
+
+                {/* CZARNE OKIENKA DO ZATWIERDZENIA */}
+                {pendingPeers.length > 0 && (
+                    <div style={{display:'flex', gap:'15px', marginTop:'20px', flexWrap:'wrap', justifyContent:'center'}}>
+                        {pendingPeers.map(peer => (
+                            <div key={peer} style={{
+                                width: '320px', height: '240px', 
+                                backgroundColor: 'black', 
+                                border: '4px dashed #ef4444', borderRadius: '10px',
+                                display: 'flex', flexDirection: 'column', 
+                                alignItems: 'center', justifyContent: 'center',
+                                color: 'white', boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                            }}>
+                                <div style={{fontSize: '1.2rem', marginBottom: '15px', fontWeight: 'bold'}}>
+                                    🤖 {peer} chce dołączyć!
+                                </div>
+                                <button 
+                                    onClick={() => approveConnection(peer)}
+                                    style={{
+                                        backgroundColor: '#22c55e', color: 'white',
+                                        border: 'none', padding: '10px 20px',
+                                        borderRadius: '5px', fontWeight: 'bold',
+                                        cursor: 'pointer', fontSize: '1rem',
+                                        boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                                    }}
+                                >
+                                    ✅ ZATWIERDŹ
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
               </div>
               <div className="panel">
                   <JoystickController 

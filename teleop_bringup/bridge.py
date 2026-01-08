@@ -173,35 +173,18 @@ class WebRTCClient:
         action = data['action']
         if peer_username == self.username: return
 
+        # 1. Ktoś wszedł (React). Nie dzwonimy sami. Wysyłamy prośbę.
         if action == 'new-peer':
-            # Ktoś wszedł -> My jesteśmy OFFEREREM (To działa dobrze!)
-            logger.info(f"🆕 Nowy peer {peer_username} -> OFFERER")
-            await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
+            logger.info(f"👋 Widzę {peer_username}. Wysyłam 'request-connect'.")
+            await self.send_signal('request-connect', {})
         
-        elif action == 'new-offer':
-            # Ktoś dzwoni -> My jesteśmy ANSWEREREM (To nie działa z wideo).
-            # STRATEGIA: Odrzucamy rolę Answerera i wymuszamy bycie Offererem.
-            
-            logger.info(f"📩 Otrzymałem ofertę od {peer_username}. IGNORUJĘ JĄ.")
-            logger.info("🔄 Wymuszam restart, abym to JA był dzwoniącym (Offerer).")
-            
-            # Czekamy chwilę, żeby nie zrobić pętli komunikatów od razu
-            await asyncio.sleep(1.0)
-            
-            # Wysyłamy sygnał "new-peer" ponownie. 
-            # Strona React odbierze to i (miejmy nadzieję) zresetuje stan, 
-            # ale co ważniejsze - my przygotujemy się do bycia Offererem przy kolejnej interakcji?
-            # NIE - jeśli wyślemy new-peer, to React spróbuje ZNOWU wysłać ofertę (bo React myśli: "O, nowy peer, dzwonię!").
-            # To zrobi nieskończoną pętlę.
-            
-            # NOWA STRATEGIA: Musimy oszukać system.
-            # Zamiast czekać na Reacta, my PROAKTYWNIE wysyłamy ofertę TERAZ,
-            # ignorując fakt, że dostaliśmy ofertę.
-            # To spowoduje "Glare" (kolizję ofert), ale jeśli React jest dobrze napisany, może obsłuży nową ofertę.
-            
-            logger.info("⚔️ [GLARE] Atakuję własną ofertą (wymuszam bycie Offererem)!")
+        # 2. React kliknął "ZATWIERDŹ". To jest rozkaz: "Dzwon teraz!"
+        elif action == 'start-call':
+            logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}. DZWONIĘ (Jestem Offererem)!")
+            # Tutaj Robot staje się Offererem (Initiator=True) - to działa najlepiej z Twoją kamerą
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
-        
+
+        # 3. Obsługa odpowiedzi na naszą ofertę
         elif action == 'new-answer':
             if peer_username in self.peers:
                 pc = self.peers[peer_username]
