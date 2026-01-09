@@ -49,7 +49,7 @@ function App() {
 
     mapPeers.current = {};
     setRemotePeers([]);
-    setPendingPeers([]); // Czyścimy listę oczekujących przy resecie
+    setPendingPeers([]); 
     setConnectionStatus(null);
     };
 
@@ -80,10 +80,9 @@ function App() {
   const lastSentTime = useRef<number>(0);
   const isScreenSharingRef = useRef(false);
   
-  // Flaga blokująca logi przy wylogowywaniu
   const isLoggingOut = useRef(false);
 
-  // === 1. FUNKCJA WYLOGOWANIA (TYLKO DLA CIEBIE) ===
+  // === 1. FUNKCJA WYLOGOWANIA ===
   const handleLogout = useCallback(() => {
     isLoggingOut.current = true;
     log("👋 [System] Wylogowywanie");
@@ -107,7 +106,6 @@ function App() {
 
       log(`🗑️ [System] Usuwanie martwego peera: ${peerName}`);
       
-      // 1. Zamknij połączenie lokalnie
       const peerData = mapPeers.current[peerName];
       if (peerData) {
           const [pc, dc] = peerData;
@@ -116,13 +114,8 @@ function App() {
           delete mapPeers.current[peerName];
       }
 
-      // 2. Usuń z listy wideo (To usunie "wiszące okienko")
       setRemotePeers(prev => prev.filter(p => p.username !== peerName));
-      
-      // 3. Usuń z pending (jeśli tam był)
       setPendingPeers(prev => prev.filter(p => p !== peerName));
-
-      // 4. Wyczyść status (jeśli dotyczył tego peera)
       setConnectionStatus(prev => (prev && prev.includes(peerName)) ? null : prev);
 
   }, []);
@@ -197,7 +190,6 @@ function App() {
               setConnectionStatus(null);
           } 
           else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-              // === ZMIANA: ZAMIAST WYLOGOWYWAĆ NAS, USUWAMY PEERA ===
               log(`⚠️ [ICE] Utracono połączenie z ${peerName}. Usuwam go z listy.`);
               removeDeadPeer(peerName);
           }
@@ -244,22 +236,44 @@ function App() {
 
         const receiverChannel = message.receiver_channel_name;
         
-        // --- 1. ROBOT PROSI O POŁĄCZENIE (lub wszedł nowy) ---
-        // Dodajemy do listy oczekujących (pendingPeers) zamiast dzwonić
+        // --- 1. KTOŚ PROSI O POŁĄCZENIE (Lobby) ---
         if (action === 'request-connect' || action === 'new-peer') {
+            // === POPRAWKA: Sprawdzamy, czy już nie jesteśmy połączeni ===
+            if (mapPeers.current[peerUsername]) {
+                log(`ℹ️ [WS] ${peerUsername} wysłał request, ale już jesteśmy połączeni. Ignoruję.`);
+                return; 
+            }
+
             log(`👋 [WS] ${peerUsername} prosi o połączenie/wszedł. Dodaję do oczekujących.`);
             setPendingPeers(prev => {
-                // Unikamy duplikatów
                 if (prev.includes(peerUsername)) return prev;
                 return [...prev, peerUsername];
             });
-        } 
-        // --- 2. OTRZYMANO OFERTĘ (To się stanie po wysłaniu start-call) ---
-        // Jeśli Robot jednak zadzwonił, to tutaj odbieramy połączenie
+        }
+        
+        else if (action === 'start-call') {
+            const target = message.target;
+            
+            // === POPRAWKA: Jeśli sygnał jest do kogoś innego, ignorujemy go ===
+            if (target && target !== currentUserName) {
+                log(`😶 [WS] Ignoruję start-call od ${peerUsername} (Cel: ${target}, Ja: ${currentUserName})`);
+                return;
+            }
+
+            log(`📞 [WS] ${peerUsername} zatwierdził połączenie DO MNIE! Dzwonię (Tworzę Ofertę).`);
+            setPendingPeers(prev => prev.filter(p => p !== peerUsername));
+            
+            if (receiverChannel) {
+                createOfferer(peerUsername, receiverChannel);
+            } else {
+                log(`❌ [Błąd] Otrzymano start-call od ${peerUsername}, ale brak receiver_channel_name.`);
+            }
+        }
+
+        // --- 3. OTRZYMANO OFERTĘ ---
         else if (action === 'new-offer') {
             log(`✨ [WebRTC] Otrzymano Ofertę od ${peerUsername}. Tworzę Answer.`);
             
-            // Usuwamy z pending, bo połączenie już trwa
             setPendingPeers(prev => prev.filter(p => p !== peerUsername));
             
             const existingPeer = mapPeers.current[peerUsername];
@@ -272,12 +286,11 @@ function App() {
                 }
             } else {
                 if (message.sdp && targetChannel) {
-                    // Tworzymy Answerer (odbieramy wideo)
                     createAnswerer(message.sdp, peerUsername, targetChannel);
                 }
             }
         } 
-        // --- 3. ODPOWIEDŹ (Gdybyśmy jednak byli Offererem) ---
+        // --- 4. ODPOWIEDŹ ---
         else if (action === 'new-answer') {
             const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
@@ -302,21 +315,18 @@ function App() {
     }
   };
 
-  // === KLUCZOWA FUNKCJA: Użytkownik klika "Zatwierdź" ===
+  // === UI: Użytkownik klika "Zatwierdź" ===
   const approveConnection = async (peerName: string) => {
       log(`🚀 [User] Zatwierdzam połączenie z ${peerName}. Wysyłam 'start-call'.`);
       
-      // 1. Usuwamy z listy oczekujących (UI)
       setPendingPeers(prev => prev.filter(p => p !== peerName));
       
-      // 2. Jeśli mamy stare połączenie z tym peerem, zamykamy je dla czystości
       if (mapPeers.current[peerName]) {
-          log(`🧹 [Approve] Zamykam stare połączenie z ${peerName}`);
           removeDeadPeer(peerName);
       }
 
-      // 3. Wysyłamy sygnał do bridge.py: "Bądź Offererem i dzwoń do mnie!"
-      sendSignal('start-call', {}); 
+      // === POPRAWKA: Dodajemy "target", żeby tylko ten peer zareagował ===
+      sendSignal('start-call', { target: peerName }); 
   };
 
   // ==========================
@@ -338,10 +348,6 @@ function App() {
 
   const handleRenegotiationOffer = async (pc: RTCPeerConnection, sdp: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
       try {
-          log(`📥 [Renegotiation] Przetwarzam Ofertę od ${peerUsername}...`);
-          if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer' && pc.signalingState !== 'have-remote-offer') {
-               log(`⚠️ [Renegotiation] Ryzykowny stan PC przy ${peerUsername}: ${pc.signalingState}`);
-          }
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -353,39 +359,64 @@ function App() {
 
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
     dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
-    
     dc.onclose = () => { 
         if(!isLoggingOut.current) {
             log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
             removeDeadPeer(peerUsername);
         }
     };
-    
     dc.onerror = (e: any) => {
-        if (isLoggingOut.current) return;
-        if (e.error?.message?.includes('User-Initiated Abort') || e.error?.name === 'OperationError') return;
-        log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
+        if (!isLoggingOut.current) log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
     };
 
     dc.onmessage = (e) => {
         if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
-        
-        if (data.joystick) {
-            log(`🕹️ [DC RECV] Joystick od ${peerUsername}: L=${data.joystick.linear} A=${data.joystick.angular}`);
-            return; 
-        }
-        
+        if (data.joystick) return; 
         if (data.message) {
-            log(`💬 [DC RECV] Chat od ${peerUsername}: "${data.message}"`);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
   };
 
+  // === [PRZYWRÓCONE] Create Offerer (potrzebne dla Browser-to-Browser) ===
+  const createOfferer = async (peerUsername: string, receiverChannel: string) => {
+    const config = getCurrentConfig();
+    log(`🛠️ [WebRTC] Tworzę Offerer dla ${peerUsername}.`);
+    setConnectionStatus(`Dzwonię do ${peerUsername}...`);
+
+    const pc = new RTCPeerConnection(config); 
+    (pc as any).remoteChannelName = receiverChannel;
+    addPcListeners(pc, peerUsername);
+
+    // Offerer tworzy Data Channel
+    const dc = pc.createDataChannel('chat');
+    mapPeers.current[peerUsername] = [pc, dc];
+    setupDataChannel(dc, peerUsername);
+
+    if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
+    } else {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+    }
+
+    pc.onicecandidate = (e) => {
+        if (!e.candidate) {
+            log(`❄️ [ICE] Zbieranie zakończone. Wysyłam OFFER do ${peerUsername}`);
+            sendSignal('new-offer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
+        }
+    };
+
+    pc.ontrack = (e) => handleRemoteTrack(e, peerUsername);
+    
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+  };
+
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
     const config = getCurrentConfig();
-    log(`🛠️ [WebRTC] Tworzę Answerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
+    log(`🛠️ [WebRTC] Tworzę Answerer dla ${peerUsername}.`);
     setConnectionStatus(`Odbieranie wideo od ${peerUsername}...`);
 
     const pc = new RTCPeerConnection(config);
@@ -393,7 +424,6 @@ function App() {
     addPcListeners(pc, peerUsername);
     
     pc.ondatachannel = (e) => {
-        log(`🔗 [WebRTC] Otrzymano DataChannel od ${peerUsername}`);
         const dc = e.channel;
         mapPeers.current[peerUsername] = [pc, dc];
         setupDataChannel(dc, peerUsername);
@@ -418,7 +448,7 @@ function App() {
   };
 
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
-    log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}. Tracks: ${e.streams[0]?.getTracks().length}`);
+    log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}.`);
     const [stream] = e.streams;
     setRemotePeers(prev => {
         if (prev.find(p => p.username === peerUsername)) return prev;
@@ -431,12 +461,9 @@ function App() {
   // ==========================
   const broadcastData = (payload: any) => {
     const json = JSON.stringify(payload);
-    let sentCount = 0;
-
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
             dc.send(json);
-            sentCount++;
         }
     });
   };
@@ -451,7 +478,6 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsAudioMuted(!t.enabled); 
-        log(`🎤 Mikrofon przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
@@ -460,7 +486,6 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsVideoStopped(!t.enabled); 
-        log(`📷 Wideo przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
@@ -470,8 +495,6 @@ function App() {
           const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
           const screenTrack = screenStream.getVideoTracks()[0];
           
-          log(`🖥️ [ScreenShare] Otrzymano strumień ekranu: ${screenTrack.label}`);
-
           Object.entries(mapPeers.current).forEach(([peerName, [pc]]) => {
               const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
               if (videoSender) {
@@ -488,9 +511,7 @@ function App() {
           setIsVideoStopped(false); 
 
           screenTrack.onended = () => {
-              if (isScreenSharingRef.current) {
-                  stopScreenShare();
-              }
+              if (isScreenSharingRef.current) stopScreenShare();
           };
 
       } catch (e: any) {
@@ -500,12 +521,8 @@ function App() {
   };
 
   const stopScreenShare = async () => {
-      log("🖥️ [ScreenShare] Zatrzymywanie...");
       setIsScreenSharing(false);
-
-      if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(t => t.stop());
-      }
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
 
       const camStream = await startCamera(); 
       
@@ -513,23 +530,17 @@ function App() {
           const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (videoSender && camStream) {
                const videoTrack = camStream.getVideoTracks()[0];
-               try {
-                   videoSender.replaceTrack(videoTrack).catch(e => log("⚠️ RevertTrack warn:", e));
-               } catch(e) {}
+               videoSender.replaceTrack(videoTrack).catch(() => {});
           }
       });
   };
 
   const toggleScreenShare = () => {
-      if (isScreenSharing) {
-          stopScreenShare();
-      } else {
-          startScreenShare();
-      }
+      isScreenSharing ? stopScreenShare() : startScreenShare();
   };
 
   const handleRefreshPeers = async () => {
-    log("🔄 [System] Refresh → pełny reset połączeń");
+    log("🔄 [System] Refresh");
     teardownConnections();
     connectWebSocket(username);
   };
@@ -538,9 +549,8 @@ function App() {
     e.preventDefault();
     if (username.trim()) {
       isLoggingOut.current = false; 
-      log(`👤 [Login] Logowanie jako: ${username} | STUN: ${useStun}`);
+      log(`👤 [Login] Logowanie jako: ${username}`);
       setIsLoggedIn(true);
-      
       const stream = await startCamera();
       if (stream) connectWebSocket(username);
     }

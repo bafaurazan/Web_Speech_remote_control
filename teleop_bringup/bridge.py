@@ -181,8 +181,13 @@ class WebRTCClient:
         
         # 2. React kliknął "ZATWIERDŹ". To jest rozkaz: "Dzwon teraz!"
         elif action == 'start-call':
+            # === POPRAWKA: Sprawdzamy czy to do nas ===
+            target = data['message'].get('target')
+            if target and target != self.username:
+                logger.info(f"😶 Ignoruję 'start-call' od {peer_username} (Cel: {target}, Ja: {self.username})")
+                return
+
             logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}. DZWONIĘ (Jestem Offererem)!")
-            # Tutaj Robot staje się Offererem (Initiator=True) - to działa najlepiej z Twoją kamerą
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
 
         # 3. Obsługa odpowiedzi na naszą ofertę
