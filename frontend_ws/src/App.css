@@ -539,3 +539,65 @@ button {
   font-size: 1.1rem; 
   padding-top: 3px; 
 }
+
+/* =========================================
+   7. POWIADOMIENIA (NOTIFICATIONS)
+   ========================================= */
+
+.notifications-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 99999; /* Bardzo wysoki indeks, by być nad wszystkim */
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  pointer-events: none; /* Żeby kontener nie blokował klikania pod spodem, jeśli jest pusty */
+}
+
+.notification-card {
+  width: 300px;
+  background-color: black;
+  border: 4px solid #ef4444; /* Czerwona ramka */
+  border-radius: 12px;
+  padding: 15px;
+  color: white;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto; /* Przywracamy klikanie dla samej karty */
+  animation: slideInRight 0.3s ease-out;
+}
+
+.notification-text {
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.notification-btn {
+  background-color: #22c55e;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 1rem;
+  box-shadow: 0 4px 0 #15803d;
+  transition: transform 0.1s;
+  width: 100%;
+}
+
+.notification-btn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(120%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

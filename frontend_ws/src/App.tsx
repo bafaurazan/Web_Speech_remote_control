@@ -570,8 +570,10 @@ function App() {
   return (
     <div className="dashboard">
       {!isLoggedIn ? (
+        // ... (ekran logowania bez zmian)
         <div className="login-container">
-          <form onSubmit={handleLogin} className="login-card">
+            {/* ...formularz logowania... */}
+             <form onSubmit={handleLogin} className="login-card">
             <h2 className="title-header">LOGIN</h2>
             
             <div className="input-row">
@@ -595,8 +597,10 @@ function App() {
         </div>
       ) : (
         <>
+          {/* === NAGŁÓWEK (HEADER) === */}
           <header className="top-bar">
-           <div className="flex gap-4 items-center">
+             {/* ... (zawartość nagłówka bez zmian) ... */}
+             <div className="flex gap-4 items-center">
               <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
               <h1 className="text-xl font-bold">ROBOT: {username}</h1>
            </div>
@@ -616,94 +620,76 @@ function App() {
            <div className="flex gap-2">
               <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
               <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
-              
-              <button 
-                onClick={toggleScreenShare} 
-                className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}
-                title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
-              >
+              <button onClick={toggleScreenShare} className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}>
                 {isScreenSharing ? '⏹️ Stop Share' : '🖥️ Share'}
               </button>
-              
               <button onClick={handleRefreshPeers} className="icon-btn">🔄</button>
            </div>
           </header>
 
+          {/* === NOWOŚĆ: POWIADOMIENIA PRAWY GÓRNY RÓG (GLOBALNE) === */}
+          <div className="notifications-container">
+            {pendingPeers.map(peer => (
+                <div key={peer} className="notification-card">
+                    <div className="notification-text">
+                        🤖 {peer} <br/> chce dołączyć!
+                    </div>
+                    <button 
+                        className="notification-btn"
+                        onClick={() => approveConnection(peer)}
+                    >
+                        ✅ ZATWIERDŹ
+                    </button>
+                </div>
+            ))}
+          </div>
+
+          {/* === GŁÓWNA ZAWARTOŚĆ === */}
           <div className="main-grid">
             {activeTab === 'operator' && (
               <div className="view-section operator-view">
                 <div className="panel">
-                
-                {connectionStatus && (
-                    <div className="loader-overlay">
-                        <div className="spinner"></div>
-                        <div className="loader-text">{connectionStatus}</div>
-                        {connectionStatus.includes('STUN') && <div className="loader-subtext">To może chwilę potrwać...</div>}
-                    </div>
-                )}
-                
-                {/* GRID Z WIDEO */}
-                <VideoGrid 
-                    localStream={localStream} 
-                    remotePeers={remotePeers} 
-                    isAudioMuted={isAudioMuted} 
-                    isVideoStopped={isVideoStopped} 
-                    onToggleAudio={toggleAudio} 
-                    onToggleVideo={toggleVideo} 
-                    />
-
-                {/* CZARNE OKIENKA DO ZATWIERDZENIA */}
-                {pendingPeers.length > 0 && (
-                    <div style={{display:'flex', gap:'15px', marginTop:'20px', flexWrap:'wrap', justifyContent:'center'}}>
-                        {pendingPeers.map(peer => (
-                            <div key={peer} style={{
-                                width: '320px', height: '240px', 
-                                backgroundColor: 'black', 
-                                border: '4px dashed #ef4444', borderRadius: '10px',
-                                display: 'flex', flexDirection: 'column', 
-                                alignItems: 'center', justifyContent: 'center',
-                                color: 'white', boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
-                            }}>
-                                <div style={{fontSize: '1.2rem', marginBottom: '15px', fontWeight: 'bold'}}>
-                                    🤖 {peer} chce dołączyć!
-                                </div>
-                                <button 
-                                    onClick={() => approveConnection(peer)}
-                                    style={{
-                                        backgroundColor: '#22c55e', color: 'white',
-                                        border: 'none', padding: '10px 20px',
-                                        borderRadius: '5px', fontWeight: 'bold',
-                                        cursor: 'pointer', fontSize: '1rem',
-                                        boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
-                                    }}
-                                >
-                                    ✅ ZATWIERDŹ
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-              </div>
-              <div className="panel">
-                  <JoystickController 
-                      onMove={(l, a) => {
-                          const now = Date.now();
-                          if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
-                              broadcastData({ username, joystick: { linear: l, angular: a } });
-                              lastSentTime.current = now;
-                          }
-                      }} 
-                      onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
-                      onCommand={sendRobotCommand} 
+                  {connectionStatus && (
+                      <div className="loader-overlay">
+                          <div className="spinner"></div>
+                          <div className="loader-text">{connectionStatus}</div>
+                          {connectionStatus.includes('STUN') && <div className="loader-subtext">To może chwilę potrwać...</div>}
+                      </div>
+                  )}
+                  
+                  {/* GRID Z WIDEO */}
+                  <VideoGrid 
+                      localStream={localStream} 
+                      remotePeers={remotePeers} 
+                      isAudioMuted={isAudioMuted} 
+                      isVideoStopped={isVideoStopped} 
+                      onToggleAudio={toggleAudio} 
+                      onToggleVideo={toggleVideo} 
                   />
-              </div>
+
+                  {/* USUNIĘTO STĄD CZARNE OKIENKA (przeniesione wyżej do notifications-container) */}
+
+                </div>
+                <div className="panel">
+                    <JoystickController 
+                        onMove={(l, a) => {
+                            const now = Date.now();
+                            if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
+                                broadcastData({ username, joystick: { linear: l, angular: a } });
+                                lastSentTime.current = now;
+                            }
+                        }} 
+                        onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
+                        onCommand={sendRobotCommand} 
+                    />
+                </div>
               </div>
             )}
             
+            {/* ... reszta tabów bez zmian ... */}
             {activeTab === 'hub' && (
               <div className="view-section operator-view">
-                <div className="panel">
+                 <div className="panel">
                 {connectionStatus && (
                     <div className="loader-overlay">
                         <div className="spinner"></div>
@@ -729,7 +715,7 @@ function App() {
             )}
 
             {activeTab === 'ai' && (
-              <div className="view-section ai-view">
+               <div className="view-section ai-view">
                 <div className="panel">
                   {connectionStatus && (
                       <div className="loader-overlay">

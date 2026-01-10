@@ -95,37 +95,89 @@ class ROS2BridgeNode(Node):
         topic_name = f'/{ROBOT_ID}/joy' if ROBOT_ID else '/g1pilot/joy'
         self.publisher_ = self.create_publisher(Joy, topic_name, 10)
         logger.info(f"ROS2 Node Started. Publishing to: {topic_name}")
-        self.default_axes = [0.0] * 8
-        self.default_buttons = [0] * 12
+        
+        # === STAN GLOBALNY ===
+        # Te zmienne trzymają aktualną pozycję "wirtualnych gałek"
+        self.current_axes = [0.0] * 8
+        self.current_buttons = [0] * 12
+        
+        # Uruchamiamy pętlę, która wysyła te wartości non-stop (30Hz)
+        self.publish_task = asyncio.create_task(self._publish_loop())
 
-    def publish_joy(self, axes, buttons):
-        msg = Joy()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "webrtc_input"
-        msg.axes = axes
-        msg.buttons = buttons
-        self.publisher_.publish(msg)
+    async def _publish_loop(self):
+        """Pętla heartbeat wysyłająca stan Joy co 1/30 sekundy"""
+        logger.info("🔄 Start pętli sterowania (30Hz continuous publish)...")
+        while True:
+            try:
+                msg = Joy()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = "webrtc_input"
+                msg.axes = self.current_axes
+                msg.buttons = self.current_buttons
+                self.publisher_.publish(msg)
+                
+                # Czekamy ok. 33ms (30Hz)
+                await asyncio.sleep(1.0 / 30.0)
+            except Exception as e:
+                logger.error(f"❌ Błąd w pętli publish: {e}")
+                await asyncio.sleep(1)
 
     async def handle_joystick_data(self, data):
+        """Obsługa joysticka z Reacta - aktualizuje stan"""
         linear = float(data.get('linear', 0.0))
         angular = float(data.get('angular', 0.0))
-        axes = list(self.default_axes)
-        buttons = list(self.default_buttons)
-        axes[1] = linear * -1.0 
-        axes[2] = angular
-        buttons[8] = 1 if (abs(linear) > 0.05 or abs(angular) > 0.05) else 0
-        self.publish_joy(axes, buttons)
+        
+        # Aktualizujemy zmienne stanu (nie publikujemy bezpośrednio!)
+        # Resetujemy osie do domyślnych zer przed ustawieniem nowych
+        self.current_axes = [0.0] * 8
+        self.current_buttons = [0] * 12
+        
+        self.current_axes[1] = linear * -1.0 
+        self.current_axes[2] = angular
+        
+        # Deadman switch (przycisk 8) aktywny jeśli jest ruch
+        self.current_buttons[8] = 1 if (abs(linear) > 0.05 or abs(angular) > 0.05) else 0
 
     async def handle_button_command(self, command):
-        buttons = list(self.default_buttons)
-        axes = list(self.default_axes)
-        if command == "forward_rover": buttons[6] = 1
-        elif command in ["stop_rover", "backward_rover"]: buttons[5] = 1
-        self.publish_joy(axes, buttons)
-        await asyncio.sleep(0.05) 
-        buttons[6] = 0
-        buttons[5] = 0
-        self.publish_joy(axes, buttons)
+        """
+        Obsługa komend głosowych/przycisków.
+        Ustawia stan na stałe, aż do komendy stop.
+        """
+        LINEAR_SPEED = 0.5
+        ANGULAR_SPEED = 0.5
+
+        # Resetujemy stan do zera przy każdej nowej komendzie, 
+        # żeby nie sumować dziwnych ruchów (np. skręt + jazda jeśli nie chcemy)
+        new_axes = [0.0] * 8
+        new_buttons = [0] * 12
+        
+        if command == "forward_rover":
+            new_axes[1] = -LINEAR_SPEED 
+            new_buttons[8] = 1 # Deadman
+            logger.info("🤖 GŁOS: JAZDA CIĄGŁA W PRZÓD")
+
+        elif command == "backward_rover":
+            new_axes[1] = LINEAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: JAZDA CIĄGŁA W TYŁ")
+
+        elif command == "left_rover":
+            new_axes[2] = -ANGULAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W LEWO")
+
+        elif command == "right_rover":
+            new_axes[2] = ANGULAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W PRAWO")
+
+        elif command == "stop_rover":
+            # Wszystko na 0
+            logger.info("🤖 GŁOS: STOP")
+        
+        # Zapisujemy nowy stan. Pętla _publish_loop od razu zacznie to wysyłać w 30Hz.
+        self.current_axes = new_axes
+        self.current_buttons = new_buttons
 
 class WebRTCClient:
     def __init__(self, ros_node):
@@ -174,14 +226,11 @@ class WebRTCClient:
         action = data['action']
         if peer_username == self.username: return
 
-        # 1. Ktoś wszedł (React). Nie dzwonimy sami. Wysyłamy prośbę.
         if action == 'new-peer':
             logger.info(f"👋 Widzę {peer_username}. Wysyłam 'request-connect'.")
             await self.send_signal('request-connect', {})
         
-        # 2. React kliknął "ZATWIERDŹ". To jest rozkaz: "Dzwon teraz!"
         elif action == 'start-call':
-            # === POPRAWKA: Sprawdzamy czy to do nas ===
             target = data['message'].get('target')
             if target and target != self.username:
                 logger.info(f"😶 Ignoruję 'start-call' od {peer_username} (Cel: {target}, Ja: {self.username})")
@@ -190,7 +239,6 @@ class WebRTCClient:
             logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}. DZWONIĘ (Jestem Offererem)!")
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
 
-        # 3. Obsługa odpowiedzi na naszą ofertę
         elif action == 'new-answer':
             if peer_username in self.peers:
                 pc = self.peers[peer_username]
@@ -203,13 +251,11 @@ class WebRTCClient:
         pc = RTCPeerConnection(configuration=config)
         self.peers[peer_username] = pc
 
-        # ZAWSZE dodajemy tracki w trybie SendOnly (bo wymuszamy bycie Offererem)
         if self.video_track:
             pc.addTransceiver(self.video_track, direction="sendonly")
         if self.audio_track:
             pc.addTransceiver(self.audio_track, direction="sendonly")
 
-        # Jeśli wymusiliśmy bycie Offererem (zawsze initiator=True w tej wersji logiki)
         if initiator:
             channel = pc.createDataChannel("chat")
             self.setup_data_channel(channel)
@@ -236,30 +282,21 @@ class WebRTCClient:
                 
                 elif 'message' in data:
                     cmd = data['message']
-                    if cmd in ["forward_rover", "backward_rover", "stop_rover"]:
+                    allowed = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]
+                    
+                    if cmd in allowed:
                         await self.ros_node.handle_button_command(cmd)
                     
-                    # 2. WYKONYWANIE W TERMINALU (jeśli to inna wiadomość)
                     else:
                         logger.info(f"🖥️ Wykonywanie komendy w terminalu: {cmd}")
                         try:
-                            # Uruchomienie komendy i przechwycenie wyniku
-                            result = subprocess.run(
-                                cmd, 
-                                shell=True, 
-                                capture_output=True, 
-                                text=True, 
-                                timeout=5
-                            )
-                            if result.stdout:
-                                logger.info(f"[OUT]: {result.stdout.strip()}")
-                            if result.stderr:
-                                logger.error(f"[ERR]: {result.stderr.strip()}")
+                            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+                            if result.stdout: logger.info(f"[OUT]: {result.stdout.strip()}")
+                            if result.stderr: logger.error(f"[ERR]: {result.stderr.strip()}")
                         except Exception as e:
                             logger.error(f"❌ Błąd wykonania komendy: {e}")
 
             except json.JSONDecodeError:
-                # Jeśli przyjdzie czysty tekst (nie JSON), też wykonaj go w terminalu
                 logger.info(f"🖥️ Wykonywanie surowego tekstu w terminalu: {message}")
                 subprocess.run(message, shell=True)
             except Exception as e:
@@ -269,12 +306,18 @@ async def main():
     rclpy.init()
     node = ROS2BridgeNode()
     client = WebRTCClient(node)
-    asyncio.create_task(client.run())
+    
+    # Główne zadanie klienta
+    client_task = asyncio.create_task(client.run())
+    
     try:
         while rclpy.ok():
+            # ROS2 spin (non-blocking)
             rclpy.spin_once(node, timeout_sec=0)
-            await asyncio.sleep(0.0001) 
-    except KeyboardInterrupt: pass
+            # Oddajemy sterowanie do pętli asyncio (ważne dla WebRTC i pętli publish_loop)
+            await asyncio.sleep(0.001) 
+    except KeyboardInterrupt:
+        pass
     finally:
         client.video_track.stop_hardware()
         node.destroy_node()
