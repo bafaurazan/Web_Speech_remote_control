@@ -447,9 +447,20 @@ function App() {
     await pc.setLocalDescription(answer);
   };
 
+  // Wewnątrz komponentu App, funkcja handleRemoteTrack:
+
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
     log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}.`);
-    const [stream] = e.streams;
+    
+    // === POPRAWKA: Zabezpieczenie przed pustym e.streams ===
+    let stream = e.streams[0];
+    
+    if (!stream) {
+        log(`⚠️ [WebRTC] Brak obiektu stream w zdarzeniu. Tworzę nowy MediaStream z tracka.`);
+        stream = new MediaStream();
+        stream.addTrack(e.track);
+    }
+
     setRemotePeers(prev => {
         if (prev.find(p => p.username === peerUsername)) return prev;
         return [...prev, { username: peerUsername, stream }];
