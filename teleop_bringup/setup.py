@@ -14,12 +14,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='walkowiczf',
-    maintainer_email='fillio00@wp.pl',
+    maintainer='rafalbazan',
+    maintainer_email='rafalbe777@gmail.com',
     description='TODO: Package description',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
+            'bridge = teleop_bringup.bridge:main',
         ],
     },
 )

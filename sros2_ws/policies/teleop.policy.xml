@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<policy version="0.2.0"
+  xmlns:xi="http://www.w3.org/2001/XInclude">
+  <enclaves>
+    <enclave path="/teleop_policy/teleop_bridge">
+      <profiles>
+        <profile ns="/" node="teleop_bridge">
+          <xi:include href="common/node.xml"
+            xpointer="xpointer(/profile/*)"/>
+          <topics publish="ALLOW">
+            <topic>g1pilot/joy</topic>
+          </topics>
+        </profile>
+      </profiles>
+    </enclave>
+    <enclave path="/teleop_policy/teleop_twist_joy_node">
+      <profiles>
+        <profile ns="/" node="teleop_twist_joy_node">
+          <xi:include href="common/node.xml"
+            xpointer="xpointer(/profile/*)"/>
+          <topics publish="ALLOW">
+            <topic>cmd_vel</topic>
+          </topics>
+          <topics subscribe="ALLOW">
+            <topic>g1pilot/joy</topic>
+            <topic>joy</topic>
+          </topics>
+        </profile>
+      </profiles>
+    </enclave>
+  </enclaves>
+</policy>

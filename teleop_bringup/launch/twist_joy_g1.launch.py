@@ -22,5 +22,7 @@ def generate_launch_description():
                 'scale_angular.yaw': -1.0, # Odwrócona oś skrętu
                 'require_enable_button': False,
             }]
+            #topic sub /g1pilot/joy 
+            #topic pub /cmd_vel
         )
     ])

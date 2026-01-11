@@ -302,26 +302,31 @@ class WebRTCClient:
             except Exception as e:
                 logger.error(f"❌ Błąd procesowania: {e}")
 
-async def main():
+async def run_bridge():
     rclpy.init()
     node = ROS2BridgeNode()
     client = WebRTCClient(node)
     
-    # Główne zadanie klienta
     client_task = asyncio.create_task(client.run())
     
     try:
         while rclpy.ok():
-            # ROS2 spin (non-blocking)
             rclpy.spin_once(node, timeout_sec=0)
-            # Oddajemy sterowanie do pętli asyncio (ważne dla WebRTC i pętli publish_loop)
             await asyncio.sleep(0.001) 
     except KeyboardInterrupt:
         pass
     finally:
-        client.video_track.stop_hardware()
-        node.destroy_node()
-        rclpy.shutdown()
+        if client.video_track:
+            client.video_track.stop_hardware()
+        if rclpy.ok():
+            node.destroy_node()
+            rclpy.shutdown()
+
+def main(args=None):
+    try:
+        asyncio.run(run_bridge())
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
