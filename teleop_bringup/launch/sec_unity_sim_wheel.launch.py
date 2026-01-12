@@ -1,12 +1,11 @@
 import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, SetEnvironmentVariable
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_path
 
 def get_yaml_params(name: str) -> str:
-    # Zakładamy, że configi są w tym samym pakiecie 'knml_wheels'
     return str(
         get_package_share_path("knml_wheels") / "config" / f"{name}.yaml"
     )
@@ -14,37 +13,77 @@ def get_yaml_params(name: str) -> str:
 def launch_setup(context):
     joy = LaunchConfiguration("joy").perform(context).lower()
     
-    # === KONFIGURACJA ENKLAWY DLA twist_controller ===
-    # Tutaj definiujesz ścieżkę do enklawy w Twoim keystore
+    # === KONFIGURACJA ŚCIEŻEK SROS2 ===
+    home_dir = os.getenv('HOME')
+    keystore_path = os.path.join(home_dir, 'Web_Speech_remote_control/sros2_ws', 'teleop_keystore')
     POLICY_PREFIX = '/teleop_policy' 
     NODE_ENCLAVE = f'{POLICY_PREFIX}/twist_controller'
+
+    # === KLUCZOWA POPRAWKA ===
+    # Kopiujemy obecne środowisko systemowe, aby zachować PYTHONPATH i inne ważne zmienne.
+    # Bez tego Python nie widzi zainstalowanych pakietów (błąd ModuleNotFoundError).
+    secure_env = os.environ.copy()
+    
+    # Dodajemy zmienne bezpieczeństwa TYLKO do tego słownika
+    secure_env['ROS_SECURITY_ENABLE'] = 'true'
+    secure_env['ROS_SECURITY_STRATEGY'] = 'Enforce'
+    secure_env['ROS_SECURITY_KEYSTORE'] = keystore_path
 
     if joy != '' and joy != 'gamepad' and joy != 'arduino':
         raise RuntimeError("Invalid joy. Choose 'gamepad' or 'arduino'.")
 
-    # Węzeł twist_controller - ZABEZPIECZONY
+    description = []
+
+    # === WĘZEŁ 1: ZABEZPIECZONY (twist_controller) ===
+    # Ten węzeł otrzyma zmodyfikowane środowisko (secure_env) oraz flagę --enclave
     twist_controller_node = Node(
         package="knml_wheels",
         executable="twist_controller",
-        name="twist_controller", # Ważne: jawna nazwa węzła
+        name="twist_controller", # Ważne: nazwa musi pasować do tej w policy.xml
         parameters=[get_yaml_params("twist_controller")],
+        
+        # Przekazujemy środowisko z kluczami i PYTHONPATH
+        env=secure_env,
+        
         arguments=[
             '--ros-args', 
             '--enclave', NODE_ENCLAVE
         ],
         output='screen'
     )
+    description.append(twist_controller_node)
 
-    # Pozostałe węzły (niezabezpieczone enklawą, chyba że dodasz im argumenty)
+    cmd_vel_test = Node(
+            package='teleop_bringup',
+            executable='cmd_vel_sub',
+            
+            # Możesz zostawić tę nazwę, jeśli tak wolisz i działało to wcześniej
+            name="twist_controller", 
+            
+            output='screen',
+            
+            # === TO JEST BRAKUJĄCY ELEMENT ===
+            # Przekazujemy zmienne (w tym keystore), żeby węzeł mógł odszyfrować dane
+            env=secure_env, 
+            
+            arguments=[
+                '--ros-args', 
+                '--enclave', NODE_ENCLAVE
+            ],
+        )
+    description.append(cmd_vel_test)
+
+    # === WĘZEŁ 2: NIEZABEZPIECZONY (drive_controller) ===
+    # Ten węzeł dziedziczy standardowe środowisko (bez wymuszonego SROS2)
     drive_controller_node = Node(
         package="knml_wheels",
         executable="drive_controller",
         parameters=[get_yaml_params("drive_controller")],
+        output='screen'
     )
+    description.append(drive_controller_node)
 
-    description = [twist_controller_node, drive_controller_node]
-
-    # Logika Joy (bez zmian)
+    # === Logika Joy (Oryginalna) ===
     if joy == 'gamepad':
         description += [
             Node(
@@ -75,24 +114,13 @@ def launch_setup(context):
     return description
 
 def generate_launch_description():
-    # Ścieżka do Twojego keystore (dostosuj jeśli inna)
-    home_dir = os.getenv('HOME')
-    keystore_path = os.path.join(home_dir, 'Web_Speech_remote_control/sros2_ws', 'teleop_keystore')
-
     return LaunchDescription(
         [
-            # === ZMIENNE ŚRODOWISKOWE SROS2 ===
-            # Ustawiamy je globalnie dla tego procesu launch,
-            # więc twist_controller je "zobaczy".
-            SetEnvironmentVariable('ROS_SECURITY_ENABLE', 'true'),
-            SetEnvironmentVariable('ROS_SECURITY_STRATEGY', 'Enforce'),
-            SetEnvironmentVariable('ROS_SECURITY_KEYSTORE', keystore_path),
-
             DeclareLaunchArgument(
                 "joy",
                 default_value="",
                 choices=["", "gamepad", "arduino"],
-                description="Joy device to use.",
+                description="Joy device to use for headless driving.",
             ),
             OpaqueFunction(function=launch_setup),
         ]

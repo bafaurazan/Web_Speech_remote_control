@@ -41,5 +41,18 @@ def generate_launch_description():
                 'scale_angular.yaw': -1.0, 
                 'require_enable_button': False,
             }]
+        ),
+        Node(
+            package='teleop_bringup',
+            executable='cmd_vel_sub',
+            
+            name=NODE_NAME,
+            
+            output='screen',
+            
+            arguments=[
+                '--ros-args', 
+                '--enclave', enclave_full_path
+            ],
         )
     ])

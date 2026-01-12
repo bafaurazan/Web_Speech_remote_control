@@ -24,7 +24,35 @@
           <topics subscribe="ALLOW">
             <topic>g1pilot/joy</topic>
             <topic>joy</topic>
+            <topic>cmd_vel</topic>
           </topics>
+        </profile>
+      </profiles>
+    </enclave>
+    <enclave path="/teleop_policy/twist_controller">
+      <profiles>
+        <profile ns="/" node="twist_controller">
+          <xi:include href="common/node.xml"
+            xpointer="xpointer(/profile/*)"/>
+          
+          <services reply="ALLOW" request="ALLOW">
+            <service>*</service>
+          </services>
+
+          <actions call="ALLOW" execute="ALLOW">
+            <action>*</action>
+          </actions>
+
+          <topics publish="ALLOW">
+            <topic>wheel_states</topic>
+            <topic>*</topic>
+          </topics>
+
+          <topics subscribe="ALLOW">
+            <topic>cmd_vel</topic>
+            <topic>*</topic>
+          </topics>
+
         </profile>
       </profiles>
     </enclave>

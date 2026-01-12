@@ -1,9 +1,9 @@
 MIME-Version: 1.0
-Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----F057BD4F6749084C07A933F533FD09B4"
+Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----16B80E72100D122B5DAB53C9577DFC89"
 
 This is an S/MIME signed message
 
-------F057BD4F6749084C07A933F533FD09B4
+------16B80E72100D122B5DAB53C9577DFC89
 Content-Type: text/plain
 
 <dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.omg.org/spec/DDS-SECURITY/20170901/omg_shared_ca_permissions.xsd">
@@ -58,6 +58,7 @@ Content-Type: text/plain
             <topic>rt/clock</topic>
             <topic>rt/g1pilot/joy</topic>
             <topic>rt/joy</topic>
+            <topic>rt/cmd_vel</topic>
             <topic>rt/parameter_events</topic>
           </topics>
         </subscribe>
@@ -82,7 +83,7 @@ Content-Type: text/plain
   </permissions>
 </dds>
 
-------F057BD4F6749084C07A933F533FD09B4
+------16B80E72100D122B5DAB53C9577DFC89
 Content-Type: application/x-pkcs7-signature; name="smime.p7s"
 Content-Transfer-Encoding: base64
 Content-Disposition: attachment; filename="smime.p7s"
@@ -97,12 +98,12 @@ Af8CAQEwCgYIKoZIzj0EAwIDSAAwRQIhANDAokLNXrJxYkOb7Cj1Dg1qhmPKRW8q
 b6A2iOLbBov5AiB2WRr42D10zfNU+Mm/eoTa2Qjevvh35LrSNL9YP4aHzTGCAX4w
 ggF6AgEBMCowEjEQMA4GA1UEAwwHc3JvczJDQQIUPyvGGUg76eG42znbuqQAOMkM
 A/4wDQYJYIZIAWUDBAIBBQCggeQwGAYJKoZIhvcNAQkDMQsGCSqGSIb3DQEHATAc
-BgkqhkiG9w0BCQUxDxcNMjYwMTExMjEzNTA5WjAvBgkqhkiG9w0BCQQxIgQg7OfE
-JYTyjxLoTaJeSXN2GbFz5OK6ONxi/xYBCfcmYJQweQYJKoZIhvcNAQkPMWwwajAL
+BgkqhkiG9w0BCQUxDxcNMjYwMTEyMDAwMjAxWjAvBgkqhkiG9w0BCQQxIgQgGqq4
+qaKDFGFY/z56K8qi8goxA0S1/XteWCVI+9glKBMweQYJKoZIhvcNAQkPMWwwajAL
 BglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsGCWCGSAFlAwQBAjAKBggqhkiG9w0D
 BzAOBggqhkiG9w0DAgICAIAwDQYIKoZIhvcNAwICAUAwBwYFKw4DAgcwDQYIKoZI
-hvcNAwICASgwCgYIKoZIzj0EAwIERzBFAiEAxoGNTlhwH1rj5hDEoeVZKCGO7k8G
-AROWjyE/i1BLcjYCICdFnriqC6LKDz974Q1IwbdEBY7HuY/K0/vK0j28+M/O
+hvcNAwICASgwCgYIKoZIzj0EAwIERzBFAiEAv28s/Wcs5dnf/X3Y+XkTXgx7tPRC
+eQbgL90Yde7iQbsCIGmiXfdYqzrhRJ4cUHuWkaDklqMEJa/6tvs/LonNN73i
 
-------F057BD4F6749084C07A933F533FD09B4--
+------16B80E72100D122B5DAB53C9577DFC89--
 

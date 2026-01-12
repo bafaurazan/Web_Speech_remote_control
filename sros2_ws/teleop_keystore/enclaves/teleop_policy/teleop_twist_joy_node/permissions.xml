@@ -50,6 +50,7 @@
             <topic>rt/clock</topic>
             <topic>rt/g1pilot/joy</topic>
             <topic>rt/joy</topic>
+            <topic>rt/cmd_vel</topic>
             <topic>rt/parameter_events</topic>
           </topics>
         </subscribe>

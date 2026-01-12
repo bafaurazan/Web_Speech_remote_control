@@ -1,16 +1,79 @@
-import os
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
+from ament_index_python.packages import get_package_share_path
+
+def get_yaml_params(name: str) -> str:
+    return str(
+        get_package_share_path("knml_wheels") / "config" / f"{name}.yaml"
+    )
+
+def launch_setup(context):
+    joy = LaunchConfiguration("joy").perform(context).lower()
+
+    if joy != '' and joy != 'gamepad' and joy != 'arduino':
+        raise RuntimeError("Invalid joy. Choose 'gamepad' or 'arduino'.")
+
+    description = [
+        Node(
+            package="knml_wheels",
+            executable="twist_controller",
+            parameters=[get_yaml_params("twist_controller")],
+        ),
+        Node(
+            package="knml_wheels",
+            executable="drive_controller",
+            parameters=[get_yaml_params("drive_controller")],
+        ),
+    ]
+
+    if joy == 'gamepad':
+        description += [
+            Node(
+                package="joy_linux",
+                executable="joy_linux_node",
+                parameters=[
+                    {
+                        "dev_name": "Logitech Gamepad",
+                    }
+                ],
+            ),
+            Node(
+                package="knml_wheels",
+                executable="gamepad_driving",
+                parameters=[get_yaml_params("gamepad_driving")],
+            )
+        ]
+    elif joy == 'arduino':
+        description += [
+            Node(
+                package="joy_linux",
+                executable="joy_linux_node",
+                parameters=[
+                    {
+                        "dev_name": "Arduino LLC Arduino Leonardo",
+                    }
+                ],
+            ),
+            Node(
+                package="knml_wheels",
+                executable="arduino_driving",
+                parameters=[get_yaml_params("arduino_driving")],
+            )
+        ]
+
+    return description
 
 def generate_launch_description():
-    unity_sim_pkg_dir = get_package_share_directory('unity_sim')
-
-    unity_launch_path = os.path.join(unity_sim_pkg_dir, 'launch', 'unity_sim.launch.py')
-
-    return LaunchDescription([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(unity_launch_path)
-        )
-    ])
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "joy",
+                default_value="",
+                choices=["", "gamepad", "arduino"],
+                description="Joy device to use for headless driving. Choose 'gamepad' or 'arduino'. Empty disables headless teleop.",
+            ),
+            OpaqueFunction(function=launch_setup),
+        ]
+    )
