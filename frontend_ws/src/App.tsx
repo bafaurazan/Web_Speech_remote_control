@@ -7,6 +7,7 @@ import type { ChatMessage, PeerData, SignalMessage } from './types';
 // 3. Funkcje pomocnicze (Utils)
 import { 
   getWebSocketUrl, 
+  getApiUrl,
   STUN_CONFIG, 
   NO_STUN_CONFIG, 
   log, 
@@ -54,6 +55,11 @@ function App() {
     };
 
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState(''); 
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const authToken = useRef<string | null>(null);
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
@@ -97,6 +103,8 @@ function App() {
 
     setIsLoggedIn(false);
     setUsername('');
+    setPassword(''); // <--- DODAJ
+    authToken.current = null; // <--- DODAJ
     }, []); 
 
 
@@ -558,12 +566,49 @@ function App() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
-      isLoggingOut.current = false; 
-      log(`👤 [Login] Logowanie jako: ${username}`);
-      setIsLoggedIn(true);
-      const stream = await startCamera();
-      if (stream) connectWebSocket(username);
+    setLoginError(null);
+    setIsLoading(true);
+
+    if (!username.trim() || !password.trim()) {
+        setLoginError("Podaj login i hasło");
+        setIsLoading(false);
+        return;
+    }
+
+    try {
+        // Używamy nowej funkcji z helpers.ts
+        const response = await fetch(getApiUrl('api/login/'), { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        // === ZMIANA: Najpierw pobierz tekst, potem parsuj ===
+        const text = await response.text(); 
+        log("📄 [Raw Response]", text); // Zobacz w konsoli co przyszło!
+        log("Numer statusu:", response.status);
+
+        if (!response.ok) {
+            // Jeśli status to nie 200-299, rzuć błąd z treścią
+            throw new Error(text || `Błąd serwera: ${response.status}`);
+        }
+
+        // Dopiero teraz parsujemy, jeśli tekst nie jest pusty
+        const data = text ? JSON.parse(text) : {};
+
+        // Sukces - zapisujemy token
+        authToken.current = data.token;
+        isLoggingOut.current = false;
+        setIsLoggedIn(true);
+
+        const stream = await startCamera();
+        if (stream) connectWebSocket(username); // Tu można też przekazać token jeśli chcesz
+
+    } catch (err: any) {
+        setLoginError(err.message || "Błąd połączenia");
+        setIsLoggedIn(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -579,6 +624,19 @@ function App() {
             <div className="input-row">
                  <input className="styled-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
             </div>
+
+            <div className="input-row">
+                <input 
+                    type="password" 
+                    className="styled-input" 
+                    placeholder="Password" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    disabled={isLoading} 
+                />
+            </div>
+
+            {loginError && <div style={{color: 'red', textAlign: 'center', marginBottom: 10}}>{loginError}</div>}
 
             <div className="flex items-center gap-2 mb-2" style={{width: '100%', justifyContent: 'center'}}>
                 <label className="switch-label flex items-center gap-2" style={{cursor: 'pointer', fontWeight: 'bold', color: '#4c1d95'}}>
