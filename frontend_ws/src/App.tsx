@@ -59,6 +59,9 @@ function App() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const authToken = useRef<string | null>(null);
+  
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -564,48 +567,66 @@ function App() {
     connectWebSocket(username);
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // === NOWA FUNKCJA: Obsługuje Logowanie i Rejestrację ===
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
     setIsLoading(true);
 
+    // Walidacja
     if (!username.trim() || !password.trim()) {
         setLoginError("Podaj login i hasło");
         setIsLoading(false);
         return;
     }
 
+    // Walidacja dla rejestracji
+    if (isRegistering && password !== confirmPassword) {
+        setLoginError("Hasła nie są identyczne!");
+        setIsLoading(false);
+        return;
+    }
+
     try {
-        // Używamy nowej funkcji z helpers.ts
-        const response = await fetch(getApiUrl('api/login/'), { 
+        // Wybieramy endpoint w zależności od trybu
+        const endpoint = isRegistering ? 'api/register/' : 'api/login/';
+        
+        log(`👤 [Auth] Wysyłam żądanie do: ${endpoint}`);
+
+        // Używamy helpera getApiUrl
+        const response = await fetch(getApiUrl(endpoint), { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
 
-        // === ZMIANA: Najpierw pobierz tekst, potem parsuj ===
         const text = await response.text(); 
-        log("📄 [Raw Response]", text); // Zobacz w konsoli co przyszło!
-        log("Numer statusu:", response.status);
-
         if (!response.ok) {
-            // Jeśli status to nie 200-299, rzuć błąd z treścią
             throw new Error(text || `Błąd serwera: ${response.status}`);
         }
 
-        // Dopiero teraz parsujemy, jeśli tekst nie jest pusty
         const data = text ? JSON.parse(text) : {};
+        
+        if (data.error) throw new Error(data.error);
+        if (!data.token) throw new Error("Brak tokenu w odpowiedzi.");
 
-        // Sukces - zapisujemy token
+        // SUKCES
         authToken.current = data.token;
         isLoggingOut.current = false;
         setIsLoggedIn(true);
 
         const stream = await startCamera();
-        if (stream) connectWebSocket(username); // Tu można też przekazać token jeśli chcesz
+        if (stream) connectWebSocket(username);
 
     } catch (err: any) {
-        setLoginError(err.message || "Błąd połączenia");
+        // Próbujemy wyczyścić komunikat błędu z JSONa
+        let msg = err.message;
+        try {
+            const parsed = JSON.parse(msg);
+            if(parsed.error) msg = parsed.error;
+        } catch {}
+        
+        setLoginError(msg);
         setIsLoggedIn(false);
     } finally {
         setIsLoading(false);
@@ -615,29 +636,54 @@ function App() {
   return (
     <div className="dashboard">
       {!isLoggedIn ? (
-        // ... (ekran logowania bez zmian)
         <div className="login-container">
-            {/* ...formularz logowania... */}
-             <form onSubmit={handleLogin} className="login-card">
-            <h2 className="title-header">LOGIN</h2>
+             <form onSubmit={handleAuth} className="login-card">
+            <h2 className="title-header">
+                {isRegistering ? 'REJESTRACJA' : 'LOGOWANIE'}
+            </h2>
             
             <div className="input-row">
-                 <input className="styled-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+                 <input 
+                    className="styled-input" 
+                    placeholder="Użytkownik" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)} 
+                    disabled={isLoading}
+                 />
             </div>
 
             <div className="input-row">
-                <input 
-                    type="password" 
+                 <input 
+                    type="password"
                     className="styled-input" 
-                    placeholder="Password" 
+                    placeholder="Hasło" 
                     value={password} 
                     onChange={e => setPassword(e.target.value)} 
-                    disabled={isLoading} 
-                />
+                    disabled={isLoading}
+                 />
             </div>
 
-            {loginError && <div style={{color: 'red', textAlign: 'center', marginBottom: 10}}>{loginError}</div>}
+            {/* Dodatkowe pole, widoczne tylko przy rejestracji */}
+            {isRegistering && (
+                <div className="input-row">
+                    <input 
+                        type="password"
+                        className="styled-input" 
+                        placeholder="Potwierdź hasło" 
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        disabled={isLoading}
+                    />
+                </div>
+            )}
 
+            {loginError && (
+                <div style={{color: '#ff6b6b', textAlign: 'center', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem'}}>
+                    {loginError}
+                </div>
+            )}
+
+            {/* Checkbox STUN (Zachowany z Twojego kodu) */}
             <div className="flex items-center gap-2 mb-2" style={{width: '100%', justifyContent: 'center'}}>
                 <label className="switch-label flex items-center gap-2" style={{cursor: 'pointer', fontWeight: 'bold', color: '#4c1d95'}}>
                     <input 
@@ -650,7 +696,29 @@ function App() {
                 </label>
             </div>
 
-            <button type="submit" className="styled-btn">Login</button>
+            <button type="submit" className="styled-btn" disabled={isLoading}>
+                {isLoading ? 'Przetwarzanie...' : (isRegistering ? 'Zarejestruj' : 'Zaloguj')}
+            </button>
+
+            {/* Przełącznik: Mam konto / Nie mam konta */}
+            <div style={{marginTop: '15px', textAlign: 'center', color: '#666', fontSize: '0.9rem'}}>
+                {isRegistering ? "Masz już konto? " : "Nie masz konta? "}
+                <span 
+                    onClick={() => {
+                        setIsRegistering(!isRegistering);
+                        setLoginError(null);
+                    }}
+                    style={{
+                        color: '#4c1d95', 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                    }}
+                >
+                    {isRegistering ? "Zaloguj się" : "Zarejestruj się"}
+                </span>
+            </div>
+
           </form>
         </div>
       ) : (

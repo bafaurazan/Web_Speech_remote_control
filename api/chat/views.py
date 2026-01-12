@@ -7,6 +7,7 @@ import requests
 
 # === WAŻNE IMPORTY (Bez nich będzie błąd 500) ===
 from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from rest_framework.authtoken.models import Token
 # ================================================
 
@@ -18,13 +19,10 @@ def ragPipeline(prompt):
 def index_view(request):
     return render(request, 'chat/index.html')
 
-# === WIDOK LOGOWANIA ===
+# === 1. WIDOK LOGOWANIA (Bez zmian) ===
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_view(request):
-    """
-    Logowanie użytkownika i zwracanie tokenu.
-    """
     username = request.data.get("username")
     password = request.data.get("password")
 
@@ -41,6 +39,34 @@ def login_view(request):
         })
     else:
         return Response({"error": "Błędne dane logowania"}, status=status.HTTP_401_UNAUTHORIZED)
+
+# === 2. NOWOŚĆ: WIDOK REJESTRACJI ===
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_view(request):
+    username = request.data.get("username")
+    password = request.data.get("password")
+
+    if not username or not password:
+        return Response({"error": "Wymagany login i hasło"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Sprawdź czy użytkownik już istnieje
+    if User.objects.filter(username=username).exists():
+        return Response({"error": "Taki użytkownik już istnieje"}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Stwórz użytkownika
+    try:
+        user = User.objects.create_user(username=username, password=password)
+        # Od razu stwórz token, żeby zalogować go automatycznie
+        token = Token.objects.create(user=user)
+        
+        return Response({
+            "token": token.key,
+            "username": user.username,
+            "message": "Zarejestrowano pomyślnie"
+        }, status=status.HTTP_201_CREATED)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
 @api_view(['POST'])
 @permission_classes([IsAuthenticated]) # Tylko dla zalogowanych
