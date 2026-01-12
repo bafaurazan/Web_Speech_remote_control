@@ -51,10 +51,12 @@ npm run dev
 
 2. setup tailscale
 ```bash
+sudo tailscale serve reset
+
 sudo tailscale funnel --bg --set-path /ws http://127.0.0.1:8000
-sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
 sudo tailscale funnel --bg --set-path /api/login/ http://127.0.0.1:8000/api/login/
 sudo tailscale funnel --bg --set-path /api/register/ http://127.0.0.1:8000/api/register/
+sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
 
 
 # to turn off 

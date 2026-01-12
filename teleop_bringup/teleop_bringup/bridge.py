@@ -92,16 +92,22 @@ class RealTimeOpenCVTrack(VideoStreamTrack):
 class ROS2BridgeNode(Node):
     def __init__(self):
         super().__init__('python_webrtc_bridge')
+        
+        # === PARAMETRY ROS ===
+        # Domyślnie True = używamy Google STUN. False = tylko lokalne IP (w tym Tailscale)
+        self.declare_parameter('use_google_stun', True)
+        
         topic_name = f'/{ROBOT_ID}/joy' if ROBOT_ID else '/g1pilot/joy'
         self.publisher_ = self.create_publisher(Joy, topic_name, 10)
+        
+        stun_enabled = self.get_parameter('use_google_stun').value
         logger.info(f"ROS2 Node Started. Publishing to: {topic_name}")
+        logger.info(f"🌍 KONFIGURACJA STUN: {'GOOGLE STUN' if stun_enabled else 'BRAK (TAILSCALE ONLY)'}")
         
         # === STAN GLOBALNY ===
-        # Te zmienne trzymają aktualną pozycję "wirtualnych gałek"
         self.current_axes = [0.0] * 8
         self.current_buttons = [0] * 12
         
-        # Uruchamiamy pętlę, która wysyła te wartości non-stop (30Hz)
         self.publish_task = asyncio.create_task(self._publish_loop())
 
     async def _publish_loop(self):
@@ -115,45 +121,33 @@ class ROS2BridgeNode(Node):
                 msg.axes = self.current_axes
                 msg.buttons = self.current_buttons
                 self.publisher_.publish(msg)
-                
-                # Czekamy ok. 33ms (30Hz)
                 await asyncio.sleep(1.0 / 30.0)
             except Exception as e:
                 logger.error(f"❌ Błąd w pętli publish: {e}")
                 await asyncio.sleep(1)
 
     async def handle_joystick_data(self, data):
-        """Obsługa joysticka z Reacta - aktualizuje stan"""
         linear = float(data.get('linear', 0.0))
         angular = float(data.get('angular', 0.0))
         
-        # Aktualizujemy zmienne stanu (nie publikujemy bezpośrednio!)
-        # Resetujemy osie do domyślnych zer przed ustawieniem nowych
         self.current_axes = [0.0] * 8
         self.current_buttons = [0] * 12
         
         self.current_axes[1] = linear * -1.0 
         self.current_axes[2] = angular
         
-        # Deadman switch (przycisk 8) aktywny jeśli jest ruch
         self.current_buttons[8] = 1 if (abs(linear) > 0.05 or abs(angular) > 0.05) else 0
 
     async def handle_button_command(self, command):
-        """
-        Obsługa komend głosowych/przycisków.
-        Ustawia stan na stałe, aż do komendy stop.
-        """
         LINEAR_SPEED = 0.5
         ANGULAR_SPEED = 0.5
 
-        # Resetujemy stan do zera przy każdej nowej komendzie, 
-        # żeby nie sumować dziwnych ruchów (np. skręt + jazda jeśli nie chcemy)
         new_axes = [0.0] * 8
         new_buttons = [0] * 12
         
         if command == "forward_rover":
             new_axes[1] = -LINEAR_SPEED 
-            new_buttons[8] = 1 # Deadman
+            new_buttons[8] = 1 
             logger.info("🤖 GŁOS: JAZDA CIĄGŁA W PRZÓD")
 
         elif command == "backward_rover":
@@ -172,10 +166,8 @@ class ROS2BridgeNode(Node):
             logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W PRAWO")
 
         elif command == "stop_rover":
-            # Wszystko na 0
             logger.info("🤖 GŁOS: STOP")
         
-        # Zapisujemy nowy stan. Pętla _publish_loop od razu zacznie to wysyłać w 30Hz.
         self.current_axes = new_axes
         self.current_buttons = new_buttons
 
@@ -247,7 +239,19 @@ class WebRTCClient:
                     await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'], type=answer['type']))
 
     async def create_peer_connection(self, peer_username, initiator, offer_sdp=None, receiver_channel=None):
-        config = RTCConfiguration(iceServers=[])
+        # === CZYTANIE PARAMETRU ROS ===
+        use_google_stun = self.ros_node.get_parameter('use_google_stun').value
+        
+        ice_servers = []
+        if use_google_stun:
+            # Używamy publicznych serwerów STUN Google
+            ice_servers.append(RTCIceServer(urls=["stun:stun.l.google.com:19302"]))
+            logger.info(f"🌐 [WebRTC] Tworzenie PC z Google STUN dla {peer_username}")
+        else:
+            # Pusta lista = używaj tylko interfejsów lokalnych (w tym IP Tailscale)
+            logger.info(f"🏠 [WebRTC] Tworzenie PC BEZ zewn. STUN (Local/Tailscale) dla {peer_username}")
+
+        config = RTCConfiguration(iceServers=ice_servers)
         pc = RTCPeerConnection(configuration=config)
         self.peers[peer_username] = pc
 
@@ -266,6 +270,7 @@ class WebRTCClient:
 
         @pc.on("iceconnectionstatechange")
         async def on_icestate():
+            logger.info(f"🧊 [ICE State] {peer_username}: {pc.iceConnectionState}")
             if pc.iceConnectionState in ["failed", "closed"]:
                 await pc.close()
                 if peer_username in self.peers: del self.peers[peer_username]
@@ -275,24 +280,18 @@ class WebRTCClient:
         async def on_message(message):
             try:
                 data = json.loads(message)
-                
-                # 1. Obsługa sterowania ROS2
                 if 'joystick' in data:
                     await self.ros_node.handle_joystick_data(data['joystick'])
-                
                 elif 'message' in data:
                     cmd = data['message']
                     allowed = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]
-                    
                     if cmd in allowed:
                         await self.ros_node.handle_button_command(cmd)
-                    
                     else:
                         logger.info(f"🖥️ Wykonywanie komendy w terminalu: {cmd}")
                         try:
                             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
                             if result.stdout: logger.info(f"[OUT]: {result.stdout.strip()}")
-                            if result.stderr: logger.error(f"[ERR]: {result.stderr.strip()}")
                         except Exception as e:
                             logger.error(f"❌ Błąd wykonania komendy: {e}")
 
