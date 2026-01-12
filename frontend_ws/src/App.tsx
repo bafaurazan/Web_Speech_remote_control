@@ -573,18 +573,54 @@ function App() {
     setLoginError(null);
     setIsLoading(true);
 
-    // Walidacja
+    // 1. Walidacja pustości
     if (!username.trim() || !password.trim()) {
         setLoginError("Podaj login i hasło");
         setIsLoading(false);
         return;
     }
 
-    // Walidacja dla rejestracji
-    if (isRegistering && password !== confirmPassword) {
-        setLoginError("Hasła nie są identyczne!");
-        setIsLoading(false);
-        return;
+    // 2. Walidacja dla REJESTRACJI
+    if (isRegistering) {
+        // Czy hasła są identyczne?
+        if (password !== confirmPassword) {
+            setLoginError("Hasła nie są identyczne!");
+            setIsLoading(false);
+            return;
+        }
+
+        // --- Standardy Bezpieczeństwa (Regex) ---
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        if (password.length < minLength) {
+            setLoginError(`Hasło za krótkie! Minimum ${minLength} znaków.`);
+            setIsLoading(false);
+            return;
+        }
+        if (!hasUpperCase) {
+            setLoginError("Hasło musi zawierać wielką literę (A-Z).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasLowerCase) {
+            setLoginError("Hasło musi zawierać małą literę (a-z).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasNumber) {
+            setLoginError("Hasło musi zawierać cyfrę (0-9).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasSpecialChar) {
+            setLoginError("Hasło musi zawierać znak specjalny (np. ! @ # $).");
+            setIsLoading(false);
+            return;
+        }
     }
 
     try {

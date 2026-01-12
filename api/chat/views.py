@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import render
 import requests
+import re
 
 # === WAŻNE IMPORTY (Bez nich będzie błąd 500) ===
 from django.contrib.auth import authenticate
@@ -50,6 +51,21 @@ def register_view(request):
     if not username or not password:
         return Response({"error": "Wymagany login i hasło"}, status=status.HTTP_400_BAD_REQUEST)
 
+    if len(password) < 8:
+        return Response({"error": "Hasło musi mieć minimum 8 znaków."}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not re.search(r"[A-Z]", password):
+        return Response({"error": "Hasło musi zawierać przynajmniej jedną wielką literę."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not re.search(r"[a-z]", password):
+        return Response({"error": "Hasło musi zawierać przynajmniej jedną małą literę."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not re.search(r"[0-9]", password):
+        return Response({"error": "Hasło musi zawierać przynajmniej jedną cyfrę."}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return Response({"error": "Hasło musi zawierać znak specjalny (np. !@#$%)."}, status=status.HTTP_400_BAD_REQUEST)
+    
     # Sprawdź czy użytkownik już istnieje
     if User.objects.filter(username=username).exists():
         return Response({"error": "Taki użytkownik już istnieje"}, status=status.HTTP_400_BAD_REQUEST)
