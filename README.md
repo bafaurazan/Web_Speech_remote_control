@@ -55,13 +55,14 @@ source ~/ros2_projects_ws/install/setup.bash
 source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 
 # run
-ros2 launch teleop_bringup teleop_system.launch.py security:=True # or False for unsecured
+ros2 launch teleop_bringup teleop_system.launch.py security:=True # or False for unsecured use_google_stun:=False
+
 ```
 
 4. run unity simulation
 ```bash
-#simple run simulation
-cd ~/ros2_projects_ws && distrobox enter kalman_ws -- bash -c "source install/setup.bash && ros2 launch knml_bringup sim_basic.launch.py"
+source ~/ros2_projects_ws/install/setup.bash
+ros2 launch unity_sim unity_sim.launch.py 
 ```
 
 5. setup tailscale
@@ -107,6 +108,9 @@ ros2 launch knml_bringup sim_basic.launch.py
 
 #simple run simulation
 cd ~/ros2_projects_ws && distrobox enter kalman_ws -- bash -c "source install/setup.bash && ros2 launch knml_bringup sim_basic.launch.py"
+
+#or only simulation without teleoperation
+ros2 launch unity_sim unity_sim.launch.py 
 ```
 
 9. run teleop
@@ -114,19 +118,31 @@ cd ~/ros2_projects_ws && distrobox enter kalman_ws -- bash -c "source install/se
 # source
 source ~/ros2_projects_ws/install/setup.bash
 source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
-
-# run
 ros2 launch teleop_bringup teleop_system.launch.py security:=True # or False for unsecured
 
 # or separatelly
-
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_webrtc_joy webrtc_client.launch.py
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_joy_cmd joy_cmd_g1.launch.py 
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_cmd_unity unity_sim_wheel.launch.py 
 
 # or separatelly secured version
-
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_webrtc_joy sec_webrtc_client.launch.py
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_joy_cmd sec_joy_cmd_g1.launch.py 
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
 ros2 launch teleop_cmd_unity sec_unity_sim_wheel.launch.py 
 ```
