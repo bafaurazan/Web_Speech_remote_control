@@ -24,5 +24,14 @@ def generate_launch_description():
             }]
             #topic sub /g1pilot/joy 
             #topic pub /cmd_vel
+        ),
+        
+        Node(
+            package='teleop_joy_cmd',
+            executable='cmd_vel_sub',
+            
+            name="teleop_twist_joy_node",
+            
+            output='screen',
         )
     ])
