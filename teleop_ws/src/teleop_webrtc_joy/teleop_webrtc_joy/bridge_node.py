@@ -21,7 +21,7 @@ from sensor_msgs.msg import Joy
 
 # === KONFIGURACJA ===
 SIGNALING_URL = os.getenv('SIGNALING_URL', 'wss://rafal.tail692f2a.ts.net/ws')
-ROBOT_ID = os.getenv('ROBOT_ID', 'robot_1')
+ROBOT_ID = os.getenv('ROBOT_ID', 'g1pilot')
 CAMERA_DEVICE = '/dev/video0'
 
 # Konfiguracja Low Latency

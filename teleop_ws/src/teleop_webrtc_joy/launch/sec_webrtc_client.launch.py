@@ -4,7 +4,7 @@ from launch.actions import SetEnvironmentVariable
 from launch_ros.actions import Node
 
 def generate_launch_description():
-    NODE_NAME = 'teleop_twist_joy_node'
+    NODE_NAME = 'teleop_bridge'
     POLICY_PREFIX = '/teleop_policy'
     
     enclave_full_path = f'{POLICY_PREFIX}/{NODE_NAME}'
@@ -18,8 +18,8 @@ def generate_launch_description():
         SetEnvironmentVariable('ROS_SECURITY_KEYSTORE', keystore_path),
 
         Node(
-            package='teleop_twist_joy',
-            executable='teleop_node',
+            package='teleop_webrtc_joy',
+            executable='bridge',
             
             name=NODE_NAME,
             
@@ -28,31 +28,6 @@ def generate_launch_description():
             arguments=[
                 '--ros-args', 
                 '--enclave', enclave_full_path
-            ],
-
-            remappings=[
-                ('/joy', '/g1pilot/joy'),
-            ],
-            
-            parameters=[{
-                'axis_linear.x': 1,
-                'scale_linear.x': -1.0, 
-                'axis_angular.yaw': 2,   
-                'scale_angular.yaw': -1.0, 
-                'require_enable_button': False,
-            }]
-        ),
-        Node(
-            package='teleop_bringup',
-            executable='cmd_vel_sub',
-            
-            name=NODE_NAME,
-            
-            output='screen',
-            
-            arguments=[
-                '--ros-args', 
-                '--enclave', enclave_full_path
-            ],
+            ]
         )
     ])

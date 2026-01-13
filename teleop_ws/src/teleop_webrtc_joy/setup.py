@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 from glob import glob
-package_name = 'teleop_bringup'
+package_name = 'teleop_webrtc_joy'
 
 setup(
     name=package_name,
@@ -20,8 +20,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_bringup.bridge:main',
-            'cmd_vel_sub = teleop_bringup.cmd_vel_sub:main',
+            'bridge = teleop_webrtc_joy.bridge_node:main',
         ],
     },
 )
