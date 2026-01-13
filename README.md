@@ -81,6 +81,8 @@ python3 bridge.py
 4. run teleop_bringup
 ```bash
 cd ~/Web_Speech_remote_control/teleop_bringup/
+source ~/ros2_projects_ws/install/setup.bash
+
 source install/setup.bash
 ros2 launch teleop_bringup twist_joy_g1.launch.py 
 ```
