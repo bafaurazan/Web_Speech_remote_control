@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 from glob import glob
-package_name = 'teleop_joy_cmd'
+package_name = 'teleop_cmd_unity'
 
 setup(
     name=package_name,
@@ -20,8 +20,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_joy_cmd.bridge:main',
-            'cmd_vel_sub = teleop_joy_cmd.cmd_vel_sub:main',
+            'twist_controller = teleop_cmd_unity.twist_controller_node:main',
         ],
     },
 )

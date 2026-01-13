@@ -1,3 +1,0 @@
-[console_scripts]
-bridge = teleop_joy_cmd.bridge:main
-cmd_vel_sub = teleop_joy_cmd.cmd_vel_sub:main

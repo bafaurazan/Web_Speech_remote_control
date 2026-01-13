@@ -10,18 +10,19 @@ def get_yaml_params(name: str) -> str:
         get_package_share_path("knml_wheels") / "config" / f"{name}.yaml"
     )
 
+def get_yaml_params_teleop(name: str) -> str:
+    return str(
+        get_package_share_path("teleop_cmd_unity") / "config" / f"{name}.yaml"
+    )
+
 def launch_setup(context):
     joy = LaunchConfiguration("joy").perform(context).lower()
     
-    # === KONFIGURACJA ŚCIEŻEK SROS2 ===
     home_dir = os.getenv('HOME')
     keystore_path = os.path.join(home_dir, 'Web_Speech_remote_control/sros2_ws', 'teleop_keystore')
     POLICY_PREFIX = '/teleop_policy' 
     NODE_ENCLAVE = f'{POLICY_PREFIX}/twist_controller'
 
-    # === KLUCZOWA POPRAWKA ===
-    # Kopiujemy obecne środowisko systemowe, aby zachować PYTHONPATH i inne ważne zmienne.
-    # Bez tego Python nie widzi zainstalowanych pakietów (błąd ModuleNotFoundError).
     secure_env = os.environ.copy()
     
     # Dodajemy zmienne bezpieczeństwa TYLKO do tego słownika
@@ -34,15 +35,12 @@ def launch_setup(context):
 
     description = []
 
-    # === WĘZEŁ 1: ZABEZPIECZONY (twist_controller) ===
-    # Ten węzeł otrzyma zmodyfikowane środowisko (secure_env) oraz flagę --enclave
     twist_controller_node = Node(
-        package="knml_wheels",
+        package="teleop_cmd_unity",
         executable="twist_controller",
-        name="twist_controller", # Ważne: nazwa musi pasować do tej w policy.xml
-        parameters=[get_yaml_params("twist_controller")],
+        name="twist_controller", 
+        parameters=[get_yaml_params_teleop("twist_controller")],
         
-        # Przekazujemy środowisko z kluczami i PYTHONPATH
         env=secure_env,
         
         arguments=[
@@ -53,28 +51,6 @@ def launch_setup(context):
     )
     description.append(twist_controller_node)
 
-    cmd_vel_test = Node(
-            package='teleop_joy_cmd',
-            executable='cmd_vel_sub',
-            
-            # Możesz zostawić tę nazwę, jeśli tak wolisz i działało to wcześniej
-            name="twist_controller", 
-            
-            output='screen',
-            
-            # === TO JEST BRAKUJĄCY ELEMENT ===
-            # Przekazujemy zmienne (w tym keystore), żeby węzeł mógł odszyfrować dane
-            env=secure_env, 
-            
-            arguments=[
-                '--ros-args', 
-                '--enclave', NODE_ENCLAVE
-            ],
-        )
-    description.append(cmd_vel_test)
-
-    # === WĘZEŁ 2: NIEZABEZPIECZONY (drive_controller) ===
-    # Ten węzeł dziedziczy standardowe środowisko (bez wymuszonego SROS2)
     drive_controller_node = Node(
         package="knml_wheels",
         executable="drive_controller",
@@ -83,7 +59,6 @@ def launch_setup(context):
     )
     description.append(drive_controller_node)
 
-    # === Logika Joy (Oryginalna) ===
     if joy == 'gamepad':
         description += [
             Node(
