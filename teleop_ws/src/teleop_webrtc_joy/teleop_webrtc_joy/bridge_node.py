@@ -19,12 +19,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 
-# === KONFIGURACJA ===
-SIGNALING_URL = os.getenv('SIGNALING_URL', 'wss://rafal.tail692f2a.ts.net/ws')
-ROBOT_ID = os.getenv('ROBOT_ID', 'g1pilot')
+# Stałe sprzętowe (można też zamienić na parametry w przyszłości)
 CAMERA_DEVICE = '/dev/video0'
-
-# Konfiguracja Low Latency
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_FPS = 30
@@ -93,16 +89,22 @@ class ROS2BridgeNode(Node):
     def __init__(self):
         super().__init__('python_webrtc_bridge')
         
-        # === PARAMETRY ROS ===
-        # Domyślnie True = używamy Google STUN. False = tylko lokalne IP (w tym Tailscale)
+        # === DEKLARACJA PARAMETRÓW ROS ===
         self.declare_parameter('use_google_stun', True)
+        self.declare_parameter('robot_id', 'g1pilot')
+        self.declare_parameter('signaling_url', 'wss://rafal.tail692f2a.ts.net/ws')
         
-        topic_name = f'/{ROBOT_ID}/joy' if ROBOT_ID else '/g1pilot/joy'
+        # Pobranie wartości parametrów do zmiennych instancji
+        self.use_google_stun = self.get_parameter('use_google_stun').value
+        self.robot_id = self.get_parameter('robot_id').value
+        self.signaling_url = self.get_parameter('signaling_url').value
+
+        topic_name = f'/{self.robot_id}/joy'
         self.publisher_ = self.create_publisher(Joy, topic_name, 10)
         
-        stun_enabled = self.get_parameter('use_google_stun').value
-        logger.info(f"ROS2 Node Started. Publishing to: {topic_name}")
-        logger.info(f"🌍 KONFIGURACJA STUN: {'GOOGLE STUN' if stun_enabled else 'BRAK (TAILSCALE ONLY)'}")
+        logger.info(f"ROS2 Node Started. Robot ID: {self.robot_id}")
+        logger.info(f"📡 Signaling URL: {self.signaling_url}")
+        logger.info(f"🌍 STUN Mode: {'GOOGLE STUN' if self.use_google_stun else 'LOCAL/TAILSCALE ONLY'}")
         
         # === STAN GLOBALNY ===
         self.current_axes = [0.0] * 8
@@ -112,7 +114,6 @@ class ROS2BridgeNode(Node):
 
     async def _publish_loop(self):
         """Pętla heartbeat wysyłająca stan Joy co 1/30 sekundy"""
-        logger.info("🔄 Start pętli sterowania (30Hz continuous publish)...")
         while True:
             try:
                 msg = Joy()
@@ -174,11 +175,10 @@ class ROS2BridgeNode(Node):
 class WebRTCClient:
     def __init__(self, ros_node):
         self.ros_node = ros_node
-        self.ws = None
-        self.username = ROBOT_ID
+        self.username = self.ros_node.robot_id  # Pobieramy z parametrów węzła
         self.peers = {} 
         
-        logger.info("🎬 [INIT] TWORZENIE KLIENTA...")
+        logger.info(f"🎬 [INIT] WebRTC Client dla: {self.username}")
         self.video_track = RealTimeOpenCVTrack()
         self.audio_track = None
         
@@ -192,11 +192,13 @@ class WebRTCClient:
              logger.info("ℹ️ Audio niedostępne (Video Only).")
 
     async def run(self):
-        logger.info("🚀 [SYSTEM] Łączenie z siecią natychmiast...")
+        url = self.ros_node.signaling_url # Pobieramy z parametrów węzła
+        logger.info(f"🚀 [SYSTEM] Łączenie z siecią: {url}")
+        
         async with aiohttp.ClientSession() as session:
             while True:
                 try:
-                    async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
+                    async with session.ws_connect(url, ssl=False) as ws:
                         self.ws = ws
                         await self.send_signal("new-peer", {})
                         logger.info("✅ ZALOGOWANO DO SIECI!")
@@ -225,10 +227,9 @@ class WebRTCClient:
         elif action == 'start-call':
             target = data['message'].get('target')
             if target and target != self.username:
-                logger.info(f"😶 Ignoruję 'start-call' od {peer_username} (Cel: {target}, Ja: {self.username})")
                 return
 
-            logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}. DZWONIĘ (Jestem Offererem)!")
+            logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}.")
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
 
         elif action == 'new-answer':
@@ -239,18 +240,13 @@ class WebRTCClient:
                     await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'], type=answer['type']))
 
     async def create_peer_connection(self, peer_username, initiator, offer_sdp=None, receiver_channel=None):
-        # === CZYTANIE PARAMETRU ROS ===
-        use_google_stun = self.ros_node.get_parameter('use_google_stun').value
+        # Pobieranie konfiguracji dynamicznie z węzła
+        use_google_stun = self.ros_node.use_google_stun
         
         ice_servers = []
         if use_google_stun:
-            # Używamy publicznych serwerów STUN Google
             ice_servers.append(RTCIceServer(urls=["stun:stun.l.google.com:19302"]))
-            logger.info(f"🌐 [WebRTC] Tworzenie PC z Google STUN dla {peer_username}")
-        else:
-            # Pusta lista = używaj tylko interfejsów lokalnych (w tym IP Tailscale)
-            logger.info(f"🏠 [WebRTC] Tworzenie PC BEZ zewn. STUN (Local/Tailscale) dla {peer_username}")
-
+        
         config = RTCConfiguration(iceServers=ice_servers)
         pc = RTCPeerConnection(configuration=config)
         self.peers[peer_username] = pc
@@ -270,7 +266,6 @@ class WebRTCClient:
 
         @pc.on("iceconnectionstatechange")
         async def on_icestate():
-            logger.info(f"🧊 [ICE State] {peer_username}: {pc.iceConnectionState}")
             if pc.iceConnectionState in ["failed", "closed"]:
                 await pc.close()
                 if peer_username in self.peers: del self.peers[peer_username]
@@ -288,18 +283,9 @@ class WebRTCClient:
                     if cmd in allowed:
                         await self.ros_node.handle_button_command(cmd)
                     else:
-                        logger.info(f"🖥️ Wykonywanie komendy w terminalu: {cmd}")
-                        try:
-                            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
-                            if result.stdout: logger.info(f"[OUT]: {result.stdout.strip()}")
-                        except Exception as e:
-                            logger.error(f"❌ Błąd wykonania komendy: {e}")
-
-            except json.JSONDecodeError:
-                logger.info(f"🖥️ Wykonywanie surowego tekstu w terminalu: {message}")
-                subprocess.run(message, shell=True)
-            except Exception as e:
-                logger.error(f"❌ Błąd procesowania: {e}")
+                        subprocess.run(cmd, shell=True)
+            except Exception:
+                pass
 
 async def run_bridge():
     rclpy.init()
