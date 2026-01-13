@@ -1,6 +1,8 @@
 import os
 from launch import LaunchDescription
-from launch.actions import SetEnvironmentVariable
+from launch.actions import SetEnvironmentVariable, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
 
 def generate_launch_description():
@@ -12,11 +14,20 @@ def generate_launch_description():
     home_dir = os.getenv('HOME')
     keystore_path = os.path.join(home_dir, 'Web_Speech_remote_control/sros2_ws', 'teleop_keystore')
 
+    debug_arg = DeclareLaunchArgument(
+        'debug',
+        default_value='false',
+        description='Czy uruchomic wezel debugujacy cmd_vel_sub (true/false)'
+    )
+
+    use_debug = LaunchConfiguration('debug')
+
     return LaunchDescription([
         SetEnvironmentVariable('ROS_SECURITY_ENABLE', 'true'),
         SetEnvironmentVariable('ROS_SECURITY_STRATEGY', 'Enforce'),
         SetEnvironmentVariable('ROS_SECURITY_KEYSTORE', keystore_path),
 
+        debug_arg,
         Node(
             package='teleop_twist_joy',
             executable='teleop_node',
@@ -50,6 +61,8 @@ def generate_launch_description():
             
             output='screen',
             
+            condition=IfCondition(use_debug),
+
             arguments=[
                 '--ros-args', 
                 '--enclave', enclave_full_path

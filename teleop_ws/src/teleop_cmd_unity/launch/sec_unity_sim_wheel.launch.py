@@ -23,24 +23,33 @@ def launch_setup(context):
     POLICY_PREFIX = '/teleop_policy' 
     NODE_ENCLAVE = f'{POLICY_PREFIX}/twist_controller'
 
+    # === 1. ŚRODOWISKO ZABEZPIECZONE (tylko dla twist_controller) ===
     secure_env = os.environ.copy()
-    
-    # Dodajemy zmienne bezpieczeństwa TYLKO do tego słownika
     secure_env['ROS_SECURITY_ENABLE'] = 'true'
     secure_env['ROS_SECURITY_STRATEGY'] = 'Enforce'
     secure_env['ROS_SECURITY_KEYSTORE'] = keystore_path
+
+    # === 2. ŚRODOWISKO NIEZABEZPIECZONE (nadpisuje ustawienia globalne) ===
+    unsecure_env = os.environ.copy()
+    unsecure_env['ROS_SECURITY_ENABLE'] = 'false'
+    unsecure_env['ROS_SECURITY_STRATEGY'] = 'Permissive'
+    # Usuwamy ścieżkę keystore, żeby ROS nie próbował szukać kluczy
+    if 'ROS_SECURITY_KEYSTORE' in unsecure_env:
+        del unsecure_env['ROS_SECURITY_KEYSTORE']
 
     if joy != '' and joy != 'gamepad' and joy != 'arduino':
         raise RuntimeError("Invalid joy. Choose 'gamepad' or 'arduino'.")
 
     description = []
 
+    # --- Węzeł Szyfrowany ---
     twist_controller_node = Node(
         package="teleop_cmd_unity",
         executable="twist_controller",
         name="twist_controller", 
         parameters=[get_yaml_params_teleop("twist_controller")],
         
+        # Używamy środowiska włączającego security
         env=secure_env,
         
         arguments=[
@@ -51,10 +60,15 @@ def launch_setup(context):
     )
     description.append(twist_controller_node)
 
+    # --- Węzeł Nieszyfrowany ---
     drive_controller_node = Node(
         package="knml_wheels",
         executable="drive_controller",
         parameters=[get_yaml_params("drive_controller")],
+        
+        # WYMUSZAMY brak security (naprawia błąd dziedziczenia)
+        env=unsecure_env,
+        
         output='screen'
     )
     description.append(drive_controller_node)
@@ -65,11 +79,13 @@ def launch_setup(context):
                 package="joy_linux",
                 executable="joy_linux_node",
                 parameters=[{"dev_name": "Logitech Gamepad"}],
+                env=unsecure_env  # Też bez szyfrowania
             ),
             Node(
                 package="knml_wheels",
                 executable="gamepad_driving",
                 parameters=[get_yaml_params("gamepad_driving")],
+                env=unsecure_env  # Też bez szyfrowania
             )
         ]
     elif joy == 'arduino':
@@ -78,11 +94,13 @@ def launch_setup(context):
                 package="joy_linux",
                 executable="joy_linux_node",
                 parameters=[{"dev_name": "Arduino LLC Arduino Leonardo"}],
+                env=unsecure_env
             ),
             Node(
                 package="knml_wheels",
                 executable="arduino_driving",
                 parameters=[get_yaml_params("arduino_driving")],
+                env=unsecure_env
             )
         ]
 

@@ -20,8 +20,6 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_bringup.bridge:main',
-            'cmd_vel_sub = teleop_bringup.cmd_vel_sub:main',
         ],
     },
 )
