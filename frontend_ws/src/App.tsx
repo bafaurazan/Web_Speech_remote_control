@@ -1,12 +1,13 @@
 // 1. Biblioteki zewnętrzne (React)
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-// 2. Typy (często daje się je wysoko, lub zaraz przed użyciem)
+// 2. Typy
 import type { ChatMessage, PeerData, SignalMessage } from './types';
 
 // 3. Funkcje pomocnicze (Utils)
 import { 
   getWebSocketUrl, 
+  getApiUrl,
   STUN_CONFIG, 
   NO_STUN_CONFIG, 
   log, 
@@ -49,10 +50,19 @@ function App() {
 
     mapPeers.current = {};
     setRemotePeers([]);
+    setPendingPeers([]); 
     setConnectionStatus(null);
     };
 
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState(''); 
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const authToken = useRef<string | null>(null);
+  
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'operator' | 'hub' | 'ai'>('operator');
@@ -66,6 +76,9 @@ function App() {
 
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
 
+  // === NOWOŚĆ: Lista peerów oczekujących na zatwierdzenie ===
+  const [pendingPeers, setPendingPeers] = useState<string[]>([]);
+
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<PeerData[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -76,10 +89,9 @@ function App() {
   const lastSentTime = useRef<number>(0);
   const isScreenSharingRef = useRef(false);
   
-  // Flaga blokująca logi przy wylogowywaniu
   const isLoggingOut = useRef(false);
 
-  // === 1. FUNKCJA WYLOGOWANIA (TYLKO DLA CIEBIE) ===
+  // === 1. FUNKCJA WYLOGOWANIA ===
   const handleLogout = useCallback(() => {
     isLoggingOut.current = true;
     log("👋 [System] Wylogowywanie");
@@ -94,6 +106,8 @@ function App() {
 
     setIsLoggedIn(false);
     setUsername('');
+    setPassword(''); // <--- DODAJ
+    authToken.current = null; // <--- DODAJ
     }, []); 
 
 
@@ -103,7 +117,6 @@ function App() {
 
       log(`🗑️ [System] Usuwanie martwego peera: ${peerName}`);
       
-      // 1. Zamknij połączenie lokalnie
       const peerData = mapPeers.current[peerName];
       if (peerData) {
           const [pc, dc] = peerData;
@@ -112,10 +125,8 @@ function App() {
           delete mapPeers.current[peerName];
       }
 
-      // 2. Usuń z listy wideo (To usunie "wiszące okienko")
       setRemotePeers(prev => prev.filter(p => p.username !== peerName));
-
-      // 3. Wyczyść status (jeśli dotyczył tego peera)
+      setPendingPeers(prev => prev.filter(p => p !== peerName));
       setConnectionStatus(prev => (prev && prev.includes(peerName)) ? null : prev);
 
   }, []);
@@ -157,7 +168,11 @@ function App() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true },
-            video: { width: { ideal: 640 }, height: { ideal: 480 } }
+            video: {
+                width: { ideal: 320 },
+                height: { ideal: 240 },
+                frameRate: { ideal: 20, max: 30 }
+            }
         });
         return setupLocalStream(stream);
     } catch (err) {
@@ -186,7 +201,6 @@ function App() {
               setConnectionStatus(null);
           } 
           else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
-              // === ZMIANA: ZAMIAST WYLOGOWYWAĆ NAS, USUWAMY PEERA ===
               log(`⚠️ [ICE] Utracono połączenie z ${peerName}. Usuwam go z listy.`);
               removeDeadPeer(peerName);
           }
@@ -196,8 +210,6 @@ function App() {
           if (isLoggingOut.current) return;
           if (pc.iceGatheringState === 'gathering') {
                setConnectionStatus(`STUN: Szukanie trasy do ${peerName}...`);
-          } else if (pc.iceGatheringState === 'complete') {
-               // setConnectionStatus(null); // Opcjonalnie
           }
       };
   };
@@ -235,40 +247,68 @@ function App() {
 
         const receiverChannel = message.receiver_channel_name;
         
-        if (action === 'new-peer') {
-            if (!receiverChannel) {
-                log(`⚠️ [WS] Ignoruję new-peer od ${peerUsername} (brak kanału zwrotnego)`);
+        // --- 1. KTOŚ PROSI O POŁĄCZENIE (Lobby) ---
+        if (action === 'request-connect' || action === 'new-peer') {
+            // === POPRAWKA: Sprawdzamy, czy już nie jesteśmy połączeni ===
+            if (mapPeers.current[peerUsername]) {
+                log(`ℹ️ [WS] ${peerUsername} wysłał request, ale już jesteśmy połączeni. Ignoruję.`);
+                return; 
+            }
+
+            log(`👋 [WS] ${peerUsername} prosi o połączenie/wszedł. Dodaję do oczekujących.`);
+            setPendingPeers(prev => {
+                if (prev.includes(peerUsername)) return prev;
+                return [...prev, peerUsername];
+            });
+        }
+        
+        else if (action === 'start-call') {
+            const target = message.target;
+            
+            // === POPRAWKA: Jeśli sygnał jest do kogoś innego, ignorujemy go ===
+            if (target && target !== currentUserName) {
+                log(`😶 [WS] Ignoruję start-call od ${peerUsername} (Cel: ${target}, Ja: ${currentUserName})`);
                 return;
             }
-            log(`🆕 [WS] New Peer: ${peerUsername} -> Inicjuję Ofertę`);
-            createOfferer(peerUsername, receiverChannel);
-        } 
+
+            log(`📞 [WS] ${peerUsername} zatwierdził połączenie DO MNIE! Dzwonię (Tworzę Ofertę).`);
+            setPendingPeers(prev => prev.filter(p => p !== peerUsername));
+            
+            if (receiverChannel) {
+                createOfferer(peerUsername, receiverChannel);
+            } else {
+                log(`❌ [Błąd] Otrzymano start-call od ${peerUsername}, ale brak receiver_channel_name.`);
+            }
+        }
+
+        // --- 3. OTRZYMANO OFERTĘ ---
         else if (action === 'new-offer') {
+            log(`✨ [WebRTC] Otrzymano Ofertę od ${peerUsername}. Tworzę Answer.`);
+            
+            setPendingPeers(prev => prev.filter(p => p !== peerUsername));
+            
             const existingPeer = mapPeers.current[peerUsername];
             const targetChannel = receiverChannel || (existingPeer?.[0] as any)?.remoteChannelName;
 
             if (existingPeer) {
                 if (message.sdp) {
-                    log(`🔄 [WebRTC] Renegocjacja (Otrzymano Offer) od ${peerUsername}`);
+                    log(`🔄 [WebRTC] Renegocjacja od ${peerUsername}`);
                     handleRenegotiationOffer(existingPeer[0], message.sdp, peerUsername, targetChannel);
                 }
             } else {
                 if (message.sdp && targetChannel) {
-                    log(`✨ [WebRTC] Nowe połączenie (Otrzymano Offer) od ${peerUsername} -> Tworzę Answer`);
                     createAnswerer(message.sdp, peerUsername, targetChannel);
                 }
             }
         } 
+        // --- 4. ODPOWIEDŹ ---
         else if (action === 'new-answer') {
             const peerData = mapPeers.current[peerUsername];
             if (peerData && message.sdp) {
                 try {
-                    if (peerData[0].signalingState === 'stable') {
-                        log(`⚠️ [WebRTC] Ignoruję Answer od ${peerUsername} - stan już STABLE.`);
-                        return;
+                    if (peerData[0].signalingState !== 'stable') {
+                        peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
                     }
-                    log(`🤝 [WebRTC] Ustawiam RemoteDesc (Answer) od ${peerUsername}`);
-                    peerData[0].setRemoteDescription(new RTCSessionDescription(message.sdp));
                 } catch (e) {
                     log(`❌ [WebRTC] Błąd przy ustawianiu Answer od ${peerUsername}:`, e);
                 }
@@ -284,6 +324,20 @@ function App() {
     } else {
         log("⚠️ [WS] Nie mogę wysłać - socket zamknięty.");
     }
+  };
+
+  // === UI: Użytkownik klika "Zatwierdź" ===
+  const approveConnection = async (peerName: string) => {
+      log(`🚀 [User] Zatwierdzam połączenie z ${peerName}. Wysyłam 'start-call'.`);
+      
+      setPendingPeers(prev => prev.filter(p => p !== peerName));
+      
+      if (mapPeers.current[peerName]) {
+          removeDeadPeer(peerName);
+      }
+
+      // === POPRAWKA: Dodajemy "target", żeby tylko ten peer zareagował ===
+      sendSignal('start-call', { target: peerName }); 
   };
 
   // ==========================
@@ -305,10 +359,6 @@ function App() {
 
   const handleRenegotiationOffer = async (pc: RTCPeerConnection, sdp: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
       try {
-          log(`📥 [Renegotiation] Przetwarzam Ofertę od ${peerUsername}...`);
-          if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer' && pc.signalingState !== 'have-remote-offer') {
-               log(`⚠️ [Renegotiation] Ryzykowny stan PC przy ${peerUsername}: ${pc.signalingState}`);
-          }
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
@@ -320,53 +370,46 @@ function App() {
 
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
     dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
-    
     dc.onclose = () => { 
         if(!isLoggingOut.current) {
             log(`🚫 [DataChannel] Stan: CLOSED z ${peerUsername}`);
             removeDeadPeer(peerUsername);
         }
     };
-    
     dc.onerror = (e: any) => {
-        if (isLoggingOut.current) return;
-        if (e.error?.message?.includes('User-Initiated Abort') || e.error?.name === 'OperationError') return;
-        log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
+        if (!isLoggingOut.current) log(`❌ [DataChannel] BŁĄD z ${peerUsername}:`, e);
     };
 
     dc.onmessage = (e) => {
         if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
-        
-        // Logowanie odbioru Joysticka
-        if (data.joystick) {
-            log(`🕹️ [DC RECV] Joystick od ${peerUsername}: L=${data.joystick.linear} A=${data.joystick.angular}`);
-            return; 
-        }
-        
-        // Logowanie odbioru Czatu
+        if (data.joystick) return; 
         if (data.message) {
-            log(`💬 [DC RECV] Chat od ${peerUsername}: "${data.message}"`);
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
     };
   };
 
+  // === [PRZYWRÓCONE] Create Offerer (potrzebne dla Browser-to-Browser) ===
   const createOfferer = async (peerUsername: string, receiverChannel: string) => {
     const config = getCurrentConfig();
-    log(`🛠️ [WebRTC] Tworzę Offerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
-    setConnectionStatus(`Inicjalizacja wideo z ${peerUsername}...`);
+    log(`🛠️ [WebRTC] Tworzę Offerer dla ${peerUsername}.`);
+    setConnectionStatus(`Dzwonię do ${peerUsername}...`);
 
     const pc = new RTCPeerConnection(config); 
     (pc as any).remoteChannelName = receiverChannel;
     addPcListeners(pc, peerUsername);
 
+    // Offerer tworzy Data Channel
     const dc = pc.createDataChannel('chat');
     mapPeers.current[peerUsername] = [pc, dc];
     setupDataChannel(dc, peerUsername);
 
     if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => pc.addTrack(t, localStreamRef.current!));
+    } else {
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
     }
 
     pc.onicecandidate = (e) => {
@@ -384,7 +427,7 @@ function App() {
 
   const createAnswerer = async (offer: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
     const config = getCurrentConfig();
-    log(`🛠️ [WebRTC] Tworzę Answerer dla ${peerUsername}. STUN: ${useStunRef.current ? 'ON' : 'OFF'}`);
+    log(`🛠️ [WebRTC] Tworzę Answerer dla ${peerUsername}.`);
     setConnectionStatus(`Odbieranie wideo od ${peerUsername}...`);
 
     const pc = new RTCPeerConnection(config);
@@ -392,7 +435,6 @@ function App() {
     addPcListeners(pc, peerUsername);
     
     pc.ondatachannel = (e) => {
-        log(`🔗 [WebRTC] Otrzymano DataChannel od ${peerUsername}`);
         const dc = e.channel;
         mapPeers.current[peerUsername] = [pc, dc];
         setupDataChannel(dc, peerUsername);
@@ -416,11 +458,21 @@ function App() {
     await pc.setLocalDescription(answer);
   };
 
+  // Wewnątrz komponentu App, funkcja handleRemoteTrack:
+
   const handleRemoteTrack = (e: RTCTrackEvent, peerUsername: string) => {
-    log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}. Tracks: ${e.streams[0]?.getTracks().length}`);
-    const [stream] = e.streams;
+    log(`🎥 [WebRTC] Odebrano ZDALNY STREAM od ${peerUsername}.`);
+    
+    // === POPRAWKA: Zabezpieczenie przed pustym e.streams ===
+    let stream = e.streams[0];
+    
+    if (!stream) {
+        log(`⚠️ [WebRTC] Brak obiektu stream w zdarzeniu. Tworzę nowy MediaStream z tracka.`);
+        stream = new MediaStream();
+        stream.addTrack(e.track);
+    }
+
     setRemotePeers(prev => {
-        // Unikamy duplikatów
         if (prev.find(p => p.username === peerUsername)) return prev;
         return [...prev, { username: peerUsername, stream }];
     });
@@ -431,28 +483,11 @@ function App() {
   // ==========================
   const broadcastData = (payload: any) => {
     const json = JSON.stringify(payload);
-    let sentCount = 0;
-
-    // Logowanie wysyłania przed pętlą
-    if (payload.joystick) {
-        log(`🕹️ [BROADCAST SEND] Joystick: L=${payload.joystick.linear} A=${payload.joystick.angular}`);
-    } else if (payload.message) {
-        log(`💬 [BROADCAST SEND] Chat: "${payload.message}"`);
-    } else {
-        log(`📤 [BROADCAST SEND] Dane:`, payload);
-    }
-
     Object.values(mapPeers.current).forEach(([_, dc]) => {
         if (dc?.readyState === 'open') {
             dc.send(json);
-            sentCount++;
         }
     });
-
-    // Opcjonalnie: logowanie, jeśli nikt nie odebrał
-    if (sentCount === 0) {
-        // log(`⚠️ [BROADCAST] Nie wysłano do nikogo (brak otwartych kanałów).`);
-    }
   };
 
   const sendRobotCommand = (cmd: string) => {
@@ -465,7 +500,6 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsAudioMuted(!t.enabled); 
-        log(`🎤 Mikrofon przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
@@ -474,26 +508,20 @@ function App() {
     if(t) { 
         t.enabled = !t.enabled; 
         setIsVideoStopped(!t.enabled); 
-        log(`📷 Wideo przełączono na: ${t.enabled ? 'ON' : 'OFF'}`);
     }
   };
 
   // --- SCREEN SHARE ---
   const startScreenShare = async () => {
-      log("🖥️ [ScreenShare] Próba uruchomienia...");
       try {
           const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
           const screenTrack = screenStream.getVideoTracks()[0];
           
-          log(`🖥️ [ScreenShare] Otrzymano strumień ekranu: ${screenTrack.label}`);
-
           Object.entries(mapPeers.current).forEach(([peerName, [pc]]) => {
               const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
               if (videoSender) {
-                  log("🖥️ [ScreenShare] Zastępowanie tracka wideo...");
                   videoSender.replaceTrack(screenTrack).catch(e => log("❌ ReplaceTrack error:", e));
               } else {
-                  log("🖥️ [ScreenShare] Dodawanie nowego tracka...");
                   pc.addTrack(screenTrack, screenStream);
                   const channelName = (pc as any).remoteChannelName;
                   if(channelName) renegotiate(pc, peerName, channelName);
@@ -505,32 +533,18 @@ function App() {
           setIsVideoStopped(false); 
 
           screenTrack.onended = () => {
-              log("🛑 [ScreenShare] Zatrzymano z UI przeglądarki (pasek).");
-              if (isScreenSharingRef.current) {
-                  stopScreenShare();
-              }
+              if (isScreenSharingRef.current) stopScreenShare();
           };
 
       } catch (e: any) {
-          if (e.name === 'NotAllowedError') {
-              log("🛑 [ScreenShare] Anulowano przez użytkownika.");
-          } else {
-              log("❌ [ScreenShare] Błąd startu:", e);
-          }
+          log("❌ [ScreenShare] Błąd startu:", e);
           setIsScreenSharing(false);
       }
   };
 
   const stopScreenShare = async () => {
-      log("🖥️ [ScreenShare] Zatrzymywanie...");
       setIsScreenSharing(false);
-
-      if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(t => {
-              log(`🛑 [ScreenShare] Zatrzymuję lokalny track ekranu: ${t.label}`);
-              t.stop();
-          });
-      }
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach(t => t.stop());
 
       const camStream = await startCamera(); 
       
@@ -538,41 +552,120 @@ function App() {
           const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
           if (videoSender && camStream) {
                const videoTrack = camStream.getVideoTracks()[0];
-               try {
-                   log("📷 [ScreenShare] Przywracanie kamery/dummy...");
-                   videoSender.replaceTrack(videoTrack).catch(e => log("⚠️ RevertTrack warn:", e));
-               } catch(e) {}
+               videoSender.replaceTrack(videoTrack).catch(() => {});
           }
       });
   };
 
   const toggleScreenShare = () => {
-      if (isScreenSharing) {
-          stopScreenShare();
-      } else {
-          startScreenShare();
-      }
+      isScreenSharing ? stopScreenShare() : startScreenShare();
   };
 
   const handleRefreshPeers = async () => {
-    log("🔄 [System] Refresh → pełny reset połączeń");
-
+    log("🔄 [System] Refresh");
     teardownConnections();
-
-    // WebSocket + signaling od nowa
     connectWebSocket(username);
-};
+  };
 
-
-  const handleLogin = async (e: React.FormEvent) => {
+  // === NOWA FUNKCJA: Obsługuje Logowanie i Rejestrację ===
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
-      isLoggingOut.current = false; 
-      log(`👤 [Login] Logowanie jako: ${username} | STUN: ${useStun}`);
-      setIsLoggedIn(true);
-      
-      const stream = await startCamera();
-      if (stream) connectWebSocket(username);
+    setLoginError(null);
+    setIsLoading(true);
+
+    // 1. Walidacja pustości
+    if (!username.trim() || !password.trim()) {
+        setLoginError("Podaj login i hasło");
+        setIsLoading(false);
+        return;
+    }
+
+    // 2. Walidacja dla REJESTRACJI
+    if (isRegistering) {
+        // Czy hasła są identyczne?
+        if (password !== confirmPassword) {
+            setLoginError("Hasła nie są identyczne!");
+            setIsLoading(false);
+            return;
+        }
+
+        // --- Standardy Bezpieczeństwa (Regex) ---
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        if (password.length < minLength) {
+            setLoginError(`Hasło za krótkie! Minimum ${minLength} znaków.`);
+            setIsLoading(false);
+            return;
+        }
+        if (!hasUpperCase) {
+            setLoginError("Hasło musi zawierać wielką literę (A-Z).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasLowerCase) {
+            setLoginError("Hasło musi zawierać małą literę (a-z).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasNumber) {
+            setLoginError("Hasło musi zawierać cyfrę (0-9).");
+            setIsLoading(false);
+            return;
+        }
+        if (!hasSpecialChar) {
+            setLoginError("Hasło musi zawierać znak specjalny (np. ! @ # $).");
+            setIsLoading(false);
+            return;
+        }
+    }
+
+    try {
+        // Wybieramy endpoint w zależności od trybu
+        const endpoint = isRegistering ? 'api/register/' : 'api/login/';
+        
+        log(`👤 [Auth] Wysyłam żądanie do: ${endpoint}`);
+
+        // Używamy helpera getApiUrl
+        const response = await fetch(getApiUrl(endpoint), { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const text = await response.text(); 
+        if (!response.ok) {
+            throw new Error(text || `Błąd serwera: ${response.status}`);
+        }
+
+        const data = text ? JSON.parse(text) : {};
+        
+        if (data.error) throw new Error(data.error);
+        if (!data.token) throw new Error("Brak tokenu w odpowiedzi.");
+
+        // SUKCES
+        authToken.current = data.token;
+        isLoggingOut.current = false;
+        setIsLoggedIn(true);
+
+        const stream = await startCamera();
+        if (stream) connectWebSocket(username);
+
+    } catch (err: any) {
+        // Próbujemy wyczyścić komunikat błędu z JSONa
+        let msg = err.message;
+        try {
+            const parsed = JSON.parse(msg);
+            if(parsed.error) msg = parsed.error;
+        } catch {}
+        
+        setLoginError(msg);
+        setIsLoggedIn(false);
+    } finally {
+        setIsLoading(false);
     }
   };
 
@@ -580,13 +673,53 @@ function App() {
     <div className="dashboard">
       {!isLoggedIn ? (
         <div className="login-container">
-          <form onSubmit={handleLogin} className="login-card">
-            <h2 className="title-header">LOGIN</h2>
+             <form onSubmit={handleAuth} className="login-card">
+            <h2 className="title-header">
+                {isRegistering ? 'REJESTRACJA' : 'LOGOWANIE'}
+            </h2>
             
             <div className="input-row">
-                 <input className="styled-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+                 <input 
+                    className="styled-input" 
+                    placeholder="Użytkownik" 
+                    value={username} 
+                    onChange={e => setUsername(e.target.value)} 
+                    disabled={isLoading}
+                 />
             </div>
 
+            <div className="input-row">
+                 <input 
+                    type="password"
+                    className="styled-input" 
+                    placeholder="Hasło" 
+                    value={password} 
+                    onChange={e => setPassword(e.target.value)} 
+                    disabled={isLoading}
+                 />
+            </div>
+
+            {/* Dodatkowe pole, widoczne tylko przy rejestracji */}
+            {isRegistering && (
+                <div className="input-row">
+                    <input 
+                        type="password"
+                        className="styled-input" 
+                        placeholder="Potwierdź hasło" 
+                        value={confirmPassword} 
+                        onChange={e => setConfirmPassword(e.target.value)} 
+                        disabled={isLoading}
+                    />
+                </div>
+            )}
+
+            {loginError && (
+                <div style={{color: '#ff6b6b', textAlign: 'center', marginBottom: '10px', fontWeight: 'bold', fontSize: '0.9rem'}}>
+                    {loginError}
+                </div>
+            )}
+
+            {/* Checkbox STUN (Zachowany z Twojego kodu) */}
             <div className="flex items-center gap-2 mb-2" style={{width: '100%', justifyContent: 'center'}}>
                 <label className="switch-label flex items-center gap-2" style={{cursor: 'pointer', fontWeight: 'bold', color: '#4c1d95'}}>
                     <input 
@@ -599,13 +732,37 @@ function App() {
                 </label>
             </div>
 
-            <button type="submit" className="styled-btn">Login</button>
+            <button type="submit" className="styled-btn" disabled={isLoading}>
+                {isLoading ? 'Przetwarzanie...' : (isRegistering ? 'Zarejestruj' : 'Zaloguj')}
+            </button>
+
+            {/* Przełącznik: Mam konto / Nie mam konta */}
+            <div style={{marginTop: '15px', textAlign: 'center', color: '#666', fontSize: '0.9rem'}}>
+                {isRegistering ? "Masz już konto? " : "Nie masz konta? "}
+                <span 
+                    onClick={() => {
+                        setIsRegistering(!isRegistering);
+                        setLoginError(null);
+                    }}
+                    style={{
+                        color: '#4c1d95', 
+                        fontWeight: 'bold', 
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                    }}
+                >
+                    {isRegistering ? "Zaloguj się" : "Zarejestruj się"}
+                </span>
+            </div>
+
           </form>
         </div>
       ) : (
         <>
+          {/* === NAGŁÓWEK (HEADER) === */}
           <header className="top-bar">
-           <div className="flex gap-4 items-center">
+             {/* ... (zawartość nagłówka bez zmian) ... */}
+             <div className="flex gap-4 items-center">
               <button className="icon-btn" onClick={() => setShowMenu(!showMenu)}>☰</button>
               <h1 className="text-xl font-bold">ROBOT: {username}</h1>
            </div>
@@ -625,60 +782,76 @@ function App() {
            <div className="flex gap-2">
               <button onClick={toggleAudio} className="icon-btn">{isAudioMuted ? '🔇' : '🎤'}</button>
               <button onClick={toggleVideo} className="icon-btn">{isVideoStopped ? '📷 OFF' : '📷 ON'}</button>
-              
-              <button 
-                onClick={toggleScreenShare} 
-                className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}
-                title={isScreenSharing ? "Stop Sharing" : "Share Screen"}
-              >
+              <button onClick={toggleScreenShare} className={`icon-btn ${isScreenSharing ? 'bg-red-600 text-white' : ''}`}>
                 {isScreenSharing ? '⏹️ Stop Share' : '🖥️ Share'}
               </button>
-              
               <button onClick={handleRefreshPeers} className="icon-btn">🔄</button>
            </div>
           </header>
 
+          {/* === NOWOŚĆ: POWIADOMIENIA PRAWY GÓRNY RÓG (GLOBALNE) === */}
+          <div className="notifications-container">
+            {pendingPeers.map(peer => (
+                <div key={peer} className="notification-card">
+                    <div className="notification-text">
+                        🤖 {peer} <br/> chce dołączyć!
+                    </div>
+                    <button 
+                        className="notification-btn"
+                        onClick={() => approveConnection(peer)}
+                    >
+                        ✅ ZATWIERDŹ
+                    </button>
+                </div>
+            ))}
+          </div>
+
+          {/* === GŁÓWNA ZAWARTOŚĆ === */}
           <div className="main-grid">
             {activeTab === 'operator' && (
               <div className="view-section operator-view">
                 <div className="panel">
-                
-                {connectionStatus && (
-                    <div className="loader-overlay">
-                        <div className="spinner"></div>
-                        <div className="loader-text">{connectionStatus}</div>
-                        {connectionStatus.includes('STUN') && <div className="loader-subtext">To może chwilę potrwać...</div>}
-                    </div>
-                )}
-                
-                <VideoGrid 
-                    localStream={localStream} 
-                    remotePeers={remotePeers} 
-                    isAudioMuted={isAudioMuted} 
-                    isVideoStopped={isVideoStopped} 
-                    onToggleAudio={toggleAudio} 
-                    onToggleVideo={toggleVideo} 
-                    />
-              </div>
-              <div className="panel">
-                  <JoystickController 
-                      onMove={(l, a) => {
-                          const now = Date.now();
-                          if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
-                              broadcastData({ username, joystick: { linear: l, angular: a } });
-                              lastSentTime.current = now;
-                          }
-                      }} 
-                      onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
-                      onCommand={sendRobotCommand} 
+                  {connectionStatus && (
+                      <div className="loader-overlay">
+                          <div className="spinner"></div>
+                          <div className="loader-text">{connectionStatus}</div>
+                          {connectionStatus.includes('STUN') && <div className="loader-subtext">To może chwilę potrwać...</div>}
+                      </div>
+                  )}
+                  
+                  {/* GRID Z WIDEO */}
+                  <VideoGrid 
+                      localStream={localStream} 
+                      remotePeers={remotePeers} 
+                      isAudioMuted={isAudioMuted} 
+                      isVideoStopped={isVideoStopped} 
+                      onToggleAudio={toggleAudio} 
+                      onToggleVideo={toggleVideo} 
                   />
-              </div>
+
+                  {/* USUNIĘTO STĄD CZARNE OKIENKA (przeniesione wyżej do notifications-container) */}
+
+                </div>
+                <div className="panel">
+                    <JoystickController 
+                        onMove={(l, a) => {
+                            const now = Date.now();
+                            if ((l === 0 && a === 0) || (now - lastSentTime.current > 100)) {
+                                broadcastData({ username, joystick: { linear: l, angular: a } });
+                                lastSentTime.current = now;
+                            }
+                        }} 
+                        onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
+                        onCommand={sendRobotCommand} 
+                    />
+                </div>
               </div>
             )}
             
+            {/* ... reszta tabów bez zmian ... */}
             {activeTab === 'hub' && (
               <div className="view-section operator-view">
-                <div className="panel">
+                 <div className="panel">
                 {connectionStatus && (
                     <div className="loader-overlay">
                         <div className="spinner"></div>
@@ -704,7 +877,7 @@ function App() {
             )}
 
             {activeTab === 'ai' && (
-              <div className="view-section ai-view">
+               <div className="view-section ai-view">
                 <div className="panel">
                   {connectionStatus && (
                       <div className="loader-overlay">

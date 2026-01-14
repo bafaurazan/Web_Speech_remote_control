@@ -1,6 +1,6 @@
 export interface SignalMessage {
   peer: string;
-  action: 'new-peer' | 'new-offer' | 'new-answer';
+  action: 'new-peer' | 'new-offer' | 'new-answer'| 'request-connect' | 'start-call';
   message: {
     receiver_channel_name?: string;
     sdp?: RTCSessionDescriptionInit;

@@ -43,39 +43,106 @@ This project is a comprehensive integration of modern software and hardware tech
 cd ~/Web_Speech_remote_control/api
 poetry run python manage.py runserver 0.0.0.0:8000
 ```
-1.5 setup react frontend
+2. setup react frontend
 ```bash
 cd ~/Web_Speech_remote_control/frontend_ws
 npm run dev
 ```
 
-2. setup tailscale
+3. setup teleop
 ```bash
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+
+# run
+ros2 launch teleop_bringup teleop_system.launch.py security:=True # or False for unsecured use_google_stun:=False
+
+```
+
+4. run unity simulation
+```bash
+source ~/ros2_projects_ws/install/setup.bash
+ros2 launch unity_sim unity_sim.launch.py 
+```
+
+5. setup tailscale
+```bash
+sudo tailscale serve reset
+
 sudo tailscale funnel --bg --set-path /ws http://127.0.0.1:8000
+sudo tailscale funnel --bg --set-path /api/login/ http://127.0.0.1:8000/api/login/
+sudo tailscale funnel --bg --set-path /api/register/ http://127.0.0.1:8000/api/register/
 sudo tailscale funnel --bg --set-path / http://127.0.0.1:5173
+
 
 # to turn off 
 # tailscale funnel --https=443 off
 
+# turn tailscale on device to control the robot
 ```
 go to website using generated address from url with react port ...etc. https://name.tail123g3a.ts.net/
 
-3. setup electron app
+6. setup electron app or ros2_webrtc_bridge
 ```bash
+#electron
 cd ~/Web_Speech_remote_control/electron
 npm run start
 ```
 
-4. run teleop_bringup
+7. run teleop_bringup
 ```bash
 cd ~/Web_Speech_remote_control/teleop_bringup/
+source ~/ros2_projects_ws/install/setup.bash
+
 source install/setup.bash
 ros2 launch teleop_bringup twist_joy_g1.launch.py 
 ```
 
-5. run unity simulation
+8. run unity simulation
 ```bash
+## automated distrobox command
 cd ~/ros2_projects_ws
-./scripts/distrobox 
+./scripts/distrobox
+## in new distrobox terminal run simulation
 ros2 launch knml_bringup sim_basic.launch.py 
+
+#simple run simulation
+cd ~/ros2_projects_ws && distrobox enter kalman_ws -- bash -c "source install/setup.bash && ros2 launch knml_bringup sim_basic.launch.py"
+
+#or only simulation without teleoperation
+ros2 launch unity_sim unity_sim.launch.py 
+```
+
+9. run teleop
+```bash
+# source
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_bringup teleop_system.launch.py security:=True # or False for unsecured
+
+# or separatelly
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_webrtc_joy webrtc_client.launch.py
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_joy_cmd joy_cmd_g1.launch.py 
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_cmd_unity unity_sim_wheel.launch.py 
+
+# or separatelly secured version
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_webrtc_joy sec_webrtc_client.launch.py
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_joy_cmd sec_joy_cmd_g1.launch.py 
+
+source ~/ros2_projects_ws/install/setup.bash
+source ~/Web_Speech_remote_control/teleop_ws/install/setup.bash
+ros2 launch teleop_cmd_unity sec_unity_sim_wheel.launch.py 
 ```

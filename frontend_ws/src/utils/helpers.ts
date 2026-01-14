@@ -1,10 +1,10 @@
 /**
  * PLIK: helpers.ts
- * OPIS: Funkcje pomocnicze dla całej aplikacji.
- * - getWebSocketUrl: dynamiczne określanie adresu WS.
- * - log: ujednolicony format logowania z timestampem.
- * - createBlackScreenStream: generuje "pusty" strumień wideo, gdy kamera jest niedostępna.
  */
+
+// Konfiguracja adresu
+const BASE_HOST = 'rafal.tail692f2a.ts.net';
+const USE_SSL = true; // Zmień na false jeśli testujesz lokalnie bez certyfikatu
 
 export const STUN_CONFIG = {
     iceServers: [
@@ -18,10 +18,17 @@ export const NO_STUN_CONFIG = {
 };
 
 export const getWebSocketUrl = () => {
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const host = window.location.host; 
-    return `${protocol}${host}/ws`; 
+    const protocol = USE_SSL ? 'wss://' : 'ws://';
+    return `${protocol}${BASE_HOST}/ws`; 
 }; 
+
+// Helper do API (logowanie itp)
+export const getApiUrl = (endpoint: string) => {
+    const protocol = USE_SSL ? 'https://' : 'http://';
+    // Usuwamy wiodący slash, żeby nie dublować
+    const path = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+    return `${protocol}${BASE_HOST}/${path}`;
+};
 
 export const log = (prefix: string, ...args: any[]) => {
     const now = new Date();
@@ -30,12 +37,14 @@ export const log = (prefix: string, ...args: any[]) => {
 };
 
 export const createBlackScreenStream = () => {
-    log("⬛ [Media] Generowanie czarnego ekranu (Dummy)...");
+    log("⬛ [Media] Generowanie czarnego ekranu (Dummy) z animacją...");
     const canvas = document.createElement('canvas');
     canvas.width = 640;
     canvas.height = 480;
     const ctx = canvas.getContext('2d');
-    if (ctx) {
+
+    const draw = () => {
+        if (!ctx) return;
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, 640, 480);
         ctx.fillStyle = 'white';
@@ -44,11 +53,29 @@ export const createBlackScreenStream = () => {
         ctx.fillText('NO CAMERA', 320, 240);
         ctx.font = '16px Arial';
         ctx.fillText('(Audio Only)', 320, 270);
-    }
+        const time = new Date().toISOString().split('T')[1].split('.')[0];
+        ctx.font = '12px Monospace';
+        ctx.fillStyle = '#555';
+        ctx.fillText(time, 320, 460);
+    };
+
+    setInterval(draw, 1000 / 15);
+    draw();
+
     const videoStream = canvas.captureStream(15);
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const dst = audioCtx.createMediaStreamDestination();
+    const oscillator = audioCtx.createOscillator();
+    oscillator.start();
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0; 
+    oscillator.connect(gainNode);
+    gainNode.connect(dst);
+
     const audioTrack = dst.stream.getAudioTracks()[0];
     const videoTrack = videoStream.getVideoTracks()[0];
+    videoTrack.enabled = true;
+    audioTrack.enabled = true;
+
     return new MediaStream([videoTrack, audioTrack]);
 };
