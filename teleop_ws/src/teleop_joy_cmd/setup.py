@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'cmd_vel_sub = teleop_joy_cmd.cmd_vel_sub:main',
+            'loco_client = teleop_joy_cmd.loco_client_node:main',
         ],
     },
 )
