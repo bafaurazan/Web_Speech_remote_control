@@ -1,0 +1,317 @@
+import asyncio
+import json
+import logging
+import os
+import time
+import fractions
+import cv2
+import numpy as np
+import subprocess
+
+# WebRTC & Network
+import aiohttp
+from av import VideoFrame
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer, VideoStreamTrack
+from aiortc.contrib.media import MediaPlayer
+
+# ROS2
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Joy
+
+# Stałe sprzętowe (można też zamienić na parametry w przyszłości)
+CAMERA_DEVICE = '/dev/video0'
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 30
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("Bridge")
+
+class RealTimeOpenCVTrack(VideoStreamTrack):
+    def __init__(self):
+        super().__init__()
+        self.cap = None
+        self._start_time = None
+        self.running = False
+        self.black_frame_data = np.zeros((CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=np.uint8)
+        self._open_camera_immediately()
+
+    def _open_camera_immediately(self):
+        try:
+            logger.info(f"⚡ [HARDWARE] Próba otwarcia kamery: {CAMERA_DEVICE}...")
+            self.cap = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+            self.cap.set(cv2.CAP_PROP_FPS, CAMERA_FPS)
+            
+            if not self.cap.isOpened():
+                logger.error("❌ [HARDWARE] Błąd: Kamera się nie otworzyła!")
+                return
+
+            self.running = True
+            self._start_time = time.time()
+            logger.info(f"✅ [HARDWARE] KAMERA URUCHOMIONA FIZYCZNIE!")
+            self.cap.read() 
+        except Exception as e:
+            logger.error(f"❌ [HARDWARE] Wyjątek: {e}")
+
+    async def recv(self):
+        if self._start_time is None:
+            self._start_time = time.time()
+            
+        timestamp = time.time() - self._start_time
+        pts = int(timestamp * 90000)
+        time_base = fractions.Fraction(1, 90000)
+
+        if self.running and self.cap and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if ret:
+                video_frame = VideoFrame.from_ndarray(frame, format="bgr24")
+                frame_to_send = video_frame.reformat(format="yuv420p")
+            else:
+                frame_to_send = VideoFrame.from_ndarray(self.black_frame_data, format="bgr24").reformat(format="yuv420p")
+        else:
+            frame_to_send = VideoFrame.from_ndarray(self.black_frame_data, format="bgr24").reformat(format="yuv420p")
+
+        frame_to_send.pts = pts
+        frame_to_send.time_base = time_base
+        return frame_to_send
+
+    def stop_hardware(self):
+        self.running = False
+        if self.cap and self.cap.isOpened():
+            logger.info("🛑 Zamykanie kamery...")
+            self.cap.release()
+
+class ROS2BridgeNode(Node):
+    def __init__(self):
+        super().__init__('python_webrtc_bridge')
+        
+        # === DEKLARACJA PARAMETRÓW ROS ===
+        self.declare_parameter('use_google_stun', True)
+        self.declare_parameter('robot_id', 'g1pilot')
+        self.declare_parameter('signaling_url', 'wss://rafal.tail692f2a.ts.net/ws')
+        
+        # Pobranie wartości parametrów do zmiennych instancji
+        self.use_google_stun = self.get_parameter('use_google_stun').value
+        self.robot_id = self.get_parameter('robot_id').value
+        self.signaling_url = self.get_parameter('signaling_url').value
+
+        topic_name = f'/{self.robot_id}/joy'
+        self.publisher_ = self.create_publisher(Joy, topic_name, 10)
+        
+        logger.info(f"ROS2 Node Started. Robot ID: {self.robot_id}")
+        logger.info(f"📡 Signaling URL: {self.signaling_url}")
+        logger.info(f"🌍 STUN Mode: {'GOOGLE STUN' if self.use_google_stun else 'LOCAL/TAILSCALE ONLY'}")
+        
+        # === STAN GLOBALNY ===
+        self.current_axes = [0.0] * 8
+        self.current_buttons = [0] * 12
+        
+        self.publish_task = asyncio.create_task(self._publish_loop())
+
+    async def _publish_loop(self):
+        """Pętla heartbeat wysyłająca stan Joy co 1/30 sekundy"""
+        while True:
+            try:
+                msg = Joy()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = "webrtc_input"
+                msg.axes = self.current_axes
+                msg.buttons = self.current_buttons
+                self.publisher_.publish(msg)
+                await asyncio.sleep(1.0 / 30.0)
+            except Exception as e:
+                logger.error(f"❌ Błąd w pętli publish: {e}")
+                await asyncio.sleep(1)
+
+    async def handle_joystick_data(self, data):
+        linear = float(data.get('linear', 0.0))
+        angular = float(data.get('angular', 0.0))
+        
+        self.current_axes = [0.0] * 8
+        self.current_buttons = [0] * 12
+        
+        self.current_axes[1] = linear * -1.0 
+        self.current_axes[2] = angular
+        
+        self.current_buttons[8] = 1 if (abs(linear) > 0.05 or abs(angular) > 0.05) else 0
+
+    async def handle_button_command(self, command):
+        LINEAR_SPEED = 0.5
+        ANGULAR_SPEED = 0.5
+
+        new_axes = [0.0] * 8
+        new_buttons = [0] * 12
+        
+        if command == "forward_rover":
+            new_axes[1] = -LINEAR_SPEED 
+            new_buttons[8] = 1 
+            logger.info("🤖 GŁOS: JAZDA CIĄGŁA W PRZÓD")
+
+        elif command == "backward_rover":
+            new_axes[1] = LINEAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: JAZDA CIĄGŁA W TYŁ")
+
+        elif command == "left_rover":
+            new_axes[2] = -ANGULAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W LEWO")
+
+        elif command == "right_rover":
+            new_axes[2] = ANGULAR_SPEED
+            new_buttons[8] = 1
+            logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W PRAWO")
+
+        elif command == "stop_rover":
+            logger.info("🤖 GŁOS: STOP")
+        
+        self.current_axes = new_axes
+        self.current_buttons = new_buttons
+
+class WebRTCClient:
+    def __init__(self, ros_node):
+        self.ros_node = ros_node
+        self.username = self.ros_node.robot_id  # Pobieramy z parametrów węzła
+        self.peers = {} 
+        
+        logger.info(f"🎬 [INIT] WebRTC Client dla: {self.username}")
+        self.video_track = RealTimeOpenCVTrack()
+        self.audio_track = None
+        
+        try:
+            logger.info("⚡ [HARDWARE] Otwieranie mikrofonu...")
+            self.audio_player = MediaPlayer('default', format='alsa', options={"fflags": "nobuffer", "flags": "low_delay"})
+            if self.audio_player.audio:
+                 self.audio_track = self.audio_player.audio
+                 logger.info("✅ [HARDWARE] MIKROFON AKTYWNY.")
+        except Exception:
+             logger.info("ℹ️ Audio niedostępne (Video Only).")
+
+    async def run(self):
+        url = self.ros_node.signaling_url # Pobieramy z parametrów węzła
+        logger.info(f"🚀 [SYSTEM] Łączenie z siecią: {url}")
+        
+        async with aiohttp.ClientSession() as session:
+            while True:
+                try:
+                    async with session.ws_connect(url, ssl=False) as ws:
+                        self.ws = ws
+                        await self.send_signal("new-peer", {})
+                        logger.info("✅ ZALOGOWANO DO SIECI!")
+                        async for msg in ws:
+                            if msg.type == aiohttp.WSMsgType.TEXT:
+                                await self.handle_signaling_message(json.loads(msg.data))
+                            elif msg.type == aiohttp.WSMsgType.ERROR:
+                                break
+                except Exception as e:
+                    logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam za 2s...")
+                    await asyncio.sleep(2)
+
+    async def send_signal(self, action, message):
+        if self.ws and not self.ws.closed:
+            await self.ws.send_str(json.dumps({'peer': self.username, 'action': action, 'message': message}))
+
+    async def handle_signaling_message(self, data):
+        peer_username = data['peer']
+        action = data['action']
+        if peer_username == self.username: return
+
+        if action == 'new-peer':
+            logger.info(f"👋 Widzę {peer_username}. Wysyłam 'request-connect'.")
+            await self.send_signal('request-connect', {})
+        
+        elif action == 'start-call':
+            target = data['message'].get('target')
+            if target and target != self.username:
+                return
+
+            logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}.")
+            await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
+
+        elif action == 'new-answer':
+            if peer_username in self.peers:
+                pc = self.peers[peer_username]
+                answer = data['message']['sdp']
+                if pc.signalingState != "stable":
+                    await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'], type=answer['type']))
+
+    async def create_peer_connection(self, peer_username, initiator, offer_sdp=None, receiver_channel=None):
+        # Pobieranie konfiguracji dynamicznie z węzła
+        use_google_stun = self.ros_node.use_google_stun
+        
+        ice_servers = []
+        if use_google_stun:
+            ice_servers.append(RTCIceServer(urls=["stun:stun.l.google.com:19302"]))
+        
+        config = RTCConfiguration(iceServers=ice_servers)
+        pc = RTCPeerConnection(configuration=config)
+        self.peers[peer_username] = pc
+
+        if self.video_track:
+            pc.addTransceiver(self.video_track, direction="sendonly")
+        if self.audio_track:
+            pc.addTransceiver(self.audio_track, direction="sendonly")
+
+        if initiator:
+            channel = pc.createDataChannel("chat")
+            self.setup_data_channel(channel)
+
+            offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            await self.send_signal('new-offer', {'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type}, 'receiver_channel_name': receiver_channel})
+
+        @pc.on("iceconnectionstatechange")
+        async def on_icestate():
+            if pc.iceConnectionState in ["failed", "closed"]:
+                await pc.close()
+                if peer_username in self.peers: del self.peers[peer_username]
+
+    def setup_data_channel(self, channel):
+        @channel.on("message")
+        async def on_message(message):
+            try:
+                data = json.loads(message)
+                if 'joystick' in data:
+                    await self.ros_node.handle_joystick_data(data['joystick'])
+                elif 'message' in data:
+                    cmd = data['message']
+                    allowed = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]
+                    if cmd in allowed:
+                        await self.ros_node.handle_button_command(cmd)
+                    else:
+                        subprocess.run(cmd, shell=True)
+            except Exception:
+                pass
+
+async def run_bridge():
+    rclpy.init()
+    node = ROS2BridgeNode()
+    client = WebRTCClient(node)
+    
+    client_task = asyncio.create_task(client.run())
+    
+    try:
+        while rclpy.ok():
+            rclpy.spin_once(node, timeout_sec=0)
+            await asyncio.sleep(0.001) 
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if client.video_track:
+            client.video_track.stop_hardware()
+        if rclpy.ok():
+            node.destroy_node()
+            rclpy.shutdown()
+
+def main(args=None):
+    try:
+        asyncio.run(run_bridge())
+    except KeyboardInterrupt:
+        pass
+
+if __name__ == "__main__":
+    main()
