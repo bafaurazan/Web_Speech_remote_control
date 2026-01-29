@@ -100,7 +100,9 @@ chmod 644 mqtt_broker.crt mqtt_broker.key ca_root.crt
 # turn off mosquitto
 sudo systemctl stop mosquitto
 # uruchomienie mosquitto z konfiguracją zabezpieczoną
-mosquitto -c ~/Web_Speech_remote_control/sros2_ws/mqtt_certs/mosquitto_secure.conf -v
+mosquitto -c ~/Web_Speech_remote_control/sros2_ws/mqtt_certs/sec_mosquitto.conf -v
+# uruchomienie mosquitto z konfiguracją nie zabezpieczoną
+mosquitto -c ~/Web_Speech_remote_control/sros2_ws/mqtt_certs/mosquitto.conf -v
 
 # tuning on
 sudo systemctl start mosquitto

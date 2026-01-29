@@ -23,6 +23,8 @@ setup(
     entry_points={
         'console_scripts': [
             'mqtt_client_test = teleop_mqtt_client.mqtt_client_test_node:main',
+            'iot_sender = teleop_mqtt_client.iot_sender:main',
+            'sec_iot_sender = teleop_mqtt_client.sec_iot_sender:main',
         ],
     },
 )
