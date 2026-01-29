@@ -1,0 +1,38 @@
+/**:
+  ros__parameters:
+    broker:
+      host: localhost
+      port: 8883
+      tls:
+        enabled: true
+        # Ścieżka do CA (z SROS 2)
+        ca_certificate: /home/rafal/Web_Speech_remote_control/sros2_ws/teleop_keystore/public/identity_ca.cert.pem
+    
+    client:
+      id: "ros2_mqtt_bridge_client"
+      tls:
+        # Certyfikat i klucz klienta
+        certificate: /home/rafal/Web_Speech_remote_control/sros2_ws/mqtt_certs/mqtt_client_node.crt
+        key: /home/rafal/Web_Speech_remote_control/sros2_ws/mqtt_certs/mqtt_client_node.key
+        version: 5
+        verify: true
+
+    # ZMIANA PONIŻEJ: Zamiast listy myślników (-), używamy struktury "ros_topics" + nazwa tematu jako klucz
+    bridge:
+      ros2mqtt:
+        ros_topics:
+          - /ping/primitive
+        
+        # Konfiguracja dla tematu zdefiniowanego wyżej
+        /ping/primitive:
+          mqtt_topic: pingpong/primitive
+          primitive: true
+
+      mqtt2ros:
+        mqtt_topics:
+          - pingpong/primitive
+        
+        # Konfiguracja dla tematu zdefiniowanego wyżej
+        pingpong/primitive:
+          ros_topic: /pong/primitive
+          primitive: true

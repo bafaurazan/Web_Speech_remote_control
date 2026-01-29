@@ -11,6 +11,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.py')),
+        ('share/' + package_name + '/config', glob('config/*.xml')),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,7 +22,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_mqtt_client.bridge_node:main',
+            'mqtt_client_test = teleop_mqtt_client.mqtt_client_test_node:main',
         ],
     },
 )

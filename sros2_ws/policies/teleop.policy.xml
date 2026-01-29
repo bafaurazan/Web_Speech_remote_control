@@ -56,5 +56,30 @@
         </profile>
       </profiles>
     </enclave>
+    <enclave path="/teleop_policy/mqtt_client">
+      <profiles>
+        <profile ns="/" node="mqtt_client">
+          <xi:include href="common/node.xml" xpointer="xpointer(/profile/*)"/>
+          
+          <services reply="ALLOW">
+            <service>~/is_connected</service>
+            <service>~/new_ros2mqtt_bridge</service>
+            <service>~/new_mqtt2ros_bridge</service>
+            </services>
+
+          <topics publish="ALLOW" subscribe="ALLOW">
+            <topic>/pong/primitive</topic>
+            <topic>/ping/ros</topic>
+            <topic>/mqtt_client/latencies/*</topic>
+            <topic>/rosout</topic>
+          </topics>
+          <topics publish="ALLOW" subscribe="ALLOW">
+            <topic>/ping/primitive</topic>
+            <topic>/ping/ros</topic>
+            <topic>/parameter_events</topic>
+          </topics>
+        </profile>
+      </profiles>
+    </enclave>
   </enclaves>
 </policy>
