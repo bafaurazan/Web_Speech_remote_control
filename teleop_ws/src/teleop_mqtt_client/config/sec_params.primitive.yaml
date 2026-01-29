@@ -17,7 +17,6 @@
         version: 5
         verify: true
 
-    # ZMIANA PONIŻEJ: Zamiast listy myślników (-), używamy struktury "ros_topics" + nazwa tematu jako klucz
     bridge:
       ros2mqtt:
         ros_topics:
