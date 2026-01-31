@@ -9,6 +9,10 @@ sudo wireshark
 
 launching mosquitto broker unsecured
 ```bash
+# 1. Stop the Background Service
+# If you installed Mosquitto via apt, it is likely running as a service. Run this command to stop it:
+sudo systemctl stop mosquitto
+
 cd ~/Web_Speech_remote_control/sros2_ws/mqtt_certs
 mosquitto -c ~/Web_Speech_remote_control/sros2_ws/mqtt_certs/mosquitto.conf -v
 ```

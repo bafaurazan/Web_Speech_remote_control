@@ -18,14 +18,6 @@ ros2 security create_permission teleop_keystore   /teleop_policy/mqtt_client ./p
 
 ```
 
-```bash
-#secured
-ros2 launch teleop_bringup sec_twist_joy_g1.launch.py 
-
-#no secured
-ros2 launch teleop_bringup twist_joy_g1.launch.py 
-
-```
 [ros2 dds security integration](https://design.ros2.org/articles/ros2_dds_security.html)
 
 ```bash
