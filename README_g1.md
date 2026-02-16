@@ -62,9 +62,9 @@ ros2 run teleop_joy_cmd loco_client --ros-args -p network_interface:=wlp4s0
 ```
 
 ```bash
-ros2 topic pub --once /g1pilot/cmd std_msgs/msg/String "{data: 'damp'}"
-ros2 topic pub --once /g1pilot/cmd std_msgs/msg/String "{data: 'standby'}"
-ros2 topic pub --once /g1pilot/cmd std_msgs/msg/String "{data: 'start'}"
+ros2 service call /g1pilot/damp std_srvs/srv/Trigger
+ros2 service call /g1pilot/standby std_srvs/srv/Trigger
+ros2 service call /g1pilot/start std_srvs/srv/Trigger
 
 #for simulation
 ros2 topic pub --once /g1pilot/arms/enabled std_msgs/msg/Bool "{data: true}"
