@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 from glob import glob
-package_name = 'teleop_joy_cmd'
+package_name = 'teleop_mqtt_client'
 
 setup(
     name=package_name,
@@ -11,6 +11,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch', glob('launch/*.py')),
+        ('share/' + package_name + '/config', glob('config/*.xml')),
+        ('share/' + package_name + '/config', glob('config/*.yaml')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -20,8 +22,9 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'cmd_vel_sub = teleop_joy_cmd.cmd_vel_sub:main',
-            'loco_client = teleop_joy_cmd.loco_client_node:main',
+            'mqtt_client_test = teleop_mqtt_client.mqtt_client_test_node:main',
+            'iot_sender = teleop_mqtt_client.iot_sender:main',
+            'sec_iot_sender = teleop_mqtt_client.sec_iot_sender:main',
         ],
     },
 )
