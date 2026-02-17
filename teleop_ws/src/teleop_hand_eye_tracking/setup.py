@@ -20,7 +20,9 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_hand_eye_tracking.bridge_node:main',
+            'eye_tracker = teleop_hand_eye_tracking.eye_tracker_node:main',
+            'gaze_controller = teleop_hand_eye_tracking.gaze_controller_node:main',
+            'gaze_calibration_gui = teleop_hand_eye_tracking.gaze_calibration_gui_node:main',
         ],
     },
 )
