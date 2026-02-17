@@ -28,11 +28,11 @@ def generate_launch_description():
             emulate_tty=True
         ),
 
-        # --- WĘZEŁ STEROWANIA MYSZKĄ (Gaze Controller) ---
+        # --- WĘZEŁ STEROWANIA MYSZKĄ (eye_tracker Controller) ---
         Node(
             package='teleop_hand_eye_tracking',
-            executable='gaze_controller',
-            name='gaze_controller_node',
+            executable='eye_tracker_controller',
+            name='eye_tracker_controller_node',
             output='screen',
             emulate_tty=True
         ),

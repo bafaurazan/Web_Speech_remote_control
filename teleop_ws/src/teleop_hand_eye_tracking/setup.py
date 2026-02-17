@@ -21,8 +21,8 @@ setup(
     entry_points={
         'console_scripts': [
             'eye_tracker = teleop_hand_eye_tracking.eye_tracker_node:main',
-            'gaze_controller = teleop_hand_eye_tracking.gaze_controller_node:main',
-            'gaze_calibration_gui = teleop_hand_eye_tracking.gaze_calibration_gui_node:main',
+            'eye_tracker_controller = teleop_hand_eye_tracking.eye_tracker_controller_node:main',
+            'eye_tracker_calibration_gui = teleop_hand_eye_tracking.eye_tracker_calibration_gui_node:main',
         ],
     },
 )

@@ -30,8 +30,8 @@ def generate_launch_description():
         # Ten węzeł uruchomi się, wyświetli instrukcję i POCZEKA NA SPACJĘ
         Node(
             package='teleop_hand_eye_tracking',
-            executable='gaze_calibration_gui', # Upewnij się, że tak nazwałeś entry point w setup.py!
-            name='gaze_calibration_gui_node',
+            executable='eye_tracker_calibration_gui', # Upewnij się, że tak nazwałeś entry point w setup.py!
+            name='eye_tracker_calibration_gui_node',
             output='screen',
             emulate_tty=True
         ),
