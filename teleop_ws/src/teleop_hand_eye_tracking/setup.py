@@ -24,6 +24,7 @@ setup(
             'eye_tracker_controller = teleop_hand_eye_tracking.eye_tracker_controller_node:main',
             'eye_tracker_calibration_gui = teleop_hand_eye_tracking.eye_tracker_calibration_gui_node:main',
             'hand_tracker = teleop_hand_eye_tracking.hand_tracker_node:main',
+            'arm_controller = teleop_hand_eye_tracking.arm_controller_node:main',
         ],
     },
 )
