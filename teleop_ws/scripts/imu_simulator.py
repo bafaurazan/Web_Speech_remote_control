@@ -42,8 +42,15 @@ class IMUMultiPeerAnswerer:
                 try:
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
+                        
+                        # === KROK 1: HARD RESET NA STARCIE ===
+                        # Upewniamy się, że pamięć jest czysta przed jakimkolwiek działaniem
+                        logger.info("🧹 [STARTUP] Czyszczenie lokalnych połączeń...")
+                        await self.reset_all_connections()
+                        
+                        # === KROK 2: OGŁOSZENIE ===
+                        logger.info("📢 [STARTUP] Wysyłam 'new-peer' (Jestem gotowy).")
                         await self.send_signal("new-peer", {})
-                        logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'! Czekam na połączenia...")
                         
                         async for msg in ws:
                             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -53,6 +60,7 @@ class IMUMultiPeerAnswerer:
                                 except Exception:
                                     traceback.print_exc()
                             elif msg.type == aiohttp.WSMsgType.ERROR:
+                                logger.error("❌ Błąd WebSocket")
                                 break
                                 
                     logger.warning("⚠️ Połączenie WebSocket zamknięte. Restart za 2s...")
@@ -60,26 +68,36 @@ class IMUMultiPeerAnswerer:
                 except Exception as e:
                     logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam za 2s...")
                 
+                # Sprzątanie po zerwaniu połączenia z serwerem
                 await self.reset_all_connections()
                 await asyncio.sleep(2)
 
     async def reset_all_connections(self):
+        """Zamyka wszystkie aktywne połączenia siłowo."""
         if self.peers:
-            logger.info("🧹 Czyszczenie połączeń...")
-            for peer_id in list(self.peers.keys()):
+            logger.info(f"🧹 Usuwanie {len(self.peers)} wiszących sesji...")
+            peer_ids = list(self.peers.keys())
+            for peer_id in peer_ids:
                 await self.close_peer(peer_id)
             self.peers.clear()
 
     async def close_peer(self, peer_id):
+        """Zamyka konkretnego peera i czyści zasoby."""
         if peer_id in self.peers:
             peer_data = self.peers[peer_id]
             try:
-                if peer_data.get('dc'): peer_data['dc'].close()
-                if peer_data.get('pc'): await peer_data['pc'].close()
-            except Exception:
-                pass
+                # Zamknij DataChannel
+                if peer_data.get('dc'): 
+                    peer_data['dc'].close()
+                
+                # Zamknij PeerConnection
+                if peer_data.get('pc'): 
+                    await peer_data['pc'].close()
+            except Exception as e:
+                logger.warning(f"⚠️ Błąd podczas zamykania {peer_id}: {e}")
+            
             del self.peers[peer_id]
-            logger.info(f"❌ Zamknięto połączenie z {peer_id}")
+            logger.info(f"❌ Połączenie z {peer_id} usunięte.")
 
     async def send_signal(self, action, message):
         if self.ws and not self.ws.closed:
@@ -93,53 +111,42 @@ class IMUMultiPeerAnswerer:
         
         if peer == MY_ID: return 
 
-        # === 1. OBSŁUGA NEW-PEER (Twardy restart drugiej strony) ===
-        if action == 'new-peer':
-            # Jeśli ktoś wysyła new-peer, to znaczy że jest "czysty". 
-            # Jeśli mieliśmy z nim połączenie, to jest ono martwe -> usuwamy.
+        # === 1. KTOŚ SIĘ POJAWIŁ / PROSI O KONTAKT ===
+        if action == 'new-peer' or action == 'request-connect':
+            # Jeśli mamy tego peera w pamięci -> to stare śmieci. Usuwamy.
             if peer in self.peers:
-                logger.info(f"♻️ Wykryto restart peera {peer} (new-peer). Usuwam starą sesję.")
+                logger.info(f"♻️ Wykryto aktywność {peer}. Resetuję jego starą sesję.")
                 await self.close_peer(peer)
 
             if peer in WHITELIST:
-                logger.info(f"🤖 Zaufany {peer} dostępny. AUTO-START.")
+                logger.info(f"🤖 Zaufany {peer}. Wysyłam 'start-call' (Auto-Accept).")
                 await self.send_signal('start-call', {'target': peer})
             else:
-                logger.info(f"👋 Nowy {peer}. Pytam o zgodę.")
+                logger.info(f"👋 Nowy {peer}. Wysyłam 'request-connect'.")
                 await self.send_signal('request-connect', {})
 
-        # === 2. OBSŁUGA REQUEST-CONNECT (Prośba o kontakt) ===
-        elif action == 'request-connect':
-            # KLUCZOWA ZMIANA: Ignorujemy prośbę, jeśli już jesteśmy połączeni.
-            # To zapobiega restartom, gdy bridge_node reaguje na innych użytkowników.
-            if peer in self.peers:
-                # logger.info(f"ℹ️ Ignoruję 'request-connect' od połączonego {peer}.")
-                return 
-
-            if peer in WHITELIST:
-                logger.info(f"🤖 Zaufany {peer} prosi o kontakt. AUTO-START.")
-                await self.send_signal('start-call', {'target': peer})
-            else:
-                logger.info(f"👋 {peer} prosi o kontakt. Odpowiadam prośbą.")
-                await self.send_signal('request-connect', {})
-
-        # === 3. START CALL (Inicjator) ===
+        # === 2. START CALL (My inicjujemy - np. do zaufanego) ===
         elif action == 'start-call':
             target = message.get('target')
             if target == MY_ID or target is None:
                 logger.info(f"🚀 Otrzymano 'start-call' od {peer}. Tworzę OFERTĘ.")
-                if peer in self.peers:
-                    await self.close_peer(peer)
+                # Zawsze czyścimy przed stworzeniem nowego
+                if peer in self.peers: await self.close_peer(peer)
                 await self.create_offerer(peer, message)
             
-        # === 4. OTRZYMANO OFERTĘ (Odbiorca) ===
+        # === 3. OTRZYMANO OFERTĘ (To tutaj następuje główne łączenie) ===
         elif action == 'new-offer':
             logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę ANSWER.")
+            
+            # === KLUCZOWE: Jeśli mieliśmy cokolwiek z tym peerem, usuwamy to teraz ===
+            # To naprawia problem "drugiego restartu" - zawsze traktujemy ofertę jako nową czystą kartę
             if peer in self.peers:
+                logger.info(f"🧹 Otrzymano nową ofertę od {peer}, ale miałem starą sesję. Usuwam ją.")
                 await self.close_peer(peer)
+            
             await self.create_answerer(peer, message)
 
-        # === 5. FINALIZACJA ===
+        # === 4. OTRZYMANO ODPOWIEDŹ (Finalizacja) ===
         elif action == 'new-answer':
             if peer in self.peers:
                 logger.info(f"✅ Otrzymano Answer od {peer}. Finalizuję połączenie.")
@@ -150,21 +157,21 @@ class IMUMultiPeerAnswerer:
                         type=message['sdp']['type']
                     ))
                 except Exception as e:
-                    logger.error(f"Błąd SDP: {e}")
+                    logger.error(f"❌ Błąd SDP z {peer}: {e}")
 
-    # === WSPÓLNA OBSŁUGA STANU ICE ===
+    # === OBSŁUGA STANU POŁĄCZENIA (RECONNECT) ===
     async def handle_ice_state_change(self, peer_id, pc):
         state = pc.iceConnectionState
         if state in ["failed", "disconnected", "closed"]:
-            logger.warning(f"⚠️ Utrata połączenia z {peer_id} (ICE: {state})")
+            logger.warning(f"⚠️ Zerwano połączenie z {peer_id} (ICE: {state})")
             await self.close_peer(peer_id)
             
-            # Reconnect tylko dla zaufanych
+            # Jeśli to zaufany (robot), próbujemy go od razu zaczepić ponownie
             if peer_id in WHITELIST:
-                logger.info(f"🔄 Próba odnowienia z {peer_id}...")
+                logger.info(f"🔄 Próba odnowienia połączenia z {peer_id}...")
                 await self.send_signal('start-call', {'target': peer_id})
 
-    # --- Rola OFFERERA ---
+    # --- TWORZENIE POŁĄCZENIA (OFFERER - my dzwonimy) ---
     async def create_offerer(self, peer_id, message):
         try:
             receiver_channel = message.get('receiver_channel_name')
@@ -173,6 +180,7 @@ class IMUMultiPeerAnswerer:
             
             self.peers[peer_id] = {'pc': pc, 'dc': None}
 
+            # Offerer tworzy kanał
             dc = pc.createDataChannel("chat")
             self.peers[peer_id]['dc'] = dc
             logger.info(f"🛠️ [Offerer] Utworzono Data Channel dla {peer_id}")
@@ -195,7 +203,7 @@ class IMUMultiPeerAnswerer:
             traceback.print_exc()
             await self.close_peer(peer_id)
 
-    # --- Rola ANSWERERA ---
+    # --- TWORZENIE POŁĄCZENIA (ANSWERER - my odbieramy) ---
     async def create_answerer(self, peer_id, message):
         try:
             sdp = message.get('sdp')
@@ -254,6 +262,7 @@ class IMUMultiPeerAnswerer:
                 }
             })
 
+            # Broadcast do wszystkich aktywnych kanałów
             if self.peers:
                 active_peers = list(self.peers.values())
                 for peer_data in active_peers:
