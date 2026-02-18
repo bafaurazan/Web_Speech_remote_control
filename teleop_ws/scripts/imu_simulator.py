@@ -14,6 +14,9 @@ from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, R
 SIGNALING_URL = 'wss://rafal.tail692f2a.ts.net/ws'
 MY_ID = 'imu_simulator'   
 
+# --- LISTA ZAUFANYCH (AUTO-CONNECT) ---
+WHITELIST = ['g1pilot']
+
 # Konfiguracja logowania
 logging.basicConfig(
     level=logging.INFO,
@@ -25,7 +28,6 @@ logger = logging.getLogger("IMU_Sim")
 class IMUMultiPeerAnswerer:
     def __init__(self):
         self.ws = None
-        # Słownik: peer_id -> {'pc': RTCPeerConnection, 'dc': RTCDataChannel}
         self.peers = {} 
         self.running = True
         self.sim_task = None
@@ -33,7 +35,6 @@ class IMUMultiPeerAnswerer:
     async def run(self):
         logger.info(f"🚀 [IMU SIM] Łączenie z serwerem: {SIGNALING_URL}")
         
-        # Uruchomienie pętli symulacji danych w tle
         self.sim_task = asyncio.create_task(self.simulate_data_loop())
 
         async with aiohttp.ClientSession() as session:
@@ -41,7 +42,6 @@ class IMUMultiPeerAnswerer:
                 try:
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
-                        # Wysyłamy new-peer zaraz po połączeniu, żeby inni nas zobaczyli
                         await self.send_signal("new-peer", {})
                         logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'! Czekam na połączenia...")
                         
@@ -73,8 +73,11 @@ class IMUMultiPeerAnswerer:
     async def close_peer(self, peer_id):
         if peer_id in self.peers:
             peer_data = self.peers[peer_id]
-            if peer_data['pc']:
-                await peer_data['pc'].close()
+            try:
+                if peer_data.get('dc'): peer_data['dc'].close()
+                if peer_data.get('pc'): await peer_data['pc'].close()
+            except Exception:
+                pass
             del self.peers[peer_id]
             logger.info(f"❌ Zamknięto połączenie z {peer_id}")
 
@@ -90,20 +93,37 @@ class IMUMultiPeerAnswerer:
         
         if peer == MY_ID: return 
 
-        # === ZMIANA KLUCZOWA ===
-        # Reakcja na pojawienie się nowego użytkownika (np. odświeżenie strony)
+        # === 1. OBSŁUGA NEW-PEER (Twardy restart drugiej strony) ===
         if action == 'new-peer':
-            logger.info(f"👋 Widzę nowego peera: {peer}. Wysyłam 'request-connect', aby mnie zauważył.")
-            # To sprawi, że na froncie pojawi się kafelek z prośbą o połączenie
-            await self.send_signal('request-connect', {})
-        
-        elif action == 'request-connect':
-            # Jeśli ktoś inny prosi o połączenie, też możemy odpowiedzieć request-connect 
-            # (czasami pomaga w sytuacjach wyścigu, ale zazwyczaj new-peer wystarcza)
-            logger.info(f"👋 Peer {peer} prosi o kontakt. Odpowiadam 'request-connect'.")
-            await self.send_signal('request-connect', {})
+            # Jeśli ktoś wysyła new-peer, to znaczy że jest "czysty". 
+            # Jeśli mieliśmy z nim połączenie, to jest ono martwe -> usuwamy.
+            if peer in self.peers:
+                logger.info(f"♻️ Wykryto restart peera {peer} (new-peer). Usuwam starą sesję.")
+                await self.close_peer(peer)
 
-        # 2. Otrzymano zgodę/rozkaz połączenia (Kliknięcie "Zatwierdź" w przeglądarce)
+            if peer in WHITELIST:
+                logger.info(f"🤖 Zaufany {peer} dostępny. AUTO-START.")
+                await self.send_signal('start-call', {'target': peer})
+            else:
+                logger.info(f"👋 Nowy {peer}. Pytam o zgodę.")
+                await self.send_signal('request-connect', {})
+
+        # === 2. OBSŁUGA REQUEST-CONNECT (Prośba o kontakt) ===
+        elif action == 'request-connect':
+            # KLUCZOWA ZMIANA: Ignorujemy prośbę, jeśli już jesteśmy połączeni.
+            # To zapobiega restartom, gdy bridge_node reaguje na innych użytkowników.
+            if peer in self.peers:
+                # logger.info(f"ℹ️ Ignoruję 'request-connect' od połączonego {peer}.")
+                return 
+
+            if peer in WHITELIST:
+                logger.info(f"🤖 Zaufany {peer} prosi o kontakt. AUTO-START.")
+                await self.send_signal('start-call', {'target': peer})
+            else:
+                logger.info(f"👋 {peer} prosi o kontakt. Odpowiadam prośbą.")
+                await self.send_signal('request-connect', {})
+
+        # === 3. START CALL (Inicjator) ===
         elif action == 'start-call':
             target = message.get('target')
             if target == MY_ID or target is None:
@@ -112,22 +132,37 @@ class IMUMultiPeerAnswerer:
                     await self.close_peer(peer)
                 await self.create_offerer(peer, message)
             
-        # 3. Ktoś inny wysłał ofertę (Answerer)
+        # === 4. OTRZYMANO OFERTĘ (Odbiorca) ===
         elif action == 'new-offer':
             logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę ANSWER.")
             if peer in self.peers:
                 await self.close_peer(peer)
             await self.create_answerer(peer, message)
 
-        # 4. Otrzymano odpowiedź na naszą ofertę
+        # === 5. FINALIZACJA ===
         elif action == 'new-answer':
             if peer in self.peers:
                 logger.info(f"✅ Otrzymano Answer od {peer}. Finalizuję połączenie.")
-                pc = self.peers[peer]['pc']
-                await pc.setRemoteDescription(RTCSessionDescription(
-                    sdp=message['sdp']['sdp'], 
-                    type=message['sdp']['type']
-                ))
+                try:
+                    pc = self.peers[peer]['pc']
+                    await pc.setRemoteDescription(RTCSessionDescription(
+                        sdp=message['sdp']['sdp'], 
+                        type=message['sdp']['type']
+                    ))
+                except Exception as e:
+                    logger.error(f"Błąd SDP: {e}")
+
+    # === WSPÓLNA OBSŁUGA STANU ICE ===
+    async def handle_ice_state_change(self, peer_id, pc):
+        state = pc.iceConnectionState
+        if state in ["failed", "disconnected", "closed"]:
+            logger.warning(f"⚠️ Utrata połączenia z {peer_id} (ICE: {state})")
+            await self.close_peer(peer_id)
+            
+            # Reconnect tylko dla zaufanych
+            if peer_id in WHITELIST:
+                logger.info(f"🔄 Próba odnowienia z {peer_id}...")
+                await self.send_signal('start-call', {'target': peer_id})
 
     # --- Rola OFFERERA ---
     async def create_offerer(self, peer_id, message):
@@ -144,13 +179,7 @@ class IMUMultiPeerAnswerer:
 
             @pc.on("iceconnectionstatechange")
             async def on_ice_state():
-                state = pc.iceConnectionState
-                if state in ["failed", "disconnected", "closed"]:
-                    logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
-                    await self.close_peer(peer_id)
-                    # Po zerwaniu wysyłamy new-peer, żeby frontend wiedział, że żyjemy
-                    logger.info("🔄 Połączenie zerwane. Ogłaszam się ponownie (new-peer).")
-                    await self.send_signal("new-peer", {})
+                await self.handle_ice_state_change(peer_id, pc)
 
             offer = await pc.createOffer()
             await pc.setLocalDescription(offer)
@@ -179,18 +208,13 @@ class IMUMultiPeerAnswerer:
 
             @pc.on("datachannel")
             def on_datachannel(channel):
-                logger.info(f"✅ [Answerer] Otrzymano Data Channel od {peer_id}: '{channel.label}'")
+                logger.info(f"✅ [Answerer] Otrzymano Data Channel od {peer_id}")
                 if peer_id in self.peers:
                     self.peers[peer_id]['dc'] = channel
 
             @pc.on("iceconnectionstatechange")
             async def on_ice_state():
-                state = pc.iceConnectionState
-                if state in ["failed", "disconnected", "closed"]:
-                    logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
-                    await self.close_peer(peer_id)
-                    logger.info("🔄 Połączenie zerwane. Ogłaszam się ponownie (new-peer).")
-                    await self.send_signal("new-peer", {})
+                await self.handle_ice_state_change(peer_id, pc)
 
             await pc.setRemoteDescription(RTCSessionDescription(sdp=sdp['sdp'], type=sdp['type']))
             answer = await pc.createAnswer()
@@ -208,7 +232,6 @@ class IMUMultiPeerAnswerer:
             await self.close_peer(peer_id)
 
     async def simulate_data_loop(self):
-        """Pętla Broadcast"""
         logger.info("🌊 Start generatora danych IMU...")
         start_time = time.time()
         
