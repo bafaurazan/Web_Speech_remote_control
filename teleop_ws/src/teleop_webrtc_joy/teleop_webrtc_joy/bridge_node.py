@@ -17,7 +17,7 @@ from aiortc.contrib.media import MediaPlayer
 # ROS2
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Joy
+from sensor_msgs.msg import Joy, Imu  # <--- [ZMIANA 1] Dodano import Imu
 
 # Stałe sprzętowe (można też zamienić na parametry w przyszłości)
 CAMERA_DEVICE = '/dev/video0'
@@ -99,8 +99,12 @@ class ROS2BridgeNode(Node):
         self.robot_id = self.get_parameter('robot_id').value
         self.signaling_url = self.get_parameter('signaling_url').value
 
-        topic_name = f'/{self.robot_id}/joy'
-        self.publisher_ = self.create_publisher(Joy, topic_name, 10)
+        joy_topic_name = f'/{self.robot_id}/joy'
+        self.publisher_ = self.create_publisher(Joy, joy_topic_name, 10)
+
+        # [ZMIANA 2] Dodanie publishera IMU
+        imu_topic_name = f'/{self.robot_id}/imu'
+        self.imu_publisher_ = self.create_publisher(Imu, imu_topic_name, 10)
         
         logger.info(f"ROS2 Node Started. Robot ID: {self.robot_id}")
         logger.info(f"📡 Signaling URL: {self.signaling_url}")
@@ -126,6 +130,34 @@ class ROS2BridgeNode(Node):
             except Exception as e:
                 logger.error(f"❌ Błąd w pętli publish: {e}")
                 await asyncio.sleep(1)
+
+    # [ZMIANA 3] Nowa metoda do obsługi danych IMU
+    async def handle_imu_data(self, data):
+        try:
+            msg = Imu()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.frame_id = "imu_link"
+            
+            # Mapowanie pól z JSONa do wiadomości ROS
+            orient = data.get('orientation', {})
+            msg.orientation.x = float(orient.get('x', 0.0))
+            msg.orientation.y = float(orient.get('y', 0.0))
+            msg.orientation.z = float(orient.get('z', 0.0))
+            msg.orientation.w = float(orient.get('w', 1.0))
+            
+            ang = data.get('angular_velocity', {})
+            msg.angular_velocity.x = float(ang.get('x', 0.0))
+            msg.angular_velocity.y = float(ang.get('y', 0.0))
+            msg.angular_velocity.z = float(ang.get('z', 0.0))
+            
+            lin = data.get('linear_acceleration', {})
+            msg.linear_acceleration.x = float(lin.get('x', 0.0))
+            msg.linear_acceleration.y = float(lin.get('y', 0.0))
+            msg.linear_acceleration.z = float(lin.get('z', 0.0))
+
+            self.imu_publisher_.publish(msg)
+        except Exception as e:
+            logger.error(f"❌ Błąd IMU: {e}")
 
     async def handle_joystick_data(self, data):
         linear = float(data.get('linear', 0.0))
@@ -277,6 +309,9 @@ class WebRTCClient:
                 data = json.loads(message)
                 if 'joystick' in data:
                     await self.ros_node.handle_joystick_data(data['joystick'])
+                # [ZMIANA 4] Obsługa klucza 'imu'
+                elif 'imu' in data:
+                    await self.ros_node.handle_imu_data(data['imu'])
                 elif 'message' in data:
                     cmd = data['message']
                     allowed = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]

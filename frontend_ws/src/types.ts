@@ -18,3 +18,23 @@ export interface PeerData {
   username: string;
   stream: MediaStream;
 }
+
+// --- NOWE TYPY IMU ---
+export interface Quaternion {
+    x: number;
+    y: number;
+    z: number;
+    w: number;
+}
+
+export interface Vector3 {
+    x: number;
+    y: number;
+    z: number;
+}
+
+export interface ImuData {
+    orientation: Quaternion;
+    angular_velocity: Vector3;
+    linear_acceleration: Vector3;
+}

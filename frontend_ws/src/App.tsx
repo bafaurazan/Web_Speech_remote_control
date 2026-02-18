@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // 2. Typy
-import type { ChatMessage, PeerData, SignalMessage } from './types';
+import type { ChatMessage, PeerData, SignalMessage, ImuData } from './types';
+import { ImuVisualizer } from './components/ImuVisualizer';
 
 // 3. Funkcje pomocnicze (Utils)
 import { 
@@ -90,6 +91,8 @@ function App() {
   const isScreenSharingRef = useRef(false);
   
   const isLoggingOut = useRef(false);
+
+  const [imuData, setImuData] = useState<ImuData | null>(null);
 
   // === 1. FUNKCJA WYLOGOWANIA ===
   const handleLogout = useCallback(() => {
@@ -383,9 +386,15 @@ function App() {
     dc.onmessage = (e) => {
         if (isLoggingOut.current) return;
         const data = JSON.parse(e.data);
+        
         if (data.joystick) return; 
+
         if (data.message) {
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
+        }
+
+        if (data.imu) {
+            setImuData(data.imu);
         }
     };
   };
@@ -844,6 +853,9 @@ function App() {
                         onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
                         onCommand={sendRobotCommand} 
                     />
+                    <div style={{ position: 'absolute', bottom: '10px', left: '10px', zIndex: 10 }}>
+                     <ImuVisualizer data={imuData} />
+                  </div>
                 </div>
               </div>
             )}
