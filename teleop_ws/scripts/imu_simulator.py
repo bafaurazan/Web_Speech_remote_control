@@ -41,8 +41,9 @@ class IMUMultiPeerAnswerer:
                 try:
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
+                        # Wysyłamy new-peer zaraz po połączeniu, żeby inni nas zobaczyli
                         await self.send_signal("new-peer", {})
-                        logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'! Czekam na sygnał 'start-call'...")
+                        logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'! Czekam na połączenia...")
                         
                         async for msg in ws:
                             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -89,9 +90,18 @@ class IMUMultiPeerAnswerer:
         
         if peer == MY_ID: return 
 
-        # 1. Ignorujemy 'new-peer' i 'request-connect' - czekamy biernie na decyzję użytkownika
-        if action == 'new-peer' or action == 'request-connect':
-            pass
+        # === ZMIANA KLUCZOWA ===
+        # Reakcja na pojawienie się nowego użytkownika (np. odświeżenie strony)
+        if action == 'new-peer':
+            logger.info(f"👋 Widzę nowego peera: {peer}. Wysyłam 'request-connect', aby mnie zauważył.")
+            # To sprawi, że na froncie pojawi się kafelek z prośbą o połączenie
+            await self.send_signal('request-connect', {})
+        
+        elif action == 'request-connect':
+            # Jeśli ktoś inny prosi o połączenie, też możemy odpowiedzieć request-connect 
+            # (czasami pomaga w sytuacjach wyścigu, ale zazwyczaj new-peer wystarcza)
+            logger.info(f"👋 Peer {peer} prosi o kontakt. Odpowiadam 'request-connect'.")
+            await self.send_signal('request-connect', {})
 
         # 2. Otrzymano zgodę/rozkaz połączenia (Kliknięcie "Zatwierdź" w przeglądarce)
         elif action == 'start-call':
@@ -102,7 +112,7 @@ class IMUMultiPeerAnswerer:
                     await self.close_peer(peer)
                 await self.create_offerer(peer, message)
             
-        # 3. Ktoś inny wysłał ofertę (my jesteśmy Answererem)
+        # 3. Ktoś inny wysłał ofertę (Answerer)
         elif action == 'new-offer':
             logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę ANSWER.")
             if peer in self.peers:
@@ -119,7 +129,7 @@ class IMUMultiPeerAnswerer:
                     type=message['sdp']['type']
                 ))
 
-    # --- Rola OFFERERA (My inicjujemy połączenie i tworzymy DataChannel) ---
+    # --- Rola OFFERERA ---
     async def create_offerer(self, peer_id, message):
         try:
             receiver_channel = message.get('receiver_channel_name')
@@ -128,7 +138,6 @@ class IMUMultiPeerAnswerer:
             
             self.peers[peer_id] = {'pc': pc, 'dc': None}
 
-            # Jako Offerer musimy stworzyć kanał danych
             dc = pc.createDataChannel("chat")
             self.peers[peer_id]['dc'] = dc
             logger.info(f"🛠️ [Offerer] Utworzono Data Channel dla {peer_id}")
@@ -139,12 +148,10 @@ class IMUMultiPeerAnswerer:
                 if state in ["failed", "disconnected", "closed"]:
                     logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
                     await self.close_peer(peer_id)
-                    
-                    # --- DODANO: Automatyczne ponowienie prośby o połączenie ---
-                    logger.info(f"🔄 Próba odnowienia połączenia: wysyłam 'request-connect'...")
-                    await self.send_signal('request-connect', {})
+                    # Po zerwaniu wysyłamy new-peer, żeby frontend wiedział, że żyjemy
+                    logger.info("🔄 Połączenie zerwane. Ogłaszam się ponownie (new-peer).")
+                    await self.send_signal("new-peer", {})
 
-            # Tworzenie oferty
             offer = await pc.createOffer()
             await pc.setLocalDescription(offer)
 
@@ -159,7 +166,7 @@ class IMUMultiPeerAnswerer:
             traceback.print_exc()
             await self.close_peer(peer_id)
 
-    # --- Rola ANSWERERA (Ktoś inny zainicjował) ---
+    # --- Rola ANSWERERA ---
     async def create_answerer(self, peer_id, message):
         try:
             sdp = message.get('sdp')
@@ -182,10 +189,8 @@ class IMUMultiPeerAnswerer:
                 if state in ["failed", "disconnected", "closed"]:
                     logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
                     await self.close_peer(peer_id)
-                    
-                    # --- DODANO: Automatyczne ponowienie prośby o połączenie ---
-                    logger.info(f"🔄 Próba odnowienia połączenia: wysyłam 'request-connect'...")
-                    await self.send_signal('request-connect', {})
+                    logger.info("🔄 Połączenie zerwane. Ogłaszam się ponownie (new-peer).")
+                    await self.send_signal("new-peer", {})
 
             await pc.setRemoteDescription(RTCSessionDescription(sdp=sdp['sdp'], type=sdp['type']))
             answer = await pc.createAnswer()
