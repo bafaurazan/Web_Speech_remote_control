@@ -13,7 +13,6 @@ from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, R
 # --- KONFIGURACJA ---
 SIGNALING_URL = 'wss://rafal.tail692f2a.ts.net/ws'
 MY_ID = 'imu_simulator'   
-TARGET_PEER = 'g1pilot'   
 
 # Konfiguracja logowania
 logging.basicConfig(
@@ -23,29 +22,27 @@ logging.basicConfig(
 )
 logger = logging.getLogger("IMU_Sim")
 
-class IMUAnswerer:
+class IMUMultiPeerAnswerer:
     def __init__(self):
         self.ws = None
-        self.pc = None
-        self.data_channel = None
+        # Słownik: peer_id -> {'pc': RTCPeerConnection, 'dc': RTCDataChannel}
+        self.peers = {} 
         self.running = True
-        self.connection_step = "IDLE" 
+        self.sim_task = None
 
     async def run(self):
         logger.info(f"🚀 [IMU SIM] Łączenie z serwerem: {SIGNALING_URL}")
         
+        # Uruchomienie pętli symulacji danych w tle
+        self.sim_task = asyncio.create_task(self.simulate_data_loop())
+
         async with aiohttp.ClientSession() as session:
             while self.running:
                 try:
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
                         await self.send_signal("new-peer", {})
-                        logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'!")
-                        
-                        # Jeśli po restarcie symulatora robot już tam jest, musimy go "zaczepić"
-                        # W tym celu symulator może wysłać request-connect, ale w tym modelu (Answerer)
-                        # czekamy aż robot się odezwie. Robot wysyła 'new-peer' przy starcie,
-                        # więc jeśli symulator działa, a robot restartuje -> symulator dostanie 'new-peer'.
+                        logger.info(f"✅ ZALOGOWANO JAKO '{MY_ID}'! Czekam na sygnał 'start-call'...")
                         
                         async for msg in ws:
                             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -62,19 +59,23 @@ class IMUAnswerer:
                 except Exception as e:
                     logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam za 2s...")
                 
-                # Pełny reset przy utracie WebSocket
-                await self.reset_connection()
+                await self.reset_all_connections()
                 await asyncio.sleep(2)
 
-    async def reset_connection(self):
-        """Czyści stan połączenia WebRTC"""
-        if self.pc:
-            logger.info("🧹 Zamykanie starego połączenia PC...")
-            await self.pc.close()
-            self.pc = None
-        self.data_channel = None
-        self.connection_step = "IDLE"
-        logger.info("🔄 Stan zresetowany do IDLE.")
+    async def reset_all_connections(self):
+        if self.peers:
+            logger.info("🧹 Czyszczenie połączeń...")
+            for peer_id in list(self.peers.keys()):
+                await self.close_peer(peer_id)
+            self.peers.clear()
+
+    async def close_peer(self, peer_id):
+        if peer_id in self.peers:
+            peer_data = self.peers[peer_id]
+            if peer_data['pc']:
+                await peer_data['pc'].close()
+            del self.peers[peer_id]
+            logger.info(f"❌ Zamknięto połączenie z {peer_id}")
 
     async def send_signal(self, action, message):
         if self.ws and not self.ws.closed:
@@ -88,131 +89,157 @@ class IMUAnswerer:
         
         if peer == MY_ID: return 
 
-        # Obsługa zdarzeń
+        # 1. Ignorujemy 'new-peer' i 'request-connect' - czekamy biernie na decyzję użytkownika
         if action == 'new-peer' or action == 'request-connect':
-            # Jeśli robot się pojawił (new-peer) lub prosi o połączenie
-            if peer == TARGET_PEER:
-                if self.connection_step == "IDLE":
-                    logger.info(f"👋 Wykryto robota {peer}. Automatycznie ZATWIERDZAM połączenie.")
-                    await self.send_signal('start-call', {'target': peer})
-                    self.connection_step = "WAITING_FOR_OFFER"
-                elif self.connection_step == "CONNECTED":
-                     # Jeśli jesteśmy połączeni, ale robot wysyła new-peer/request, to znaczy że się zrestartował
-                     logger.warning(f"⚠️ Robot {peer} wysłał {action}, ale mam status CONNECTED. Resetuję i łączę ponownie.")
-                     await self.reset_connection()
-                     # Po resecie ponawiamy próbę
-                     await self.send_signal('start-call', {'target': peer})
-                     self.connection_step = "WAITING_FOR_OFFER"
+            pass
 
+        # 2. Otrzymano zgodę/rozkaz połączenia (Kliknięcie "Zatwierdź" w przeglądarce)
+        elif action == 'start-call':
+            target = message.get('target')
+            if target == MY_ID or target is None:
+                logger.info(f"🚀 Otrzymano 'start-call' od {peer}. Tworzę OFERTĘ.")
+                if peer in self.peers:
+                    await self.close_peer(peer)
+                await self.create_offerer(peer, message)
+            
+        # 3. Ktoś inny wysłał ofertę (my jesteśmy Answererem)
         elif action == 'new-offer':
-            if peer == TARGET_PEER:
-                logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę Answer.")
-                sdp = message.get('sdp')
-                receiver_channel = message.get('receiver_channel_name')
-                
-                # Jeśli mamy stare PC, zamykamy je
-                if self.pc:
-                    await self.pc.close()
-                
-                await self.create_answerer(sdp, receiver_channel)
+            logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę ANSWER.")
+            if peer in self.peers:
+                await self.close_peer(peer)
+            await self.create_answerer(peer, message)
 
-    async def create_answerer(self, remote_sdp, receiver_channel):
+        # 4. Otrzymano odpowiedź na naszą ofertę
+        elif action == 'new-answer':
+            if peer in self.peers:
+                logger.info(f"✅ Otrzymano Answer od {peer}. Finalizuję połączenie.")
+                pc = self.peers[peer]['pc']
+                await pc.setRemoteDescription(RTCSessionDescription(
+                    sdp=message['sdp']['sdp'], 
+                    type=message['sdp']['type']
+                ))
+
+    # --- Rola OFFERERA (My inicjujemy połączenie i tworzymy DataChannel) ---
+    async def create_offerer(self, peer_id, message):
         try:
+            receiver_channel = message.get('receiver_channel_name')
             config = RTCConfiguration(iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])])
-            self.pc = RTCPeerConnection(configuration=config)
+            pc = RTCPeerConnection(configuration=config)
+            
+            self.peers[peer_id] = {'pc': pc, 'dc': None}
 
-            @self.pc.on("datachannel")
-            def on_datachannel(channel):
-                logger.info(f"✅ Otrzymano Data Channel: '{channel.label}' (Stan: {channel.readyState})")
-                self.setup_data_channel(channel)
+            # Jako Offerer musimy stworzyć kanał danych
+            dc = pc.createDataChannel("chat")
+            self.peers[peer_id]['dc'] = dc
+            logger.info(f"🛠️ [Offerer] Utworzono Data Channel dla {peer_id}")
 
-            @self.pc.on("iceconnectionstatechange")
+            @pc.on("iceconnectionstatechange")
             async def on_ice_state():
-                state = self.pc.iceConnectionState
-                logger.info(f"🧊 Stan ICE: {state}")
+                state = pc.iceConnectionState
                 if state in ["failed", "disconnected", "closed"]:
-                    logger.warning("❌ Utrata połączenia ICE. Resetowanie...")
-                    await self.reset_connection()
+                    logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
+                    await self.close_peer(peer_id)
+                    
+                    # --- DODANO: Automatyczne ponowienie prośby o połączenie ---
+                    logger.info(f"🔄 Próba odnowienia połączenia: wysyłam 'request-connect'...")
+                    await self.send_signal('request-connect', {})
 
-            await self.pc.setRemoteDescription(RTCSessionDescription(sdp=remote_sdp['sdp'], type=remote_sdp['type']))
-            
-            answer = await self.pc.createAnswer()
-            await self.pc.setLocalDescription(answer)
-            
-            logger.info("❄️ Wysyłam ANSWER do robota...")
-            await self.send_signal('new-answer', {
-                'sdp': {'sdp': self.pc.localDescription.sdp, 'type': self.pc.localDescription.type},
+            # Tworzenie oferty
+            offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+
+            logger.info(f"📨 Wysyłam Ofertę do {peer_id}...")
+            await self.send_signal('new-offer', {
+                'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type},
                 'receiver_channel_name': receiver_channel
             })
-            
-            self.connection_step = "CONNECTED"
 
         except Exception:
-            logger.error("❌ Błąd w create_answerer:")
+            logger.error(f"❌ Błąd w create_offerer dla {peer_id}:")
             traceback.print_exc()
-            await self.reset_connection()
+            await self.close_peer(peer_id)
 
-    def setup_data_channel(self, channel):
-        self.data_channel = channel
-        
-        def start_simulation():
-            logger.info("🟢 KANAŁ DANYCH OTWARTY! START WYSYŁANIA IMU 🟢")
-            asyncio.create_task(self.simulate_imu_data())
+    # --- Rola ANSWERERA (Ktoś inny zainicjował) ---
+    async def create_answerer(self, peer_id, message):
+        try:
+            sdp = message.get('sdp')
+            receiver_channel = message.get('receiver_channel_name')
 
-        if channel.readyState == "open":
-            start_simulation()
-        else:
-            @channel.on("open")
-            def on_open():
-                start_simulation()
+            config = RTCConfiguration(iceServers=[RTCIceServer(urls=["stun:stun.l.google.com:19302"])])
+            pc = RTCPeerConnection(configuration=config)
+            
+            self.peers[peer_id] = {'pc': pc, 'dc': None}
 
-        @channel.on("close")
-        def on_close():
-             logger.warning("🔴 Data Channel ZAMKNIĘTY")
-             # To też może być sygnał do resetu, jeśli kanał padnie
-             # Ale zazwyczaj iceconnectionstatechange to wyłapie szybciej
+            @pc.on("datachannel")
+            def on_datachannel(channel):
+                logger.info(f"✅ [Answerer] Otrzymano Data Channel od {peer_id}: '{channel.label}'")
+                if peer_id in self.peers:
+                    self.peers[peer_id]['dc'] = channel
 
-    async def simulate_imu_data(self):
-        """Generuje ruch wahadłowy LEWO/PRAWO (Yaw - oś Z)"""
+            @pc.on("iceconnectionstatechange")
+            async def on_ice_state():
+                state = pc.iceConnectionState
+                if state in ["failed", "disconnected", "closed"]:
+                    logger.warning(f"❌ Utrata połączenia z {peer_id} (ICE: {state})")
+                    await self.close_peer(peer_id)
+                    
+                    # --- DODANO: Automatyczne ponowienie prośby o połączenie ---
+                    logger.info(f"🔄 Próba odnowienia połączenia: wysyłam 'request-connect'...")
+                    await self.send_signal('request-connect', {})
+
+            await pc.setRemoteDescription(RTCSessionDescription(sdp=sdp['sdp'], type=sdp['type']))
+            answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            
+            logger.info(f"❄️ Wysyłam ANSWER do {peer_id}...")
+            await self.send_signal('new-answer', {
+                'sdp': {'sdp': pc.localDescription.sdp, 'type': pc.localDescription.type},
+                'receiver_channel_name': receiver_channel
+            })
+
+        except Exception:
+            logger.error(f"❌ Błąd w create_answerer dla {peer_id}:")
+            traceback.print_exc()
+            await self.close_peer(peer_id)
+
+    async def simulate_data_loop(self):
+        """Pętla Broadcast"""
+        logger.info("🌊 Start generatora danych IMU...")
         start_time = time.time()
         
-        # Pętla działa dopóki kanał jest otwarty
-        while self.data_channel and self.data_channel.readyState == "open":
+        while self.running:
             t = time.time() - start_time
-
+            
             angle_rad = math.sin(t * 1.0) * (math.pi / 2.0)
             
             qx = 0.0
             qy = 0.0
             qz = math.sin(angle_rad / 2.0)
             qw = math.cos(angle_rad / 2.0)
-
             ang_vel_z = math.cos(t * 1.0) * (math.pi / 2.0)
 
-            imu_data = {
+            imu_json = json.dumps({
                 "imu": {
-                    "orientation": {
-                        "x": qx, 
-                        "y": qy, 
-                        "z": qz, 
-                        "w": qw
-                    },
+                    "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
                     "angular_velocity": {"x": 0.0, "y": 0.0, "z": ang_vel_z},
                     "linear_acceleration": {"x": 0.0, "y": 0.0, "z": 9.81}
                 }
-            }
+            })
 
-            try:
-                self.data_channel.send(json.dumps(imu_data))
-            except Exception:
-                # Błąd wysyłania oznacza zazwyczaj zerwanie kanału
-                logger.warning("⚠️ Błąd wysyłania danych (kanał zamknięty?)")
-                break
+            if self.peers:
+                active_peers = list(self.peers.values())
+                for peer_data in active_peers:
+                    dc = peer_data.get('dc')
+                    if dc and dc.readyState == "open":
+                        try:
+                            dc.send(imu_json)
+                        except Exception:
+                            pass
             
-            await asyncio.sleep(0.033) # 30 Hz
+            await asyncio.sleep(0.033)
 
 if __name__ == "__main__":
-    sim = IMUAnswerer()
+    sim = IMUMultiPeerAnswerer()
     try:
         asyncio.run(sim.run())
     except KeyboardInterrupt:

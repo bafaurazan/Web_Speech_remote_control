@@ -853,10 +853,10 @@ function App() {
                         onStop={() => broadcastData({ username, joystick: { linear: 0, angular: 0 } })} 
                         onCommand={sendRobotCommand} 
                     />
+                </div>
                     <div style={{ position: 'absolute', bottom: '10px', left: '10px', zIndex: 10 }}>
                      <ImuVisualizer data={imuData} />
                   </div>
-                </div>
               </div>
             )}
             
