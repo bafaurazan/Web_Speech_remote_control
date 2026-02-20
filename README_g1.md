@@ -10,6 +10,20 @@ cd ~/Web_Speech_remote_control/frontend_ws
 npm run dev
 ```
 
+test imu_simulator
+```bash
+cd ~/Web_Speech_remote_control/teleop_ws
+python3 scripts/imu_simulator.py # --osemka
+```
+
+test bridge_node
+```bash
+cd ~/Web_Speech_remote_control/teleop_ws
+source install/setup.bash
+ros2 run teleop_webrtc_joy bridge 
+
+```
+
 3. setup teleop
 ```bash
 source ~/ros2_projects_ws/install/setup.bash

@@ -31,6 +31,13 @@ class IMUMultiPeerAnswerer:
         self.peers = {} 
         self.running = True
         self.sim_task = None
+        
+        # Sprawdzamy czy użytkownik wpisał argument "--osemka"
+        self.figure_eight_mode = '--osemka' in sys.argv
+        if self.figure_eight_mode:
+            logger.info("♾️  Uruchomiono tryb ÓSEMKI (Lissajous) dla danych IMU!")
+        else:
+            logger.info("➡️  Uruchomiono STANDARDOWY tryb działania IMU.")
 
     async def run(self):
         logger.info(f"🚀 [IMU SIM] Łączenie z serwerem: {SIGNALING_URL}")
@@ -43,12 +50,9 @@ class IMUMultiPeerAnswerer:
                     async with session.ws_connect(SIGNALING_URL, ssl=False) as ws:
                         self.ws = ws
                         
-                        # === KROK 1: HARD RESET NA STARCIE ===
-                        # Upewniamy się, że pamięć jest czysta przed jakimkolwiek działaniem
                         logger.info("🧹 [STARTUP] Czyszczenie lokalnych połączeń...")
                         await self.reset_all_connections()
                         
-                        # === KROK 2: OGŁOSZENIE ===
                         logger.info("📢 [STARTUP] Wysyłam 'new-peer' (Jestem gotowy).")
                         await self.send_signal("new-peer", {})
                         
@@ -68,12 +72,10 @@ class IMUMultiPeerAnswerer:
                 except Exception as e:
                     logger.error(f"⚠️ Błąd sieci: {e}. Ponawiam za 2s...")
                 
-                # Sprzątanie po zerwaniu połączenia z serwerem
                 await self.reset_all_connections()
                 await asyncio.sleep(2)
 
     async def reset_all_connections(self):
-        """Zamyka wszystkie aktywne połączenia siłowo."""
         if self.peers:
             logger.info(f"🧹 Usuwanie {len(self.peers)} wiszących sesji...")
             peer_ids = list(self.peers.keys())
@@ -82,15 +84,11 @@ class IMUMultiPeerAnswerer:
             self.peers.clear()
 
     async def close_peer(self, peer_id):
-        """Zamyka konkretnego peera i czyści zasoby."""
         if peer_id in self.peers:
             peer_data = self.peers[peer_id]
             try:
-                # Zamknij DataChannel
                 if peer_data.get('dc'): 
                     peer_data['dc'].close()
-                
-                # Zamknij PeerConnection
                 if peer_data.get('pc'): 
                     await peer_data['pc'].close()
             except Exception as e:
@@ -111,9 +109,7 @@ class IMUMultiPeerAnswerer:
         
         if peer == MY_ID: return 
 
-        # === 1. KTOŚ SIĘ POJAWIŁ / PROSI O KONTAKT ===
         if action == 'new-peer' or action == 'request-connect':
-            # Jeśli mamy tego peera w pamięci -> to stare śmieci. Usuwamy.
             if peer in self.peers:
                 logger.info(f"♻️ Wykryto aktywność {peer}. Resetuję jego starą sesję.")
                 await self.close_peer(peer)
@@ -125,28 +121,21 @@ class IMUMultiPeerAnswerer:
                 logger.info(f"👋 Nowy {peer}. Wysyłam 'request-connect'.")
                 await self.send_signal('request-connect', {})
 
-        # === 2. START CALL (My inicjujemy - np. do zaufanego) ===
         elif action == 'start-call':
             target = message.get('target')
             if target == MY_ID or target is None:
                 logger.info(f"🚀 Otrzymano 'start-call' od {peer}. Tworzę OFERTĘ.")
-                # Zawsze czyścimy przed stworzeniem nowego
                 if peer in self.peers: await self.close_peer(peer)
                 await self.create_offerer(peer, message)
             
-        # === 3. OTRZYMANO OFERTĘ (To tutaj następuje główne łączenie) ===
         elif action == 'new-offer':
             logger.info(f"✨ Otrzymano Ofertę od {peer}. Tworzę ANSWER.")
-            
-            # === KLUCZOWE: Jeśli mieliśmy cokolwiek z tym peerem, usuwamy to teraz ===
-            # To naprawia problem "drugiego restartu" - zawsze traktujemy ofertę jako nową czystą kartę
             if peer in self.peers:
                 logger.info(f"🧹 Otrzymano nową ofertę od {peer}, ale miałem starą sesję. Usuwam ją.")
                 await self.close_peer(peer)
             
             await self.create_answerer(peer, message)
 
-        # === 4. OTRZYMANO ODPOWIEDŹ (Finalizacja) ===
         elif action == 'new-answer':
             if peer in self.peers:
                 logger.info(f"✅ Otrzymano Answer od {peer}. Finalizuję połączenie.")
@@ -159,19 +148,16 @@ class IMUMultiPeerAnswerer:
                 except Exception as e:
                     logger.error(f"❌ Błąd SDP z {peer}: {e}")
 
-    # === OBSŁUGA STANU POŁĄCZENIA (RECONNECT) ===
     async def handle_ice_state_change(self, peer_id, pc):
         state = pc.iceConnectionState
         if state in ["failed", "disconnected", "closed"]:
             logger.warning(f"⚠️ Zerwano połączenie z {peer_id} (ICE: {state})")
             await self.close_peer(peer_id)
             
-            # Jeśli to zaufany (robot), próbujemy go od razu zaczepić ponownie
             if peer_id in WHITELIST:
                 logger.info(f"🔄 Próba odnowienia połączenia z {peer_id}...")
                 await self.send_signal('start-call', {'target': peer_id})
 
-    # --- TWORZENIE POŁĄCZENIA (OFFERER - my dzwonimy) ---
     async def create_offerer(self, peer_id, message):
         try:
             receiver_channel = message.get('receiver_channel_name')
@@ -180,14 +166,26 @@ class IMUMultiPeerAnswerer:
             
             self.peers[peer_id] = {'pc': pc, 'dc': None}
 
-            # Offerer tworzy kanał
             dc = pc.createDataChannel("chat")
             self.peers[peer_id]['dc'] = dc
             logger.info(f"🛠️ [Offerer] Utworzono Data Channel dla {peer_id}")
 
+            @pc.on("track")
+            def on_track(track):
+                logger.info(f"🗑️ Ignorowanie strumienia {track.kind} od {peer_id} (Blackhole)")
+                async def consume():
+                    while True:
+                        try:
+                            await track.recv()
+                        except Exception:
+                            break
+                asyncio.create_task(consume())
+
             @pc.on("iceconnectionstatechange")
             async def on_ice_state():
-                await self.handle_ice_state_change(peer_id, pc)
+                active_pc = self.peers.get(peer_id, {}).get('pc')
+                if active_pc:
+                    await self.handle_ice_state_change(peer_id, active_pc)
 
             offer = await pc.createOffer()
             await pc.setLocalDescription(offer)
@@ -203,7 +201,6 @@ class IMUMultiPeerAnswerer:
             traceback.print_exc()
             await self.close_peer(peer_id)
 
-    # --- TWORZENIE POŁĄCZENIA (ANSWERER - my odbieramy) ---
     async def create_answerer(self, peer_id, message):
         try:
             sdp = message.get('sdp')
@@ -220,9 +217,22 @@ class IMUMultiPeerAnswerer:
                 if peer_id in self.peers:
                     self.peers[peer_id]['dc'] = channel
 
+            @pc.on("track")
+            def on_track(track):
+                logger.info(f"🗑️ Ignorowanie strumienia {track.kind} od {peer_id} (Blackhole)")
+                async def consume():
+                    while True:
+                        try:
+                            await track.recv()
+                        except Exception:
+                            break
+                asyncio.create_task(consume())
+
             @pc.on("iceconnectionstatechange")
             async def on_ice_state():
-                await self.handle_ice_state_change(peer_id, pc)
+                active_pc = self.peers.get(peer_id, {}).get('pc')
+                if active_pc:
+                    await self.handle_ice_state_change(peer_id, active_pc)
 
             await pc.setRemoteDescription(RTCSessionDescription(sdp=sdp['sdp'], type=sdp['type']))
             answer = await pc.createAnswer()
@@ -246,23 +256,56 @@ class IMUMultiPeerAnswerer:
         while self.running:
             t = time.time() - start_time
             
-            angle_rad = math.sin(t * 1.0) * (math.pi / 2.0)
-            
-            qx = 0.0
-            qy = 0.0
-            qz = math.sin(angle_rad / 2.0)
-            qw = math.cos(angle_rad / 2.0)
-            ang_vel_z = math.cos(t * 1.0) * (math.pi / 2.0)
+            if self.figure_eight_mode:
+                # --- TRYB ÓSEMKI (LISSAJOUS) ---
+                # Żeby uzyskać ósemkę, oś Pitch musi drgać 2x szybciej niż oś Yaw
+                yaw = math.sin(t * 1.0) * (math.pi / 4.0)     # Obrót wokół osi Z (w lewo-prawo)
+                pitch = math.sin(t * 2.0) * (math.pi / 4.0)   # Obrót wokół osi Y (góra-dół)
+                
+                # Przeliczenie kątów Eulera (z pominięciem Roll, które wynosi 0) na kwaternion
+                cy = math.cos(yaw * 0.5)
+                sy = math.sin(yaw * 0.5)
+                cp = math.cos(pitch * 0.5)
+                sp = math.sin(pitch * 0.5)
+                
+                qw = cp * cy
+                qx = -sp * sy
+                qy = sp * cy
+                qz = cp * sy
+                
+                # Prędkości kątowe to po prostu pochodne funkcji użytych wyżej
+                ang_vel_x = 0.0
+                ang_vel_y = math.cos(t * 2.0) * (math.pi / 2.0)
+                ang_vel_z = math.cos(t * 1.0) * (math.pi / 4.0)
+                
+                # Modyfikujemy lekko wektor grawitacji (przyspieszenia), by wyglądał naturalnie podczas przechyłów
+                lin_acc_x = math.sin(pitch) * 9.81
+                lin_acc_y = -math.sin(yaw) * math.cos(pitch) * 9.81
+                lin_acc_z = math.cos(yaw) * math.cos(pitch) * 9.81
+                
+            else:
+                # --- STANDARDOWE ZACHOWANIE ---
+                angle_rad = math.sin(t * 1.0) * (math.pi / 2.0)
+                
+                qx, qy = 0.0, 0.0
+                qz = math.sin(angle_rad / 2.0)
+                qw = math.cos(angle_rad / 2.0)
+                
+                ang_vel_x, ang_vel_y = 0.0, 0.0
+                ang_vel_z = math.cos(t * 1.0) * (math.pi / 2.0)
+                
+                lin_acc_x, lin_acc_y, lin_acc_z = 0.0, 0.0, 9.81
 
+            # Generujemy JSON z danymi
             imu_json = json.dumps({
                 "imu": {
                     "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
-                    "angular_velocity": {"x": 0.0, "y": 0.0, "z": ang_vel_z},
-                    "linear_acceleration": {"x": 0.0, "y": 0.0, "z": 9.81}
+                    "angular_velocity": {"x": ang_vel_x, "y": ang_vel_y, "z": ang_vel_z},
+                    "linear_acceleration": {"x": lin_acc_x, "y": lin_acc_y, "z": lin_acc_z}
                 }
             })
 
-            # Broadcast do wszystkich aktywnych kanałów
+            # Wysyłka paczek do wszystkich Peerów
             if self.peers:
                 active_peers = list(self.peers.values())
                 for peer_data in active_peers:
