@@ -17,9 +17,10 @@ from aiortc.contrib.media import MediaPlayer
 # ROS2
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Joy, Imu  # <--- [ZMIANA 1] Dodano import Imu
+from sensor_msgs.msg import Joy, Imu
+from geometry_msgs.msg import PoseStamped  # <--- [NOWOŚĆ] Import wiadomości Pose (6DOF)
 
-# Stałe sprzętowe (można też zamienić na parametry w przyszłości)
+# Stałe sprzętowe
 CAMERA_DEVICE = '/dev/video0'
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
@@ -89,12 +90,10 @@ class ROS2BridgeNode(Node):
     def __init__(self):
         super().__init__('python_webrtc_bridge')
         
-        # === DEKLARACJA PARAMETRÓW ROS ===
         self.declare_parameter('use_google_stun', True)
         self.declare_parameter('robot_id', 'g1pilot')
         self.declare_parameter('signaling_url', 'wss://rafal.tail692f2a.ts.net/ws')
         
-        # Pobranie wartości parametrów do zmiennych instancji
         self.use_google_stun = self.get_parameter('use_google_stun').value
         self.robot_id = self.get_parameter('robot_id').value
         self.signaling_url = self.get_parameter('signaling_url').value
@@ -102,22 +101,23 @@ class ROS2BridgeNode(Node):
         joy_topic_name = f'/{self.robot_id}/joy'
         self.publisher_ = self.create_publisher(Joy, joy_topic_name, 10)
 
-        # [ZMIANA 2] Dodanie publishera IMU
         imu_topic_name = f'/{self.robot_id}/imu'
         self.imu_publisher_ = self.create_publisher(Imu, imu_topic_name, 10)
+        
+        # [NOWOŚĆ] Publisher dla pełnego 6DOF (Pozycja + Rotacja)
+        pose_topic_name = f'/{self.robot_id}/pose'
+        self.pose_publisher_ = self.create_publisher(PoseStamped, pose_topic_name, 10)
         
         logger.info(f"ROS2 Node Started. Robot ID: {self.robot_id}")
         logger.info(f"📡 Signaling URL: {self.signaling_url}")
         logger.info(f"🌍 STUN Mode: {'GOOGLE STUN' if self.use_google_stun else 'LOCAL/TAILSCALE ONLY'}")
         
-        # === STAN GLOBALNY ===
         self.current_axes = [0.0] * 8
         self.current_buttons = [0] * 12
         
         self.publish_task = asyncio.create_task(self._publish_loop())
 
     async def _publish_loop(self):
-        """Pętla heartbeat wysyłająca stan Joy co 1/30 sekundy"""
         while True:
             try:
                 msg = Joy()
@@ -131,33 +131,58 @@ class ROS2BridgeNode(Node):
                 logger.error(f"❌ Błąd w pętli publish: {e}")
                 await asyncio.sleep(1)
 
-    # [ZMIANA 3] Nowa metoda do obsługi danych IMU
-    async def handle_imu_data(self, data):
+    # [NOWOŚĆ] Zintegrowana metoda do obsługi 6DOF (IMU + Pozycja)
+    async def handle_6dof_data(self, data):
         try:
-            msg = Imu()
-            msg.header.stamp = self.get_clock().now().to_msg()
-            msg.header.frame_id = "imu_link"
+            now = self.get_clock().now().to_msg()
             
-            # Mapowanie pól z JSONa do wiadomości ROS
-            orient = data.get('orientation', {})
-            msg.orientation.x = float(orient.get('x', 0.0))
-            msg.orientation.y = float(orient.get('y', 0.0))
-            msg.orientation.z = float(orient.get('z', 0.0))
-            msg.orientation.w = float(orient.get('w', 1.0))
-            
-            ang = data.get('angular_velocity', {})
-            msg.angular_velocity.x = float(ang.get('x', 0.0))
-            msg.angular_velocity.y = float(ang.get('y', 0.0))
-            msg.angular_velocity.z = float(ang.get('z', 0.0))
-            
-            lin = data.get('linear_acceleration', {})
-            msg.linear_acceleration.x = float(lin.get('x', 0.0))
-            msg.linear_acceleration.y = float(lin.get('y', 0.0))
-            msg.linear_acceleration.z = float(lin.get('z', 0.0))
+            # --- PUBLIKACJA IMU ---
+            if 'imu' in data:
+                imu_data = data['imu']
+                msg_imu = Imu()
+                msg_imu.header.stamp = now
+                msg_imu.header.frame_id = "odom"  # Zmieniono na odom, by pasowało do przestrzeni
+                
+                orient = imu_data.get('orientation', {})
+                msg_imu.orientation.x = float(orient.get('x', 0.0))
+                msg_imu.orientation.y = float(orient.get('y', 0.0))
+                msg_imu.orientation.z = float(orient.get('z', 0.0))
+                msg_imu.orientation.w = float(orient.get('w', 1.0))
+                
+                ang = imu_data.get('angular_velocity', {})
+                msg_imu.angular_velocity.x = float(ang.get('x', 0.0))
+                msg_imu.angular_velocity.y = float(ang.get('y', 0.0))
+                msg_imu.angular_velocity.z = float(ang.get('z', 0.0))
+                
+                lin = imu_data.get('linear_acceleration', {})
+                msg_imu.linear_acceleration.x = float(lin.get('x', 0.0))
+                msg_imu.linear_acceleration.y = float(lin.get('y', 0.0))
+                msg_imu.linear_acceleration.z = float(lin.get('z', 0.0))
 
-            self.imu_publisher_.publish(msg)
+                self.imu_publisher_.publish(msg_imu)
+
+            # --- PUBLIKACJA POZYCJI (6DOF Pose) ---
+            if 'position' in data and 'imu' in data:
+                pos_data = data['position']
+                orient = data['imu'].get('orientation', {})
+                
+                msg_pose = PoseStamped()
+                msg_pose.header.stamp = now
+                msg_pose.header.frame_id = "odom"  # Ważne dla RViz2!
+                
+                msg_pose.pose.position.x = float(pos_data.get('x', 0.0))
+                msg_pose.pose.position.y = float(pos_data.get('y', 0.0))
+                msg_pose.pose.position.z = float(pos_data.get('z', 0.0))
+                
+                msg_pose.pose.orientation.x = float(orient.get('x', 0.0))
+                msg_pose.pose.orientation.y = float(orient.get('y', 0.0))
+                msg_pose.pose.orientation.z = float(orient.get('z', 0.0))
+                msg_pose.pose.orientation.w = float(orient.get('w', 1.0))
+                
+                self.pose_publisher_.publish(msg_pose)
+
         except Exception as e:
-            logger.error(f"❌ Błąd IMU: {e}")
+            logger.error(f"❌ Błąd podczas parsowania 6DOF: {e}")
 
     async def handle_joystick_data(self, data):
         linear = float(data.get('linear', 0.0))
@@ -182,22 +207,18 @@ class ROS2BridgeNode(Node):
             new_axes[1] = -LINEAR_SPEED 
             new_buttons[8] = 1 
             logger.info("🤖 GŁOS: JAZDA CIĄGŁA W PRZÓD")
-
         elif command == "backward_rover":
             new_axes[1] = LINEAR_SPEED
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: JAZDA CIĄGŁA W TYŁ")
-
         elif command == "left_rover":
             new_axes[2] = -ANGULAR_SPEED
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W LEWO")
-
         elif command == "right_rover":
             new_axes[2] = ANGULAR_SPEED
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W PRAWO")
-
         elif command == "stop_rover":
             logger.info("🤖 GŁOS: STOP")
         
@@ -207,7 +228,7 @@ class ROS2BridgeNode(Node):
 class WebRTCClient:
     def __init__(self, ros_node):
         self.ros_node = ros_node
-        self.username = self.ros_node.robot_id  # Pobieramy z parametrów węzła
+        self.username = self.ros_node.robot_id  
         self.peers = {} 
         
         logger.info(f"🎬 [INIT] WebRTC Client dla: {self.username}")
@@ -224,7 +245,7 @@ class WebRTCClient:
              logger.info("ℹ️ Audio niedostępne (Video Only).")
 
     async def run(self):
-        url = self.ros_node.signaling_url # Pobieramy z parametrów węzła
+        url = self.ros_node.signaling_url 
         logger.info(f"🚀 [SYSTEM] Łączenie z siecią: {url}")
         
         async with aiohttp.ClientSession() as session:
@@ -272,7 +293,6 @@ class WebRTCClient:
                     await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'], type=answer['type']))
 
     async def create_peer_connection(self, peer_username, initiator, offer_sdp=None, receiver_channel=None):
-        # Pobieranie konfiguracji dynamicznie z węzła
         use_google_stun = self.ros_node.use_google_stun
         
         ice_servers = []
@@ -309,9 +329,9 @@ class WebRTCClient:
                 data = json.loads(message)
                 if 'joystick' in data:
                     await self.ros_node.handle_joystick_data(data['joystick'])
-                # [ZMIANA 4] Obsługa klucza 'imu'
-                elif 'imu' in data:
-                    await self.ros_node.handle_imu_data(data['imu'])
+                # [NOWOŚĆ] Przekierowanie całego obiektu, jeśli zawiera imu lub pozycję
+                elif 'imu' in data or 'position' in data:
+                    await self.ros_node.handle_6dof_data(data)
                 elif 'message' in data:
                     cmd = data['message']
                     allowed = ["forward_rover", "backward_rover", "left_rover", "right_rover", "stop_rover"]

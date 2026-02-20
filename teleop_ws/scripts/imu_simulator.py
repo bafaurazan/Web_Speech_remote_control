@@ -32,12 +32,16 @@ class IMUMultiPeerAnswerer:
         self.running = True
         self.sim_task = None
         
-        # Sprawdzamy czy użytkownik wpisał argument "--osemka"
-        self.figure_eight_mode = '--osemka' in sys.argv
-        if self.figure_eight_mode:
-            logger.info("♾️  Uruchomiono tryb ÓSEMKI (Lissajous) dla danych IMU!")
+        # --- SPRAWDZANIE FLAG (DOMYŚLNIE 3DOF) ---
+        if '--6dof' in sys.argv:
+            self.mode = '6dof'
+            logger.info("♾️ Uruchomiono tryb 6DOF (Pozycja + Rotacja / Lot po ósemce)!")
+        elif '--3dof' in sys.argv:
+            self.mode = '3dof'
+            logger.info("➡️ Uruchomiono tryb 3DOF (Tylko rotacja, pozycja zerowa) - wymuszone flagą.")
         else:
-            logger.info("➡️  Uruchomiono STANDARDOWY tryb działania IMU.")
+            self.mode = '3dof'
+            logger.info("➡️ Uruchomiono tryb 3DOF (Tylko rotacja) - ustawienie DOMYŚLNE.")
 
     async def run(self):
         logger.info(f"🚀 [IMU SIM] Łączenie z serwerem: {SIGNALING_URL}")
@@ -250,19 +254,17 @@ class IMUMultiPeerAnswerer:
             await self.close_peer(peer_id)
 
     async def simulate_data_loop(self):
-        logger.info("🌊 Start generatora danych IMU...")
+        logger.info(f"🌊 Start generatora danych ({self.mode.upper()})...")
         start_time = time.time()
         
         while self.running:
             t = time.time() - start_time
             
-            if self.figure_eight_mode:
-                # --- TRYB ÓSEMKI (LISSAJOUS) ---
-                # Żeby uzyskać ósemkę, oś Pitch musi drgać 2x szybciej niż oś Yaw
-                yaw = math.sin(t * 1.0) * (math.pi / 4.0)     # Obrót wokół osi Z (w lewo-prawo)
-                pitch = math.sin(t * 2.0) * (math.pi / 4.0)   # Obrót wokół osi Y (góra-dół)
+            if self.mode == '6dof':
+                # --- TRYB 6DOF (Rotacja + Pozycja / Ósemka) ---
+                yaw = math.sin(t * 1.0) * (math.pi / 4.0)     
+                pitch = math.sin(t * 2.0) * (math.pi / 4.0)   
                 
-                # Przeliczenie kątów Eulera (z pominięciem Roll, które wynosi 0) na kwaternion
                 cy = math.cos(yaw * 0.5)
                 sy = math.sin(yaw * 0.5)
                 cp = math.cos(pitch * 0.5)
@@ -273,18 +275,20 @@ class IMUMultiPeerAnswerer:
                 qy = sp * cy
                 qz = cp * sy
                 
-                # Prędkości kątowe to po prostu pochodne funkcji użytych wyżej
                 ang_vel_x = 0.0
                 ang_vel_y = math.cos(t * 2.0) * (math.pi / 2.0)
                 ang_vel_z = math.cos(t * 1.0) * (math.pi / 4.0)
                 
-                # Modyfikujemy lekko wektor grawitacji (przyspieszenia), by wyglądał naturalnie podczas przechyłów
                 lin_acc_x = math.sin(pitch) * 9.81
                 lin_acc_y = -math.sin(yaw) * math.cos(pitch) * 9.81
                 lin_acc_z = math.cos(yaw) * math.cos(pitch) * 9.81
+
+                pos_x = math.sin(t * 1.0) * 2.0  
+                pos_y = math.sin(t * 2.0) * 2.0  
+                pos_z = math.cos(t * 1.0) * 0.5  
                 
             else:
-                # --- STANDARDOWE ZACHOWANIE ---
+                # --- TRYB 3DOF (Tylko Rotacja, bez zmian pozycji) ---
                 angle_rad = math.sin(t * 1.0) * (math.pi / 2.0)
                 
                 qx, qy = 0.0, 0.0
@@ -296,23 +300,30 @@ class IMUMultiPeerAnswerer:
                 
                 lin_acc_x, lin_acc_y, lin_acc_z = 0.0, 0.0, 9.81
 
-            # Generujemy JSON z danymi
-            imu_json = json.dumps({
+                pos_x, pos_y, pos_z = 0.0, 0.0, 0.0
+
+            # --- GENEROWANIE JSON ---
+            pose_json = json.dumps({
                 "imu": {
                     "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
                     "angular_velocity": {"x": ang_vel_x, "y": ang_vel_y, "z": ang_vel_z},
                     "linear_acceleration": {"x": lin_acc_x, "y": lin_acc_y, "z": lin_acc_z}
+                },
+                "position": {
+                    "x": pos_x, 
+                    "y": pos_y, 
+                    "z": pos_z
                 }
             })
 
-            # Wysyłka paczek do wszystkich Peerów
+            # Wysyłka paczek
             if self.peers:
                 active_peers = list(self.peers.values())
                 for peer_data in active_peers:
                     dc = peer_data.get('dc')
                     if dc and dc.readyState == "open":
                         try:
-                            dc.send(imu_json)
+                            dc.send(pose_json)
                         except Exception:
                             pass
             
