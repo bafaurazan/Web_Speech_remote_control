@@ -366,17 +366,6 @@ function App() {
       }
   };
 
-  const handleRenegotiationOffer = async (pc: RTCPeerConnection, sdp: RTCSessionDescriptionInit, peerUsername: string, receiverChannel: string) => {
-      try {
-          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          sendSignal('new-answer', { sdp: pc.localDescription, receiver_channel_name: receiverChannel });
-      } catch (e) {
-          log(`❌ [Renegotiation Handler] Błąd przy ${peerUsername}:`, e);
-      }
-  };
-
   const setupDataChannel = (dc: RTCDataChannel, peerUsername: string) => {
     dc.onopen = () => log(`✅ [DataChannel] Stan: OPEN z ${peerUsername}`);
     dc.onclose = () => { 
