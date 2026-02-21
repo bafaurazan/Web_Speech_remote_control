@@ -255,8 +255,8 @@ function App() {
         if (action === 'request-connect' || action === 'new-peer') {
             // === POPRAWKA: Sprawdzamy, czy już nie jesteśmy połączeni ===
             if (mapPeers.current[peerUsername]) {
-                log(`ℹ️ [WS] ${peerUsername} wysłał request, ale już jesteśmy połączeni. Ignoruję.`);
-                return; 
+                log(`♻️ [WS] ${peerUsername} wysłał request, ale mamy starą sesję. Resetuję ją.`);
+                removeDeadPeer(peerUsername);
             }
 
             log(`👋 [WS] ${peerUsername} prosi o połączenie/wszedł. Dodaję do oczekujących.`);
@@ -278,6 +278,10 @@ function App() {
             log(`📞 [WS] ${peerUsername} zatwierdził połączenie DO MNIE! Dzwonię (Tworzę Ofertę).`);
             setPendingPeers(prev => prev.filter(p => p !== peerUsername));
             
+            if (mapPeers.current[peerUsername]) {
+                removeDeadPeer(peerUsername);
+            }
+
             if (receiverChannel) {
                 createOfferer(peerUsername, receiverChannel);
             } else {
@@ -295,15 +299,16 @@ function App() {
             const targetChannel = receiverChannel || (existingPeer?.[0] as any)?.remoteChannelName;
 
             if (existingPeer) {
-                if (message.sdp) {
-                    log(`🔄 [WebRTC] Renegocjacja od ${peerUsername}`);
-                    handleRenegotiationOffer(existingPeer[0], message.sdp, peerUsername, targetChannel);
-                }
-            } else {
-                if (message.sdp && targetChannel) {
-                    createAnswerer(message.sdp, peerUsername, targetChannel);
-                }
+                // POPRAWKA: Zamiast traktować to jako renegocjację, traktujemy to jako 
+                // twardy reset (ponieważ nie implementowaliśmy prawdziwej renegocjacji w Pythonie).
+                log(`🧹 [WebRTC] Mieliśmy starą sesję z ${peerUsername}. Usuwamy ją przed Answer.`);
+                removeDeadPeer(peerUsername);
             }
+            
+            if (message.sdp && targetChannel) {
+                createAnswerer(message.sdp, peerUsername, targetChannel);
+            }
+            
         } 
         // --- 4. ODPOWIEDŹ ---
         else if (action === 'new-answer') {
