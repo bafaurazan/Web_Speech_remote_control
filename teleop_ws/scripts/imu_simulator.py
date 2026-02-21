@@ -88,8 +88,12 @@ class IMUMultiPeerAnswerer:
             self.peers.clear()
 
     async def close_peer(self, peer_id):
+        # Sprawdzamy, czy peer jest w słowniku
         if peer_id in self.peers:
-            peer_data = self.peers[peer_id]
+            # OD RAZU usuwamy go ze słownika i pobieramy jego dane.
+            # Dzięki temu żadne inne równoległe wywołanie już go tu nie znajdzie!
+            peer_data = self.peers.pop(peer_id) 
+            
             try:
                 if peer_data.get('dc'): 
                     peer_data['dc'].close()
@@ -98,7 +102,7 @@ class IMUMultiPeerAnswerer:
             except Exception as e:
                 logger.warning(f"⚠️ Błąd podczas zamykania {peer_id}: {e}")
             
-            del self.peers[peer_id]
+            # Usunęliśmy linię `del self.peers[peer_id]`, bo pop() załatwił sprawę
             logger.info(f"❌ Połączenie z {peer_id} usunięte.")
 
     async def send_signal(self, action, message):
@@ -178,11 +182,19 @@ class IMUMultiPeerAnswerer:
             def on_track(track):
                 logger.info(f"🗑️ Ignorowanie strumienia {track.kind} od {peer_id} (Blackhole)")
                 async def consume():
-                    while True:
-                        try:
+                    try:
+                        while True:
+                            # Jeśli track zostanie zamknięty, .recv() rzuci wyjątkiem
                             await track.recv()
-                        except Exception:
-                            break
+                    except asyncio.CancelledError:
+                        # Zadanie anulowane z zewnątrz
+                        pass
+                    except Exception as e:
+                        # Ignoruj inne błędy zamknięcia (np. aiortc.mediastreams.MediaStreamError)
+                        pass
+                
+                # Zapisujemy referencję do zadania, choć nie jest to ściśle wymagane, 
+                # obsługa wyjątków wyżej wystarczy, by pętla się ładnie zakończyła.
                 asyncio.create_task(consume())
 
             @pc.on("iceconnectionstatechange")

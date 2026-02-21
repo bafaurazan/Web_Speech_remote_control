@@ -2,8 +2,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // 2. Typy
-import type { ChatMessage, PeerData, SignalMessage, ImuData } from './types';
+import type { ChatMessage, PeerData, SignalMessage } from './types';
 import { ImuVisualizer } from './components/ImuVisualizer';
+import type { PoseData } from './components/ImuVisualizer';
 
 // 3. Funkcje pomocnicze (Utils)
 import { 
@@ -92,7 +93,7 @@ function App() {
   
   const isLoggingOut = useRef(false);
 
-  const [imuData, setImuData] = useState<ImuData | null>(null);
+  const [imuData, setImuData] = useState<PoseData | null>(null);
 
   // === 1. FUNKCJA WYLOGOWANIA ===
   const handleLogout = useCallback(() => {
@@ -393,8 +394,8 @@ function App() {
             setChatMessages(prev => [...prev, { username: data.username, message: data.message, isMe: false }]);
         }
 
-        if (data.imu) {
-            setImuData(data.imu);
+        if (data.imu || data.position) {
+            setImuData(data); 
         }
     };
   };

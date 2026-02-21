@@ -13,7 +13,7 @@ npm run dev
 test imu_simulator
 ```bash
 cd ~/Web_Speech_remote_control/teleop_ws
-python3 scripts/imu_simulator.py # --osemka
+python3 scripts/imu_simulator.py # --6dof
 ```
 
 test bridge_node

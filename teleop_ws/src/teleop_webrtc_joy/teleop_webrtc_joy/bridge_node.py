@@ -268,12 +268,22 @@ class WebRTCClient:
         if self.ws and not self.ws.closed:
             await self.ws.send_str(json.dumps({'peer': self.username, 'action': action, 'message': message}))
 
+    async def close_peer(self, peer_username):
+        if peer_username in self.peers:
+            pc = self.peers.pop(peer_username)
+            try:
+                logger.info(f"🧹 Zamykanie starego połączenia WebRTC z {peer_username}...")
+                await pc.close()
+            except Exception as e:
+                logger.error(f"⚠️ Błąd podczas zamykania {peer_username}: {e}")
+
     async def handle_signaling_message(self, data):
         peer_username = data['peer']
         action = data['action']
         if peer_username == self.username: return
 
         if action == 'new-peer':
+            await self.close_peer(peer_username)  # <--- DODANE
             logger.info(f"👋 Widzę {peer_username}. Wysyłam 'request-connect'.")
             await self.send_signal('request-connect', {})
         
@@ -282,6 +292,7 @@ class WebRTCClient:
             if target and target != self.username:
                 return
 
+            await self.close_peer(peer_username)  # <--- DODANE
             logger.info(f"🚀 Otrzymałem 'start-call' od {peer_username}.")
             await self.create_peer_connection(peer_username, initiator=True, receiver_channel=data['message'].get('receiver_channel_name'))
 
@@ -318,9 +329,10 @@ class WebRTCClient:
 
         @pc.on("iceconnectionstatechange")
         async def on_icestate():
-            if pc.iceConnectionState in ["failed", "closed"]:
-                await pc.close()
-                if peer_username in self.peers: del self.peers[peer_username]
+            # Dodano "disconnected" do listy stanów zrywających
+            if pc.iceConnectionState in ["failed", "closed", "disconnected"]:
+                logger.warning(f"⚠️ Utracono połączenie ICE z {peer_username} (Stan: {pc.iceConnectionState})")
+                await self.close_peer(peer_username) # <--- UŻYCIE NOWEJ METODY
 
     def setup_data_channel(self, channel):
         @channel.on("message")
