@@ -1,0 +1,7 @@
+numpy==1.26.4
+protobuf==3.20.3
+opencv-python==4.8.1.78
+opencv-contrib-python==4.8.1.78
+mediapipe==0.10.9
+matplotlib==3.7.5
+PyAutoGUI==0.9.54
