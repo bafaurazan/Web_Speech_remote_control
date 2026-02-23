@@ -38,26 +38,29 @@ class HandTrackerDepthNode(Node):
         self.hand_2_votes = deque(maxlen=self.STABILITY_THRESHOLD)
 
         # --- ZABEZPIECZENIA ZASIĘGU ---
-        # MIN_REACH: Fizyczna granica OAK-D to ok 30-35cm.
-        # Ustawiamy 400mm jako minimalną "trzymaną" odległość (chcemy nie dopuścić bliżej).
-        # Poniżej tej wartości czujnik głębi często gubi pomiar i potrafi zwrócić tło (dużą odległość),
-        # co wygląda jak "skok w górę". Dlatego poniżej progu włączamy lock.
         self.MIN_REACH_MM = 400.0
-        self.MAX_REACH_MM = 800.0  
+        self.MAX_REACH_MM = 800.0
 
-        # Gdy ręka jest za blisko i depth zaczyna wariować, trzymaj dystans przez chwilę.
-        self.CLOSE_LOCK_FRAMES = 10  # ~0.5s przy 20Hz
+        # Lock przy "za blisko" – ignoruj skoki w górę (tło) przez kilka klatek
+        self.CLOSE_LOCK_FRAMES = 15
         self._close_lock_left = 0
         self._close_lock_right = 0
-        self.CLOSE_LOCK_SPIKE_MM = 150.0  # jeśli depth nagle skacze powyżej (MIN + spike) -> traktuj jako błąd
-        self.DEPTH_QUALITY_MIN = 0.02     # minimalny udział poprawnych pikseli w ROI, poniżej uznaj pomiar za słaby
-        
-        # Wygładzanie
+        self.CLOSE_LOCK_SPIKE_MM = 120.0   # pomiar > MIN+spike w trakcie locka = uznaj za błąd
+        self.DEPTH_QUALITY_MIN = 0.03       # poniżej tej jakości ROI uznaj pomiar za niewiarygodny
+
+        # Odrzucanie skoków: zmiana względem poprzedniej wartości
+        self.MAX_JUMP_MM = 80.0             # jeśli |raw - prev| > to, uznaj za skok i ogranicz krok
+        self.MAX_STEP_PER_FRAME_MM = 45.0   # max zmiana wyjścia [mm] na jedną klatkę (rate limit)
+
+        # Wygładzanie (alpha: im mniejszy, tym bardziej trzymamy poprzednią wartość)
         self.prev_z_left = 400.0
         self.prev_z_right = 400.0
-        self.SMOOTHING_ALPHA = 0.2 
+        self.SMOOTHING_ALPHA = 0.22         # normalna szybkość śledzenia
+        self.SMOOTHING_ALPHA_CLOSE = 0.08  # przy "za blisko" / słabej jakości – mocniejsze wygładzanie
 
-        self.get_logger().info('Hand Tracker: Min-Range Protected (400mm floor + close-lock)')
+        self.get_logger().info(
+            'Hand Tracker: Min-Range Protected (400mm) + jump rejection + rate limit'
+        )
 
     def depth_callback(self, msg):
         try:
@@ -193,23 +196,34 @@ class HandTrackerDepthNode(Node):
         if raw_z == 0:
             raw_z = prev_z
 
-        # A2. Jeśli lock aktywny i pomiar jest słaby lub "skacze w górę" -> traktuj jako za blisko
+        # A2. Lock: przy za blisko ignoruj skoki w górę i słabe pomiary
         if lock_active:
             if (raw_z_meas == 0.0) or (depth_q < self.DEPTH_QUALITY_MIN) or (raw_z_meas > self.MIN_REACH_MM + self.CLOSE_LOCK_SPIKE_MM):
                 raw_z = self.MIN_REACH_MM
-        
-        # B. TWARDE OGRANICZENIE DOŁU (Min Safe Distance)
-        # Jeśli kamera podaje mniej niż MIN_REACH, to znaczy że ręka jest za blisko.
-        # Wymuszamy MIN_REACH, żeby nie skakało do zera czy losowych wartości.
+
+        # A3. Odrzucanie skoków: zbyt duża zmiana względem poprzedniej wartości = prawdopodobny błąd
+        if raw_z != prev_z and prev_z > 0:
+            jump = abs(raw_z - prev_z)
+            if jump > self.MAX_JUMP_MM:
+                # Zamiast surowego raw_z weź poprzednią + max dozwolony krok w stronę raw_z
+                step = np.clip(raw_z - prev_z, -self.MAX_JUMP_MM, self.MAX_JUMP_MM)
+                raw_z = prev_z + step
+
+        # B. Twarde ograniczenie dołu i góry
         if raw_z < self.MIN_REACH_MM:
             raw_z = self.MIN_REACH_MM
-            
-        # C. Twarde ograniczenie góry
         if raw_z > self.MAX_REACH_MM:
             raw_z = self.MAX_REACH_MM
-        
-        # D. Wygładzanie
-        filtered_z = (self.SMOOTHING_ALPHA * raw_z) + ((1.0 - self.SMOOTHING_ALPHA) * prev_z)
+
+        # C. Wygładzanie – mocniejsze przy "za blisko" lub słabej jakości
+        in_close_zone = lock_active or (depth_q < self.DEPTH_QUALITY_MIN) or (raw_z <= self.MIN_REACH_MM + 30.0)
+        alpha = self.SMOOTHING_ALPHA_CLOSE if in_close_zone else self.SMOOTHING_ALPHA
+        filtered_z = (alpha * raw_z) + ((1.0 - alpha) * prev_z)
+
+        # D. Rate limit: max zmiana na klatkę (żeby wyjście nie "wariowało")
+        step = filtered_z - prev_z
+        step = np.clip(step, -self.MAX_STEP_PER_FRAME_MM, self.MAX_STEP_PER_FRAME_MM)
+        filtered_z = float(np.clip(prev_z + step, self.MIN_REACH_MM, self.MAX_REACH_MM))
 
         # Zapisz
         if is_real_left: self.prev_z_left = filtered_z

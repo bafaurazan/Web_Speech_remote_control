@@ -7,7 +7,7 @@ from launch_ros.actions import Node
 
 def generate_launch_description():
     # 1. Znajdź ścieżkę do launch file kamery OAK-D
-    depthai_prefix = get_package_share_directory('depthai_ros_driver')
+    depthai_prefix = get_package_share_directory('teleop_hand_eye_tracking')
     depthai_launch_file = os.path.join(depthai_prefix, 'launch', 'camera.launch.py')
 
     return LaunchDescription([
