@@ -1,77 +1,80 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    # 1. Znajdź ścieżkę do launch file kamery OAK-D
-    depthai_prefix = get_package_share_directory("depthai_ros_driver")
-    depthai_launch_file = os.path.join(depthai_prefix, "launch", "camera.launch.py")
+    pkg_prefix = get_package_share_directory("teleop_hand_eye_tracking")
+    manipulation_launch_file = os.path.join(
+        pkg_prefix, "launch", "hand_tracker_launch", "rviz2_manipulation_launcher.launch.py"
+    )
+    camera_launch_file = os.path.join(pkg_prefix, "launch", "camera.launch.py")
 
-    # Konfigurowalne ramy TF – żeby połączyć drzewo kamery z drzewem robota.
-    # parent_frame: rama z URDF G1 (np. 'pelvis' albo 'mrbeam_link')
-    # camera_frame: rama publikowana przez depthai_ros_driver (np. 'oak_rgb_camera_optical_frame')
     camera_parent_frame = LaunchConfiguration("camera_parent_frame")
-    camera_frame = LaunchConfiguration("camera_frame")
+    camera_base_frame = LaunchConfiguration("camera_base_frame")
+    use_sim_time = LaunchConfiguration("use_sim_time")
+    interface = LaunchConfiguration("interface")
+    use_robot = LaunchConfiguration("use_robot")
+    publish_joint_states = LaunchConfiguration("publish_joint_states")
+    sim_rate_hz = LaunchConfiguration("sim_rate_hz")
 
     return LaunchDescription(
         [
-            # --- Argumenty, żeby można było łatwo zmienić w launchu ---
+            DeclareLaunchArgument("use_sim_time", default_value="false"),
+            DeclareLaunchArgument("interface", default_value="eno1"),
+            DeclareLaunchArgument("use_robot", default_value="false"),
+            DeclareLaunchArgument("publish_joint_states", default_value="false"),
+            DeclareLaunchArgument("sim_rate_hz", default_value="50.0"),
             DeclareLaunchArgument(
                 "camera_parent_frame",
-                default_value="pelvis",
-                description="Rama robota, do której podwieszamy kamerę OAK-D",
+                default_value="torso_link",
+                description="Rama robota dla kamery (torso_link = na głowie jak d435)",
             ),
             DeclareLaunchArgument(
-                "camera_frame",
-                default_value="oak_rgb_camera_optical_frame",
-                description="Rama TF generowana przez depthai_ros_driver dla kamery RGB",
+                "camera_base_frame",
+                default_value="oak-d-base-frame",
+                description="Frame OAK do podpięcia",
             ),
 
-            # --- URUCHOMIENIE KAMERY ---
+            # Kamera (model OAK na /oak/robot_description)
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(depthai_launch_file),
-                # Możesz tu w razie potrzeby dodać launch_arguments do kamery
+                PythonLaunchDescriptionSource(camera_launch_file),
             ),
-
-            # --- STATIC TF: robot -> kamera ---
-            # Składnia: x y z roll pitch yaw frame_id child_frame_id
+            # Robot + RViz (G1 na /robot_description)
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(manipulation_launch_file),
+                launch_arguments={
+                    "use_sim_time": use_sim_time,
+                    "interface": interface,
+                    "use_robot": use_robot,
+                    "publish_joint_states": publish_joint_states,
+                    "sim_rate_hz": sim_rate_hz,
+                }.items(),
+            ),
+            # OAK na głowie: ta sama pozycja i pochylenie co RealSense d435 w 29dof.urdf
+            # (d435_joint: xyz="0.0576235 0.01753 0.42987" rpy="0 0.83077 0")
+            # static_transform_publisher: x y z yaw pitch roll parent child
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
-                name="oak_to_robot_tf",
+                name="robot_to_oak_tf",
                 arguments=[
-                    "0.10",  # x: 10 cm przed robotem
-                    "0.00",  # y
-                    "0.15",  # z: 15 cm nad ramą parent_frame
-                    "0.0",
-                    "0.0",
-                    "0.0",
+                    "0.0576235", "0.01753", "0.42987",
+                    "0", "0.8307767239493009", "0",
                     camera_parent_frame,
-                    camera_frame,
+                    camera_base_frame,
                 ],
             ),
-
-            # --- WĘZEŁ ŚLEDZENIA RĄK (Hand Tracker) ---
             Node(
                 package="teleop_hand_eye_tracking",
                 executable="hand_tracker",
                 name="hand_tracker_node",
                 output="screen",
-                emulate_tty=True,  # potrzebne dla cv2.imshow
+                emulate_tty=True,
             ),
-
-            # --- WĘZEŁ STEROWANIA MYSZKĄ (hand_tracker Controller) ---
-            # Node(
-            #     package='teleop_hand_eye_tracking',
-            #     executable='hand_tracker_controller',
-            #     name='hand_tracker_controller_node',
-            #     output='screen',
-            #     emulate_tty=True
-            # ),
         ]
     )

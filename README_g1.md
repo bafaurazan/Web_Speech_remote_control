@@ -83,3 +83,11 @@ ros2 service call /g1pilot/start std_srvs/srv/Trigger
 #for simulation
 ros2 topic pub --once /g1pilot/arms/enabled std_msgs/msg/Bool "{data: true}"
 ```
+
+```bash
+source install/setup.bash
+ros2 launch teleop_hand_eye_tracking hand_control.launch.py interface:=wlp4s0 publish_joint_states:=false use_robot:=false
+```
+
+**Wyświetlanie robota i kamery OAK w RViz (oba modele):**  
+Kamera publikuje model na `/oak/robot_description`, robot G1 na `/robot_description`. Aby zobaczyć oba: w RViz **Add** → **By display type** → **RobotModel**. W nowym RobotModel ustaw **Description Topic** na `/oak/robot_description`. Fixed Frame: `pelvis`.
