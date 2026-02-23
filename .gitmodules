@@ -4,4 +4,3 @@
 [submodule "teleop_ws/src/vendor/astroviz_interfaces"]
 	path = teleop_ws/src/vendor/astroviz_interfaces
 	url = https://github.com/CDonosoK/astroviz_interfaces.git
-
