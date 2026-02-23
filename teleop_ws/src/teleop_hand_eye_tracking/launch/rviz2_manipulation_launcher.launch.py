@@ -140,7 +140,11 @@ def generate_launch_description():
             name="rviz2",
             arguments=[
                 "-d",
-                os.path.join("/ros2_ws/src/g1pilot/config", rviz_config_file_name)
+                os.path.join(
+                    get_package_share_directory("g1pilot"),
+                    "config",
+                    rviz_config_file_name
+                )
             ],
         ),
 
@@ -156,7 +160,7 @@ def generate_launch_description():
         # ),
 
         Node(
-            package='g1pilot',
+            package='teleop_hand_eye_tracking',
             executable='arm_controller_waist_cmd_vel',
             name='arm_controller',
             parameters=[{

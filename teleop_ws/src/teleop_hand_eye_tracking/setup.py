@@ -20,11 +20,15 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'eye_tracker = teleop_hand_eye_tracking.eye_tracker_node:main',
-            'eye_tracker_controller = teleop_hand_eye_tracking.eye_tracker_controller_node:main',
-            'eye_tracker_calibration_gui = teleop_hand_eye_tracking.eye_tracker_calibration_gui_node:main',
-            'hand_tracker = teleop_hand_eye_tracking.hand_tracker_node:main',
-            'arm_controller = teleop_hand_eye_tracking.arm_controller_node:main',
+            'eye_tracker = teleop_hand_eye_tracking.eye_tracker.eye_tracker_node:main',
+            'eye_tracker_controller = teleop_hand_eye_tracking.eye_tracker.eye_tracker_controller_node:main',
+            'eye_tracker_calibration_gui = teleop_hand_eye_tracking.eye_tracker.eye_tracker_calibration_gui_node:main',
+            'hand_tracker = teleop_hand_eye_tracking.hand_tracker.hand_tracker_node:main',
+            'arm_controller = teleop_hand_eye_tracking.hand_tracker.arm_controller_node:main',
+            # Experimental wrappers around vendor g1pilot controllers
+            'arm_controller_waist_cmd_vel = teleop_hand_eye_tracking.experimental.arm_controller_waist_cmd_vel:main',
+            'arm_controller_waist_cmd_vel_new = teleop_hand_eye_tracking.experimental.arm_controller_waist_cmd_vel_new:main',
+            'arm_controller_oryg = teleop_hand_eye_tracking.experimental.arm_controller_oryg_node:main',
         ],
     },
 )
