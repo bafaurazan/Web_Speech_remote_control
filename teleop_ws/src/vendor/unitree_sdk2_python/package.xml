@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>unitree_sdk2_python</name>
+  <version>1.0.1</version>
+  <description>Unitree robot SDK version 2 for Python (vendor fork for ROS 2 workspace).</description>
+  <maintainer email="unitree@unitree.com">UnitreeRobotics</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <depend>python3-numpy</depend>
+  <depend>python3-opencv</depend>
+  <exec_depend>python3-cyclonedds</exec_depend>
+  <exec_depend>python3-pygame</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
