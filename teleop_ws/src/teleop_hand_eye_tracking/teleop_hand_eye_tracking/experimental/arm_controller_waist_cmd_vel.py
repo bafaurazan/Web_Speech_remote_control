@@ -238,9 +238,11 @@ class ArmController(Node):
         if self.use_robot:
             self._init_robot_interface()
         else:
-            self._initialized = True 
+            self._initialized = True
             # [NOWE] W symulacji uznajemy, że tułów jest zainicjalizowany (nie trzeba czekać na dane z silników)
-            self._waist_initialized = True 
+            self._waist_initialized = True
+            # Start from home pose so first publish is not a jump from zeros
+            self._last_q_target = np.concatenate((self.home_left, self.home_right)).astype(float)
             self.get_logger().info("Simulation mode: Arm controller initialized.")
 
         self._last_tick_time = None
@@ -527,6 +529,12 @@ class ArmController(Node):
                 self.msg.motor_cmd[jid].kd = self.kd_low
             self.msg.motor_cmd[jid].q = float(self.all_motor_q[jid.value])
 
+        # Sync _last_q_target to current robot pose so first command is not a jump
+        self._last_q_target = np.array(
+            [self.all_motor_q[i] for i in LEFT_JOINT_INDICES_LIST]
+            + [self.all_motor_q[i] for i in RIGHT_JOINT_INDICES_LIST],
+            dtype=float,
+        )
         self.q_target = np.zeros(14)
         self.tauff_target = np.zeros(14)
         self._initialized = True

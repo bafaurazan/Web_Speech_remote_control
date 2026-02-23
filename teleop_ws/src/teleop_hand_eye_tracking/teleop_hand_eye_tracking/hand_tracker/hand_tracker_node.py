@@ -39,16 +39,25 @@ class HandTrackerDepthNode(Node):
 
         # --- ZABEZPIECZENIA ZASIĘGU ---
         # MIN_REACH: Fizyczna granica OAK-D to ok 30-35cm.
-        # Ustawiamy 350mm jako bezpieczną granicę. Poniżej tego dane to szum.
-        self.MIN_REACH_MM = 350.0 
+        # Ustawiamy 400mm jako minimalną "trzymaną" odległość (chcemy nie dopuścić bliżej).
+        # Poniżej tej wartości czujnik głębi często gubi pomiar i potrafi zwrócić tło (dużą odległość),
+        # co wygląda jak "skok w górę". Dlatego poniżej progu włączamy lock.
+        self.MIN_REACH_MM = 400.0
         self.MAX_REACH_MM = 800.0  
+
+        # Gdy ręka jest za blisko i depth zaczyna wariować, trzymaj dystans przez chwilę.
+        self.CLOSE_LOCK_FRAMES = 10  # ~0.5s przy 20Hz
+        self._close_lock_left = 0
+        self._close_lock_right = 0
+        self.CLOSE_LOCK_SPIKE_MM = 150.0  # jeśli depth nagle skacze powyżej (MIN + spike) -> traktuj jako błąd
+        self.DEPTH_QUALITY_MIN = 0.02     # minimalny udział poprawnych pikseli w ROI, poniżej uznaj pomiar za słaby
         
         # Wygładzanie
         self.prev_z_left = 400.0
         self.prev_z_right = 400.0
         self.SMOOTHING_ALPHA = 0.2 
 
-        self.get_logger().info('Hand Tracker: Min-Range Protected (350mm floor)')
+        self.get_logger().info('Hand Tracker: Min-Range Protected (400mm floor + close-lock)')
 
     def depth_callback(self, msg):
         try:
@@ -92,11 +101,18 @@ class HandTrackerDepthNode(Node):
             pass
 
     def get_robust_depth(self, landmarks, h, w):
+        z, _q = self.get_robust_depth_with_quality(landmarks, h, w)
+        return z
+
+    def get_robust_depth_with_quality(self, landmarks, h, w):
         if self.latest_depth_img is None:
-            return 0.0
+            return 0.0, 0.0
 
         key_indices = [0, 5, 9, 13, 17] 
         valid_depths = []
+        valid_px = 0
+        total_px = 0
+        r = 2  # ROI radius -> (2r+1)x(2r+1) = 5x5
 
         for idx in key_indices:
             lm = landmarks.landmark[idx]
@@ -106,14 +122,21 @@ class HandTrackerDepthNode(Node):
             safe_x = max(0, min(px, self.latest_depth_img.shape[1] - 1))
             safe_y = max(0, min(py, self.latest_depth_img.shape[0] - 1))
 
-            d = self.latest_depth_img[safe_y, safe_x]
-            
-            if d == 0:
-                roi = self.latest_depth_img[max(0, safe_y-1):safe_y+2, max(0, safe_x-1):safe_x+2]
-                if roi.size > 0:
-                    nonzero = roi[roi > 0]
-                    if nonzero.size > 0:
-                        d = np.median(nonzero)
+            roi = self.latest_depth_img[
+                max(0, safe_y - r):safe_y + r + 1,
+                max(0, safe_x - r):safe_x + r + 1
+            ]
+            if roi.size == 0:
+                continue
+
+            total_px += int(roi.size)
+            nonzero = roi[(roi > 0) & (roi < 2000)]
+            valid_px += int(nonzero.size)
+
+            if nonzero.size > 0:
+                d = float(np.median(nonzero))
+            else:
+                d = 0.0
             
             # --- FILTRACJA PUNKTOWA ---
             # Odrzucamy punkty, które są ewidentnym błędem (poniżej fizycznego limitu kamery)
@@ -122,10 +145,12 @@ class HandTrackerDepthNode(Node):
                 valid_depths.append(d)
 
         if not valid_depths:
-            return 0.0
+            return 0.0, (valid_px / total_px) if total_px > 0 else 0.0
 
         # Zwracamy medianę z poprawnych punktów
-        return float(np.median(valid_depths))
+        z = float(np.median(valid_depths))
+        q = (valid_px / total_px) if total_px > 0 else 0.0
+        return z, q
 
     def process_hand(self, detection, image, vote_buffer, is_primary):
         # 1. Stabilizacja Etykiety
@@ -142,19 +167,40 @@ class HandTrackerDepthNode(Node):
         px_y = int(target.y * h)
 
         # 3. Pobierz głębię
-        raw_z = self.get_robust_depth(detection['marks'], h, w)
+        raw_z_meas, depth_q = self.get_robust_depth_with_quality(detection['marks'], h, w)
 
         # 4. ZABEZPIECZENIA WARTOŚCI (Logic Clamping)
         
         prev_z = self.prev_z_left if is_real_left else self.prev_z_right
+
+        # Close-lock: jeśli pomiar wskazuje, że ręka weszła poniżej MIN_REACH,
+        # to przez kilka klatek traktuj kolejne "skoki w górę" jako błąd (zwykle tło).
+        if 0.0 < raw_z_meas < self.MIN_REACH_MM:
+            if is_real_left:
+                self._close_lock_left = self.CLOSE_LOCK_FRAMES
+            else:
+                self._close_lock_right = self.CLOSE_LOCK_FRAMES
+        else:
+            if is_real_left and self._close_lock_left > 0:
+                self._close_lock_left -= 1
+            if (not is_real_left) and self._close_lock_right > 0:
+                self._close_lock_right -= 1
+
+        lock_active = (self._close_lock_left > 0) if is_real_left else (self._close_lock_right > 0)
         
         # A. Jeśli pomiar nieudany (0), użyj poprzedniego
+        raw_z = raw_z_meas
         if raw_z == 0:
             raw_z = prev_z
+
+        # A2. Jeśli lock aktywny i pomiar jest słaby lub "skacze w górę" -> traktuj jako za blisko
+        if lock_active:
+            if (raw_z_meas == 0.0) or (depth_q < self.DEPTH_QUALITY_MIN) or (raw_z_meas > self.MIN_REACH_MM + self.CLOSE_LOCK_SPIKE_MM):
+                raw_z = self.MIN_REACH_MM
         
         # B. TWARDE OGRANICZENIE DOŁU (Min Safe Distance)
-        # Jeśli kamera podaje mniej niż 350mm, to znaczy że ręka jest za blisko.
-        # Wymuszamy 350mm, żeby nie skakało do zera czy losowych wartości.
+        # Jeśli kamera podaje mniej niż MIN_REACH, to znaczy że ręka jest za blisko.
+        # Wymuszamy MIN_REACH, żeby nie skakało do zera czy losowych wartości.
         if raw_z < self.MIN_REACH_MM:
             raw_z = self.MIN_REACH_MM
             
@@ -178,6 +224,10 @@ class HandTrackerDepthNode(Node):
         self.mp_drawing.draw_landmarks(image, detection['marks'], self.mp_hands.HAND_CONNECTIONS)
         
         txt = f"{int(filtered_z)}mm"
+        # Debug: jakość pomiaru głębi (0.0–1.0) i status close-lock
+        debug_q = f"q={depth_q:.2f}"
+        debug_lock = "LOCK" if lock_active else "OK"
+
         if is_real_left:
             self.pub_left.publish(msg)
             color = (255, 0, 0)
@@ -193,7 +243,18 @@ class HandTrackerDepthNode(Node):
         if filtered_z <= self.MIN_REACH_MM + 10:
              cv2.putText(image, "TOO CLOSE!", (px_x-30, px_y-50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
 
+        # Główna informacja o dystansie
         cv2.putText(image, f"{prefix}: {txt}", (px_x-20, px_y-25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+        # Dodatkowy overlay z jakością i statusem locka (nieco wyżej)
+        cv2.putText(
+            image,
+            f"{debug_q} {debug_lock}",
+            (px_x-40, px_y-65),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            (255, 255, 255),
+            1,
+        )
 
 def main(args=None):
     rclpy.init(args=args)

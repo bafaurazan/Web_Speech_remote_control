@@ -7,7 +7,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
 from rclpy.time import Time
-from geometry_msgs.msg import PoseStamped, Point
+# [MODYFIKACJA] Dodano Twist do importów
+from geometry_msgs.msg import PoseStamped, Point, Twist
 from visualization_msgs.msg import Marker
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, ColorRGBA
@@ -136,8 +137,8 @@ class ArmController(Node):
         super().__init__("arm_controller")
         self.get_logger().info("Arm Controller Node started.")
 
-        self.declare_parameter("use_robot", True)
-        self.declare_parameter("interface", "eth0")
+        self.declare_parameter("use_robot", False)
+        self.declare_parameter("interface", "eno1")
         self.declare_parameter("arm_velocity_limit", 5.0)
         self.declare_parameter("rate_hz", 250.0)
         self.declare_parameter("ik_world_frame", "pelvis")
@@ -202,6 +203,15 @@ class ArmController(Node):
         self._auto_done_right = False
         self._auto_done_left = False
 
+        # --- [NOWE] KONFIGURACJA WAIST YAW (CMD_VEL) ---
+        self.waist_yaw_target_pos = 0.0
+        self.waist_yaw_target_vel = 0.0
+        self.waist_kp = 60.0
+        self.waist_kd = 2.0
+        self.waist_yaw_index = 12 # Indeks G1 WaistYaw
+        self._waist_initialized = False # Flaga do synchronizacji startowej
+        self.waist_limit_rad = 1.0 # Limit obrotu +/- 1 rad
+
         self.ik_solver = G1IKSolver(debug=False)
         if hasattr(self.ik_solver, "set_orientation_mode"):
             self.ik_solver.set_orientation_mode(self.ik_orientation_mode)
@@ -222,11 +232,26 @@ class ArmController(Node):
         self.create_subscription(Bool, "/g1pilot/arms/enabled", self._arms_controlled_callback, 10)
         self.create_subscription(Bool, "/g1pilot/arms/home", self._homming_callback, 10)
 
+        # [NOWE] Subskrypcja cmd_vel do sterowania tułowiem
+        self.create_subscription(Twist, "/cmd_vel", self._cmd_vel_callback, 10)
+
         if self.use_robot:
             self._init_robot_interface()
+        else:
+            self._initialized = True
+            # [NOWE] W symulacji uznajemy, że tułów jest zainicjalizowany (nie trzeba czekać na dane z silników)
+            self._waist_initialized = True
+            # Start from home pose so first publish is not a jump from zeros
+            self._last_q_target = np.concatenate((self.home_left, self.home_right)).astype(float)
+            self.get_logger().info("Simulation mode: Arm controller initialized.")
 
         self._last_tick_time = None
         self.timer = self.create_timer(1.0 / self.rate_hz, self.main_loop)
+
+    # [NOWE] Callback dla prędkości tułowia
+    def _cmd_vel_callback(self, msg: Twist):
+        """Odbiera prędkość obrotową (angular.z) z klawiatury."""
+        self.waist_yaw_target_vel = msg.angular.z
 
     def _mk_static_T(self, xyz, rpy_deg):
         """
@@ -504,6 +529,12 @@ class ArmController(Node):
                 self.msg.motor_cmd[jid].kd = self.kd_low
             self.msg.motor_cmd[jid].q = float(self.all_motor_q[jid.value])
 
+        # Sync _last_q_target to current robot pose so first command is not a jump
+        self._last_q_target = np.array(
+            [self.all_motor_q[i] for i in LEFT_JOINT_INDICES_LIST]
+            + [self.all_motor_q[i] for i in RIGHT_JOINT_INDICES_LIST],
+            dtype=float,
+        )
         self.q_target = np.zeros(14)
         self.tauff_target = np.zeros(14)
         self._initialized = True
@@ -596,7 +627,8 @@ class ArmController(Node):
 
         self.msg.mode_pr = 0
         for jid in G1_29_JointIndex:
-            if jid.value in arm_vals:
+            # [MODYFIKACJA] Pomijamy ramiona ORAZ Tułów (indeks 12), bo sterujemy nim aktywnie
+            if jid.value in arm_vals or jid.value == self.waist_yaw_index:
                 continue
             self.msg.motor_cmd[jid].mode = 1
             if jid.value in weak_vals:
@@ -877,8 +909,25 @@ class ArmController(Node):
         if not getattr(self, "_initialized", False):
             return
         
+        # [NOWE] Obliczanie dt używane też do całkowania tułowia
+        dt = self._compute_dt()
+
+        # [NOWE] Logika tułowia (dla obu trybów Sim i Robot)
+        if self._waist_initialized:
+            # 1. Całkowanie prędkości: poz = poz + vel * dt
+            self.waist_yaw_target_pos += self.waist_yaw_target_vel * dt
+            # 2. Limitowanie zakresu ruchu
+            self.waist_yaw_target_pos = max(-self.waist_limit_rad, min(self.waist_limit_rad, self.waist_yaw_target_pos))
+        
         if self.use_robot:
             robot_data = self.lowstate_subscriber.Read()
+            # [NOWE] Synchronizacja tułowia po podłączeniu
+            if not self._waist_initialized and robot_data is not None:
+                current_q = self.get_current_motor_q()
+                self.waist_yaw_target_pos = current_q[self.waist_yaw_index]
+                self._waist_initialized = True
+                self.get_logger().info(f"Waist synchronized at: {self.waist_yaw_target_pos:.3f} rad")
+
             if robot_data is not None:
                 self.lowstate_buffer.SetData(robot_data)
                 for i in range(len(self.motor_state)):
@@ -887,6 +936,20 @@ class ArmController(Node):
 
         if not self.arms_enabled:
             self._hold_non_arm_joints()
+            
+            # [NOWE] Jeśli ręce wyłączone, ale jesteśmy w trybie robota, obsługujemy tułów
+            if self.use_robot and self._waist_initialized:
+                 for jid in G1_29_JointIndex:
+                    if jid.value == self.waist_yaw_index:
+                        self.msg.motor_cmd[jid].mode = 1
+                        self.msg.motor_cmd[jid].q = float(self.waist_yaw_target_pos)
+                        self.msg.motor_cmd[jid].dq = float(self.waist_yaw_target_vel)
+                        self.msg.motor_cmd[jid].tau = 0.0
+                        self.msg.motor_cmd[jid].kp = self.waist_kp
+                        self.msg.motor_cmd[jid].kd = self.waist_kd
+                        break
+                 self.msg.crc = self.crc.Crc(self.msg)
+                 self.lowcmd_publisher.Write(self.msg)
             return
 
         if self.homing_active:
@@ -958,7 +1021,7 @@ class ArmController(Node):
             if "right" in q_dict:
                 q_target[7:14] = q_dict["right"]
 
-        dt = self._compute_dt()
+        # [MODYFIKACJA] dt obliczono wcześniej, tutaj używamy zmiennej
         max_step = self.arm_velocity_limit * dt
         dq = np.clip(q_target - self._last_q_target, -max_step, max_step)
 
@@ -988,6 +1051,18 @@ class ArmController(Node):
                     self.msg.motor_cmd[jid].kp = self.kp_low
                     self.msg.motor_cmd[jid].kd = self.kd_low
 
+            # [NOWE] Sterowanie tułowiem w trybie robota (aktywne)
+            if self._waist_initialized:
+                for jid in G1_29_JointIndex:
+                    if jid.value == self.waist_yaw_index:
+                        self.msg.motor_cmd[jid].mode = 1 
+                        self.msg.motor_cmd[jid].q = float(self.waist_yaw_target_pos)
+                        self.msg.motor_cmd[jid].dq = float(self.waist_yaw_target_vel)
+                        self.msg.motor_cmd[jid].tau = 0.0
+                        self.msg.motor_cmd[jid].kp = self.waist_kp
+                        self.msg.motor_cmd[jid].kd = self.waist_kd
+                        break
+
             self.msg.crc = self.crc.Crc(self.msg)
             self.lowcmd_publisher.Write(self.msg)
         else:
@@ -999,6 +1074,13 @@ class ArmController(Node):
                 js.position[joint_idx] = float(q_smooth[idx])
             for idx, joint_idx in enumerate(RIGHT_JOINT_INDICES_LIST):
                 js.position[joint_idx] = float(q_smooth[7 + idx])
+            
+            # [NOWE] Ustawianie tułowia (WaistYaw) w symulacji (RViz)
+            waist_joint_name = JOINT_NAMES_ROS[self.waist_yaw_index]
+            if waist_joint_name in js.name:
+                w_idx = js.name.index(waist_joint_name)
+                js.position[w_idx] = float(self.waist_yaw_target_pos)
+            
             self.joint_pub.publish(js)
 
 
