@@ -20,6 +20,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
+            'xreal_imu = teleop_xreal_oak.xreal_imu_node:main',
         ],
     },
 )
