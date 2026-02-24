@@ -219,6 +219,13 @@ def generate_launch_description():
             name="hand_tracker_node",
             output="screen",
         ),
+
+        Node(
+            package="teleop_hand_eye_tracking",
+            executable="hand_tracker_to_arm_goal",
+            name="hand_tracker_to_arm_goal_node",
+            output="screen",
+        ),
     ])
 
 # sudo apt install iproute2 -y

@@ -89,12 +89,13 @@ class HandTrackerDepthNode(Node):
                 detections.append({'x': wrist_x, 'marks': hand_landmarks, 'raw_label': raw_label})
             
             detections.sort(key=lambda d: d['x'])
+            num_hands = len(detections)
 
-            if len(detections) > 0:
-                self.process_hand(detections[0], cv_image, self.hand_1_votes, True)
+            if num_hands > 0:
+                self.process_hand(detections[0], cv_image, self.hand_1_votes, True, num_hands)
 
-            if len(detections) > 1:
-                self.process_hand(detections[1], cv_image, self.hand_2_votes, False)
+            if num_hands > 1:
+                self.process_hand(detections[1], cv_image, self.hand_2_votes, False, num_hands)
         else:
             self.hand_1_votes.clear()
             self.hand_2_votes.clear()
@@ -155,13 +156,30 @@ class HandTrackerDepthNode(Node):
         q = (valid_px / total_px) if total_px > 0 else 0.0
         return z, q
 
-    def process_hand(self, detection, image, vote_buffer, is_primary):
-        # 1. Stabilizacja Etykiety
-        vote_buffer.append(detection['raw_label'])
-        final_label = "Left" if vote_buffer.count("Left") > vote_buffer.count("Right") else "Right"
-        if len(vote_buffer) < 5: final_label = detection['raw_label']
+    def process_hand(self, detection, image, vote_buffer, is_primary, num_hands: int):
+        """
+        Przetwarzanie pojedynczej dłoni.
 
-        is_real_left = (final_label == "Right") 
+        Stabilne przypisanie lewej/prawej:
+        - gdy WIDZIMY DWIE ręce:
+            * lewa na obrazie  (mniejszy x)  -> /hand/left
+            * prawa na obrazie (większy x)   -> /hand/right
+          (czyli używamy is_primary=True/False, niezależnie od labela Mediapipe)
+        - gdy WIDZIMY JEDNĄ rękę:
+            * używamy labela Mediapipe (z korektą strony kamery),
+              żeby odróżnić lewą od prawej dłoni.
+        """
+
+        raw_label = detection['raw_label']
+
+        if num_hands >= 2:
+            # Dwie ręce w kadrze – stabilnie pozycją w obrazie
+            is_real_left = bool(is_primary)
+        else:
+            # Jedna ręka – opieramy się na labelu Mediapipe.
+            # W oryginalnym kodzie było final_label == "Right" => lewa,
+            # co odpowiada odbiciu lustrzanemu kamery.
+            is_real_left = (raw_label == "Right")
         
         # 2. Współrzędne 2D
         h, w, _ = image.shape

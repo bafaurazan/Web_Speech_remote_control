@@ -43,6 +43,7 @@ sudo apt install ros-humble-rqt*
 export ROS_DOMAIN_ID=0
 colcon build
 source install/setup.bash
+ros2 topic pub -1 /g1pilot/hand_goal/left geometry_msgs/msg/PoseStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'pelvis'}, pose: {position: {x: 0.40, y: 0.17, z: 0.09}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}"
 
 #for real robot
 ros2 launch g1pilot rviz2_manipulation_launcher.launch.py interface:=eno1 publish_joint_states:=true use_robot:=true
@@ -58,7 +59,6 @@ sudo sh run_camera.sh
 export ROS_DOMAIN_ID=0
 colcon build
 source install/setup.bash
-ros2 topic pub -1 /g1pilot/hand_goal/left geometry_msgs/msg/PoseStamped "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: 'pelvis'}, pose: {position: {x: 0.40, y: 0.17, z: 0.09}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}"
 
 
 ```
@@ -88,6 +88,29 @@ ros2 topic pub --once /g1pilot/arms/enabled std_msgs/msg/Bool "{data: true}"
 source install/setup.bash
 ros2 launch teleop_hand_eye_tracking hand_control.launch.py interface:=wlp4s0 publish_joint_states:=false use_robot:=false
 ```
+
+### Sterowanie mapowaniem dłoni → ramiona (hand_tracker_to_arm_goal)
+
+Węzeł `hand_tracker_to_arm_goal` ma prostą maszynę stanów:
+
+- **idle** – nie wysyła celów do `/g1pilot/hand_goal/left` i `/g1pilot/hand_goal/right`
+- **active** – aktywne mapowanie `/hand/left`, `/hand/right` → cele ramion robota
+
+Aktualny stan jest publikowany na:
+
+- `hand_tracker_to_arm_goal/state` (`std_msgs/msg/String`): `"idle"` lub `"active"`
+
+Przełączanie odbywa się przez serwis:
+
+```bash
+# włączenie mapowania (stan: active)
+ros2 service call /hand_tracker_to_arm_goal/set_enabled std_srvs/srv/SetBool "{data: true}"
+
+# wyłączenie mapowania (stan: idle)
+ros2 service call /hand_tracker_to_arm_goal/set_enabled std_srvs/srv/SetBool "{data: false}"
+```
+
+GUI/teleop powinny korzystać z tego serwisu (a nie bezpośrednio z topiców) do włączania/wyłączania mapowania dłoni.
 
 **Wyświetlanie robota i kamery OAK w RViz (oba modele):**  
 Kamera publikuje model na `/oak/robot_description`, robot G1 na `/robot_description`. Aby zobaczyć oba: w RViz **Add** → **By display type** → **RobotModel**. W nowym RobotModel ustaw **Description Topic** na `/oak/robot_description`. Fixed Frame: `pelvis`.
