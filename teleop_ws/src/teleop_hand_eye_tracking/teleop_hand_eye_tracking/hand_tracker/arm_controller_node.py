@@ -146,6 +146,11 @@ class ArmController(Node):
         self.declare_parameter("ik_goal_filter_alpha", 0.25)
         self.declare_parameter("ik_orientation_mode", "full")
         self.declare_parameter("ik_max_ori_step_rad", 0.35)
+        # Dodatkowy limiter na "flipy" łokci/ramion: maksymalna zmiana konfiguracji
+        # jednej ręki (norma 7D) w jednym kroku IK. Jeśli solver zaproponuje
+        # konfigurację zbyt odległą od poprzedniej, zostanie ona dodatkowo
+        # skrócona w stronę poprzedniej, żeby uniknąć gwałtownych przeskoków.
+        self.declare_parameter("ik_max_step_norm", 0.8)  # rad (~45° w 7D wektorze)
         self.declare_parameter("ee_auto_calibrate", True)
 
 
@@ -163,6 +168,7 @@ class ArmController(Node):
         self.ik_goal_filter_alpha = float(self.get_parameter("ik_goal_filter_alpha").value)
         self.ik_orientation_mode = str(self.get_parameter("ik_orientation_mode").value).lower()
         self.ik_max_ori_step_rad = float(self.get_parameter("ik_max_ori_step_rad").value)
+        self.ik_max_step_norm = float(self.get_parameter("ik_max_step_norm").value)
         self.ee_auto_calibrate = bool(self.get_parameter("ee_auto_calibrate").value)
 
         self.declare_parameter("auto_reissue_goals", True)
@@ -1026,6 +1032,23 @@ class ArmController(Node):
         dq = np.clip(q_target - self._last_q_target, -max_step, max_step)
 
         q_unsmoothed = self._last_q_target + dq
+
+        # --- ANTI-FLIP dla obu rąk ---
+        # Dodatkowe ograniczenie "skoku" konfiguracji jednej ręki w jednym kroku.
+        # Jeśli 7D wektor zmian dla lewej/prawej przekracza ik_max_step_norm,
+        # to go skracamy. Dzięki temu solver nie może nagle "przeskoczyć"
+        # na zupełnie inną gałąź rozwiązania (flip łokcia/ramienia),
+        # tylko będzie tam dochodził powoli – co w praktyce zwykle nie
+        # następuje, bo cele dłoni ciągle się zmieniają.
+        for offset in (0, 7):  # 0=left, 7=right
+            q_prev = self._last_q_target[offset:offset+7]
+            q_new = q_unsmoothed[offset:offset+7]
+            diff = q_new - q_prev
+            norm = float(np.linalg.norm(diff))
+            if norm > self.ik_max_step_norm and norm > 1e-6:
+                scale = self.ik_max_step_norm / norm
+                q_unsmoothed[offset:offset+7] = q_prev + diff * scale
+
         q_smooth = (1.0 - self.ik_alpha) * self._last_q_target + self.ik_alpha * q_unsmoothed
         self._last_q_target = q_smooth.copy()
 

@@ -38,8 +38,14 @@ class HandTrackerDepthNode(Node):
         self.hand_2_votes = deque(maxlen=self.STABILITY_THRESHOLD)
 
         # --- ZABEZPIECZENIA ZASIĘGU ---
-        self.MIN_REACH_MM = 400.0
+        self.MIN_REACH_MM = 400.0      # minimalnie sensowny pomiar kamery
         self.MAX_REACH_MM = 800.0
+        # Dodatkowe odsunięcie w przód (cała chmura punktów jest przesunięta
+        # o stałą wartość, żeby robotowe ręce były dalej od tułowia).
+        self.DEPTH_OFFSET_MM = 95.0
+        # Minimalny dystans, na jaki POZWALAMY dojść robotowi
+        # (nawet jeśli kamera widzi bliżej).
+        self.MIN_ROBOT_REACH_MM = 520.0
 
         # Lock przy "za blisko" – ignoruj skoki w górę (tło) przez kilka klatek
         self.CLOSE_LOCK_FRAMES = 15
@@ -243,19 +249,28 @@ class HandTrackerDepthNode(Node):
         step = np.clip(step, -self.MAX_STEP_PER_FRAME_MM, self.MAX_STEP_PER_FRAME_MM)
         filtered_z = float(np.clip(prev_z + step, self.MIN_REACH_MM, self.MAX_REACH_MM))
 
-        # Zapisz
-        if is_real_left: self.prev_z_left = filtered_z
-        else: self.prev_z_right = filtered_z
+        # Zapisz (bez offsetu – filtr działa na "prawdziwym" dystansie)
+        if is_real_left:
+            self.prev_z_left = filtered_z
+        else:
+            self.prev_z_right = filtered_z
+
+        # E. Globalne odsunięcie w przód – docelowa odległość dla robota
+        #    (przesuwamy całą chmurę pomiarów, żeby ręce robota były dalej),
+        #    PLUS minimalny dystans bezpieczeństwa dla robota.
+        out_z = float(filtered_z + self.DEPTH_OFFSET_MM)
+        if out_z < self.MIN_ROBOT_REACH_MM:
+            out_z = self.MIN_ROBOT_REACH_MM
 
         # 5. Publikacja
         msg = Point()
         msg.x = float(px_x)
         msg.y = float(px_y)
-        msg.z = float(filtered_z)
+        msg.z = out_z
         
         self.mp_drawing.draw_landmarks(image, detection['marks'], self.mp_hands.HAND_CONNECTIONS)
         
-        txt = f"{int(filtered_z)}mm"
+        txt = f"{int(out_z)}mm"
         # Debug: jakość pomiaru głębi (0.0–1.0) i status close-lock
         debug_q = f"q={depth_q:.2f}"
         debug_lock = "LOCK" if lock_active else "OK"
