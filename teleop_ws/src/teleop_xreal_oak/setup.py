@@ -20,7 +20,6 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'bridge = teleop_xreal_oak.bridge_node:main',
         ],
     },
 )

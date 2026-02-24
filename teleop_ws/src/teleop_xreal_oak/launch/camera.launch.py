@@ -42,10 +42,9 @@ def launch_setup(context, *args, **kwargs):
     if context.environment.get("DEPTHAI_DEBUG") == "1":
         log_level = "debug"
 
-    # Używamy lokalnego oak_urdf.launch.py (publikuje na /oak/robot_description),
-    # żeby kolejność uruchamiania robota i kamery nie nadpisywała /robot_description.
+    # Lokalny oak_urdf.launch.py w paczce teleop_xreal_oak (model na /oak/robot_description)
     urdf_launch_dir = os.path.join(
-        get_package_share_directory("teleop_hand_eye_tracking"), "launch"
+        get_package_share_directory("teleop_xreal_oak"), "launch"
     )
 
     parent_frame = LaunchConfiguration(
@@ -71,7 +70,7 @@ def launch_setup(context, *args, **kwargs):
     namespace = LaunchConfiguration("namespace", default="").perform(context)
     name = LaunchConfiguration("name").perform(context)
 
-    # If RealSense compatibility is enabled, we need to override some parameters, topics and node names
+    # If RealSense compatibility is enabled, override some parameters
     parameter_overrides = {}
     color_sens_name = "rgb"
     stereo_sens_name = "stereo"
@@ -92,8 +91,6 @@ def launch_setup(context, *args, **kwargs):
         infra_profile = LaunchConfiguration("depth_module.infra_profile").perform(
             context
         )
-        # split profile string (0,0,0 or 0x0x0 or 0X0X0) into with (int) height(int) and fps(double)
-        # find delimiter
         delimiter = ","
         if "x" in depth_profile:
             delimiter = "x"
@@ -342,3 +339,4 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments + [OpaqueFunction(function=launch_setup)]
     )
+

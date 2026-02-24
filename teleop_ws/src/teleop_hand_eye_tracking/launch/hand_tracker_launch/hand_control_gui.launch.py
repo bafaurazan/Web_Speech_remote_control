@@ -159,9 +159,9 @@ def generate_launch_description():
         #     output='screen'
         # ),
 
-        Node(
+        Node(       
             package='teleop_hand_eye_tracking',
-            executable='arm_controller_waist_cmd_vel',
+            executable='arm_controller',
             name='arm_controller',
             parameters=[{
                 'interface': interface,
@@ -211,6 +211,13 @@ def generate_launch_description():
             executable='rqt_gui',
             name='rqt',
             output='screen',
+        ),
+        
+        Node(
+            package="teleop_hand_eye_tracking",
+            executable="hand_tracker",
+            name="hand_tracker_node",
+            output="screen",
         ),
     ])
 

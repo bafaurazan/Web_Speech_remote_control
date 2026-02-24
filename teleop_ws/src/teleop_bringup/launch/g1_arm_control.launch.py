@@ -8,11 +8,13 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_prefix = get_package_share_directory("teleop_hand_eye_tracking")
+    pkg_hand = get_package_share_directory("teleop_hand_eye_tracking")
+    pkg_oak = get_package_share_directory("teleop_xreal_oak")
+
     manipulation_launch_file = os.path.join(
-        pkg_prefix, "launch", "hand_tracker_launch", "rviz2_manipulation_launcher.launch.py"
+        pkg_hand, "launch", "hand_tracker_launch", "hand_control_gui.launch.py"
     )
-    camera_launch_file = os.path.join(pkg_prefix, "launch", "camera.launch.py")
+    camera_launch_file = os.path.join(pkg_oak, "launch", "camera.launch.py")
 
     camera_parent_frame = LaunchConfiguration("camera_parent_frame")
     camera_base_frame = LaunchConfiguration("camera_base_frame")
@@ -63,18 +65,16 @@ def generate_launch_description():
                 executable="static_transform_publisher",
                 name="robot_to_oak_tf",
                 arguments=[
-                    "0.0576235", "0.01753", "0.42987",
-                    "0", "0.8307767239493009", "0",
+                    "0.0576235",
+                    "0.01753",
+                    "0.42987",
+                    "0",
+                    "0.8307767239493009",
+                    "0",
                     camera_parent_frame,
                     camera_base_frame,
                 ],
             ),
-            Node(
-                package="teleop_hand_eye_tracking",
-                executable="hand_tracker",
-                name="hand_tracker_node",
-                output="screen",
-                emulate_tty=True,
-            ),
         ]
     )
+

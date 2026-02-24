@@ -120,7 +120,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "namespace",
             default_value="",
-            description='Namespace of the robot state publisher node.',
+            description="Namespace of the robot state publisher node.",
         ),
         DeclareLaunchArgument(
             "camera_model",
@@ -160,3 +160,4 @@ def generate_launch_description():
     return LaunchDescription(
         declared_arguments + [OpaqueFunction(function=launch_setup)]
     )
+
