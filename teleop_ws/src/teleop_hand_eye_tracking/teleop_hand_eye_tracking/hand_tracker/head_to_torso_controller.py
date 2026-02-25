@@ -9,6 +9,7 @@ from geometry_msgs.msg import Twist
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu, JointState
+from std_srvs.srv import SetBool
 
 
 class HeadToTorsoController(Node):
@@ -44,6 +45,8 @@ class HeadToTorsoController(Node):
 
         # Zakres fizyczny tułowia (do saturacji odczytu)
         self.declare_parameter("waist_max_range_rad", 1.0)
+        # Czy kontroler ma być aktywny od startu (inaczej czeka na service)
+        self.declare_parameter("enabled_at_start", False)
 
         # Tematy / nazwy
         self.declare_parameter("xreal_imu_topic", "/xreal/imu/data")
@@ -63,6 +66,7 @@ class HeadToTorsoController(Node):
         self.max_angular_vel = float(self.get_parameter("max_angular_vel").value)
         self.deadzone_rad = float(self.get_parameter("deadzone_rad").value)
         self.waist_max_range_rad = float(self.get_parameter("waist_max_range_rad").value)
+        self.enabled = bool(self.get_parameter("enabled_at_start").value)
 
         xreal_topic = str(self.get_parameter("xreal_imu_topic").value)
         joint_states_topic = str(self.get_parameter("joint_states_topic").value)
@@ -88,6 +92,9 @@ class HeadToTorsoController(Node):
             self._joint_states_callback,
             10,
         )
+
+        # Service do włączania/wyłączania kontrolera
+        self.create_service(SetBool, "enable_head_to_torso", self._enable_srv_cb)
 
         # Publikacja
         self.cmd_vel_pub = self.create_publisher(Twist, cmd_vel_topic, 10)
@@ -147,7 +154,7 @@ class HeadToTorsoController(Node):
         - jeśli po prawej -> jedzie w lewo z -max_angular_vel
         - gdy błąd mniejszy niż deadzone_rad -> zatrzymuje się (kąt praktycznie taki sam)
         """
-        if self.imu_w is None or self.robot_waist_pos is None:
+        if not self.enabled or self.imu_w is None or self.robot_waist_pos is None:
             return
 
         target = self._compute_target_from_w(self.imu_w)
@@ -172,6 +179,18 @@ class HeadToTorsoController(Node):
             f"waist_pos={self.robot_waist_pos:.3f}, "
             f"target={target:.3f}, cmd_vel.z={angular_z:.3f}"
         )
+
+    # -----------------------------
+    # Service handlers
+    # -----------------------------
+    def _enable_srv_cb(self, request: SetBool.Request, response: SetBool.Response):
+        """Service: włącz/wyłącz sterowanie tułowiem."""
+        self.enabled = bool(request.data)
+        state = "ENABLED" if self.enabled else "DISABLED"
+        self.get_logger().info(f"HeadToTorsoController state changed via service: {state}")
+        response.success = True
+        response.message = state
+        return response
 
 
 def main(args=None) -> None:

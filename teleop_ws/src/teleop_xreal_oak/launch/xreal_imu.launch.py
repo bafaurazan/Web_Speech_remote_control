@@ -1,3 +1,6 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -15,8 +18,15 @@ def generate_launch_description():
     accel_in_g = LaunchConfiguration("accel_in_g")
     gyro_scale = LaunchConfiguration("gyro_scale")
     accel_scale = LaunchConfiguration("accel_scale")
-    gyro_bias_calib_samples = LaunchConfiguration("gyro_bias_calib_samples")
     axis_remap = LaunchConfiguration("axis_remap")
+    bias_file = LaunchConfiguration("bias_file")
+
+    # Domyślna ścieżka do pliku biasu w paczce
+    default_bias_path = os.path.join(
+        get_package_share_directory("teleop_xreal_oak"),
+        "config",
+        "xreal_imu_bias.json",
+    )
 
     # Topics
     raw_topic = LaunchConfiguration("raw_topic")
@@ -32,9 +42,13 @@ def generate_launch_description():
             DeclareLaunchArgument("accel_in_g", default_value="true"),
             DeclareLaunchArgument("gyro_scale", default_value="1.0"),
             DeclareLaunchArgument("accel_scale", default_value="1.0"),
-            DeclareLaunchArgument("gyro_bias_calib_samples", default_value="1000"), # set to 0 to disable gyro bias calibration, default 500
             DeclareLaunchArgument("axis_remap", default_value="true",
                 description="Remap XREAL axes so yaw (head left/right) = ROS Z for correct RViz orientation"),
+            DeclareLaunchArgument(
+                "bias_file",
+                default_value=default_bias_path,
+                description="Path to JSON file with previously calibrated gyro bias",
+            ),
             DeclareLaunchArgument("raw_topic", default_value="/xreal/imu/data_raw"),
             DeclareLaunchArgument("out_topic", default_value="/xreal/imu/data"),
 
@@ -53,8 +67,8 @@ def generate_launch_description():
                         "accel_in_g": accel_in_g,
                         "gyro_scale": gyro_scale,
                         "accel_scale": accel_scale,
-                        "gyro_bias_calib_samples": gyro_bias_calib_samples,
                         "axis_remap": axis_remap,
+                        "bias_file": bias_file,
                     }
                 ],
                 remappings=[

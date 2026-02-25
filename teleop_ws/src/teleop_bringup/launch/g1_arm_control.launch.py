@@ -14,6 +14,9 @@ def generate_launch_description():
     manipulation_launch_file = os.path.join(
         pkg_hand, "launch", "hand_tracker_launch", "hand_control_gui.launch.py"
     )
+    head_to_torso_launch_file = os.path.join(
+        pkg_hand, "launch", "hand_tracker_launch", "head_to_torso.launch.py"
+    )
     camera_launch_file = os.path.join(pkg_oak, "launch", "camera.launch.py")
 
     camera_parent_frame = LaunchConfiguration("camera_parent_frame")
@@ -56,6 +59,10 @@ def generate_launch_description():
                     "publish_joint_states": publish_joint_states,
                     "sim_rate_hz": sim_rate_hz,
                 }.items(),
+            ),
+            # Sterowanie tułowiem z IMU głowy (domyślnie disabled, czeka na service)
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(head_to_torso_launch_file),
             ),
             # OAK na głowie: ta sama pozycja i pochylenie co RealSense d435 w 29dof.urdf
             # (d435_joint: xyz="0.0576235 0.01753 0.42987" rpy="0 0.83077 0")

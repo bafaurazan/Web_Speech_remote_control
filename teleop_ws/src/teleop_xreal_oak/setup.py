@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'xreal_imu = teleop_xreal_oak.xreal_imu_node:main',
+            'xreal_imu_calib = teleop_xreal_oak.xreal_imu_calib_node:main',
         ],
     },
 )

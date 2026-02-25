@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import json
 import math
+import os
 import socket
 import struct
 import threading
@@ -10,6 +12,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu
@@ -54,9 +57,14 @@ class XrealImuNode(Node):
         # Dzięki temu obrót głowy w lewo/prawo (yaw) = obrót wokół Z w RViz.
         self.declare_parameter("axis_remap", True)
 
-        # Optional gyro bias calibration (averaging first N samples when device is still). 0 = off.
-        self.declare_parameter("gyro_bias_calib_samples", 0)
-        self.declare_parameter("gyro_bias_calib_max_speed", 0.05)  # rad/s; samples above this are skipped
+        # Plik z wcześniej skalibrowanym biasem żyroskopu (tworzony przez osobny node kalibracyjny)
+        try:
+            pkg_share = get_package_share_directory("teleop_xreal_oak")
+            default_bias_path = os.path.join(pkg_share, "config", "xreal_imu_bias.json")
+        except Exception:
+            # Awaryjnie: katalog domowy, gdyby ament_index nie zadziałał
+            default_bias_path = os.path.expanduser("~/.xreal_imu_bias.json")
+        self.declare_parameter("bias_file", default_bias_path)
 
         self._ip = str(self.get_parameter("ip").value)
         self._port = int(self.get_parameter("port").value)
@@ -69,12 +77,9 @@ class XrealImuNode(Node):
         self._accel_scale = float(self.get_parameter("accel_scale").value)
         self._axis_remap = bool(self.get_parameter("axis_remap").value)
 
-        self._bias_N = max(0, int(self.get_parameter("gyro_bias_calib_samples").value))
-        self._bias_calib_max_speed = float(self.get_parameter("gyro_bias_calib_max_speed").value)
+        self._bias_file = str(self.get_parameter("bias_file").value)
         self._bias = _Bias()
-        self._bias_count = 0
-        self._bias_sum = _Bias()
-        self._bias_calib_logged = False
+        self._load_bias_from_file()
 
         self._sock: Optional[socket.socket] = None
         self._recv_buffer = b""
@@ -165,27 +170,7 @@ class XrealImuNode(Node):
     # Publishing
     # -----------------------------
     def _publish(self, gx: float, gy: float, gz: float, ax: float, ay: float, az: float):
-        # Optional gyro bias calibration: average only when device is still (no head motion)
-        if self._bias_N > 0 and self._bias_count < self._bias_N:
-            if not self._bias_calib_logged:
-                self._bias_calib_logged = True
-                self.get_logger().info(
-                    f"Kalibracja żyroskopu ({self._bias_N} próbek): trzymaj głowę nieruchomo. "
-                    "Ruch głowy w tym momencie psuje kalibrację."
-                )
-            speed = math.sqrt(gx * gx + gy * gy + gz * gz)
-            if speed <= self._bias_calib_max_speed:
-                self._bias_sum.gx += gx
-                self._bias_sum.gy += gy
-                self._bias_sum.gz += gz
-                self._bias_count += 1
-                if self._bias_count == self._bias_N:
-                    self._bias.gx = self._bias_sum.gx / self._bias_N
-                    self._bias.gy = self._bias_sum.gy / self._bias_N
-                    self._bias.gz = self._bias_sum.gz / self._bias_N
-                    self.get_logger().info("✅ Gyro bias calibrated.")
-            return
-
+        # Zastosuj wcześniej zapisaną kalibrację biasu żyroskopu
         gx = (gx - self._bias.gx) * self._gyro_scale
         gy = (gy - self._bias.gy) * self._gyro_scale
         gz = (gz - self._bias.gz) * self._gyro_scale
@@ -229,6 +214,33 @@ class XrealImuNode(Node):
         msg.linear_acceleration.z = acc_z
 
         self.pub_raw.publish(msg)
+
+    # -----------------------------
+    # Bias loading
+    # -----------------------------
+
+    def _load_bias_from_file(self) -> None:
+        """Ładuje zapisany bias żyroskopu z pliku (jeśli istnieje)."""
+        path = os.path.expanduser(self._bias_file)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self._bias.gx = float(data.get("gx", 0.0))
+            self._bias.gy = float(data.get("gy", 0.0))
+            self._bias.gz = float(data.get("gz", 0.0))
+            self.get_logger().info(
+                f"Loaded gyro bias from {path}: "
+                f"gx={self._bias.gx:.6f}, gy={self._bias.gy:.6f}, gz={self._bias.gz:.6f}"
+            )
+        except FileNotFoundError:
+            self.get_logger().warn(
+                f"Gyro bias file not found: {path}. Using zero bias. "
+                "Run xreal_imu_calib.launch.py to calibrate."
+            )
+        except Exception as e:
+            self.get_logger().warn(
+                f"Failed to load gyro bias from {path}: {e}. Using zero bias."
+            )
 
 
 def main(args=None):
