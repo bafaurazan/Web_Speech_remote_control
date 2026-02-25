@@ -43,14 +43,20 @@ class XrealImuNode(Node):
         self.declare_parameter("timeout_s", 5.0)
         self.declare_parameter("frame_id", "xreal_imu")
 
-        # Units / scaling
-        self.declare_parameter("gyro_in_degs", True)   # demo integrated in degrees → assume deg/s
+        # Units / scaling (ROS expects rad/s and m/s^2)
+        # XREAL protocol: gyro w rad/s; ustaw True tylko jeśli wiesz że urządzenie podaje deg/s
+        self.declare_parameter("gyro_in_degs", False)
         self.declare_parameter("accel_in_g", True)     # common IMU unit; scale to m/s^2
         self.declare_parameter("gyro_scale", 1.0)      # extra multiplier
         self.declare_parameter("accel_scale", 1.0)     # extra multiplier
 
-        # Optional gyro bias calibration (averaging first N samples)
-        self.declare_parameter("gyro_bias_calib_samples", 500)
+        # Mapowanie osi: XREAL (gx=pitch, gy=yaw, gz=roll) → ROS (x=roll, y=pitch, z=yaw)
+        # Dzięki temu obrót głowy w lewo/prawo (yaw) = obrót wokół Z w RViz.
+        self.declare_parameter("axis_remap", True)
+
+        # Optional gyro bias calibration (averaging first N samples when device is still). 0 = off.
+        self.declare_parameter("gyro_bias_calib_samples", 0)
+        self.declare_parameter("gyro_bias_calib_max_speed", 0.05)  # rad/s; samples above this are skipped
 
         self._ip = str(self.get_parameter("ip").value)
         self._port = int(self.get_parameter("port").value)
@@ -61,11 +67,14 @@ class XrealImuNode(Node):
         self._accel_in_g = bool(self.get_parameter("accel_in_g").value)
         self._gyro_scale = float(self.get_parameter("gyro_scale").value)
         self._accel_scale = float(self.get_parameter("accel_scale").value)
+        self._axis_remap = bool(self.get_parameter("axis_remap").value)
 
         self._bias_N = max(0, int(self.get_parameter("gyro_bias_calib_samples").value))
+        self._bias_calib_max_speed = float(self.get_parameter("gyro_bias_calib_max_speed").value)
         self._bias = _Bias()
         self._bias_count = 0
         self._bias_sum = _Bias()
+        self._bias_calib_logged = False
 
         self._sock: Optional[socket.socket] = None
         self._recv_buffer = b""
@@ -156,17 +165,25 @@ class XrealImuNode(Node):
     # Publishing
     # -----------------------------
     def _publish(self, gx: float, gy: float, gz: float, ax: float, ay: float, az: float):
-        # Optional gyro bias calibration (device must be stationary)
+        # Optional gyro bias calibration: average only when device is still (no head motion)
         if self._bias_N > 0 and self._bias_count < self._bias_N:
-            self._bias_sum.gx += gx
-            self._bias_sum.gy += gy
-            self._bias_sum.gz += gz
-            self._bias_count += 1
-            if self._bias_count == self._bias_N:
-                self._bias.gx = self._bias_sum.gx / self._bias_N
-                self._bias.gy = self._bias_sum.gy / self._bias_N
-                self._bias.gz = self._bias_sum.gz / self._bias_N
-                self.get_logger().info("✅ Gyro bias calibrated.")
+            if not self._bias_calib_logged:
+                self._bias_calib_logged = True
+                self.get_logger().info(
+                    f"Kalibracja żyroskopu ({self._bias_N} próbek): trzymaj głowę nieruchomo. "
+                    "Ruch głowy w tym momencie psuje kalibrację."
+                )
+            speed = math.sqrt(gx * gx + gy * gy + gz * gz)
+            if speed <= self._bias_calib_max_speed:
+                self._bias_sum.gx += gx
+                self._bias_sum.gy += gy
+                self._bias_sum.gz += gz
+                self._bias_count += 1
+                if self._bias_count == self._bias_N:
+                    self._bias.gx = self._bias_sum.gx / self._bias_N
+                    self._bias.gy = self._bias_sum.gy / self._bias_N
+                    self._bias.gz = self._bias_sum.gz / self._bias_N
+                    self.get_logger().info("✅ Gyro bias calibrated.")
             return
 
         gx = (gx - self._bias.gx) * self._gyro_scale
@@ -187,6 +204,15 @@ class XrealImuNode(Node):
             ay *= g
             az *= g
 
+        # Remap axes: XREAL gx = lewo/prawo (yaw) ✓, gy↔gz zamienione żeby góra/dół i poprzek były dobre.
+        # ROS: roll=X, pitch=Y, yaw=Z → gy→x, gz→y, gx→z
+        if self._axis_remap:
+            omg_x, omg_y, omg_z = gy, gz, gx
+            acc_x, acc_y, acc_z = ay, az, ax  # ta sama permutacja co żyroskop
+        else:
+            omg_x, omg_y, omg_z = gx, gy, gz
+            acc_x, acc_y, acc_z = ax, ay, az
+
         msg = Imu()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = self._frame_id
@@ -194,13 +220,13 @@ class XrealImuNode(Node):
         # Orientation unknown in raw message
         msg.orientation_covariance[0] = -1.0
 
-        msg.angular_velocity.x = gx
-        msg.angular_velocity.y = gy
-        msg.angular_velocity.z = gz
+        msg.angular_velocity.x = omg_x
+        msg.angular_velocity.y = omg_y
+        msg.angular_velocity.z = omg_z
 
-        msg.linear_acceleration.x = ax
-        msg.linear_acceleration.y = ay
-        msg.linear_acceleration.z = az
+        msg.linear_acceleration.x = acc_x
+        msg.linear_acceleration.y = acc_y
+        msg.linear_acceleration.z = acc_z
 
         self.pub_raw.publish(msg)
 

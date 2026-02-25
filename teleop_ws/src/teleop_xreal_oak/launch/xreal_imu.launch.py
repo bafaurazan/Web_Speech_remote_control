@@ -16,6 +16,7 @@ def generate_launch_description():
     gyro_scale = LaunchConfiguration("gyro_scale")
     accel_scale = LaunchConfiguration("accel_scale")
     gyro_bias_calib_samples = LaunchConfiguration("gyro_bias_calib_samples")
+    axis_remap = LaunchConfiguration("axis_remap")
 
     # Topics
     raw_topic = LaunchConfiguration("raw_topic")
@@ -26,11 +27,14 @@ def generate_launch_description():
             DeclareLaunchArgument("ip", default_value="169.254.2.1"),
             DeclareLaunchArgument("port", default_value="52998"),
             DeclareLaunchArgument("frame_id", default_value="xreal_imu"),
-            DeclareLaunchArgument("gyro_in_degs", default_value="true"),
+            DeclareLaunchArgument("gyro_in_degs", default_value="false",
+                description="Set true only if XREAL sends gyro in deg/s (default: rad/s)"),
             DeclareLaunchArgument("accel_in_g", default_value="true"),
             DeclareLaunchArgument("gyro_scale", default_value="1.0"),
             DeclareLaunchArgument("accel_scale", default_value="1.0"),
-            DeclareLaunchArgument("gyro_bias_calib_samples", default_value="500"),
+            DeclareLaunchArgument("gyro_bias_calib_samples", default_value="1000"), # set to 0 to disable gyro bias calibration, default 500
+            DeclareLaunchArgument("axis_remap", default_value="true",
+                description="Remap XREAL axes so yaw (head left/right) = ROS Z for correct RViz orientation"),
             DeclareLaunchArgument("raw_topic", default_value="/xreal/imu/data_raw"),
             DeclareLaunchArgument("out_topic", default_value="/xreal/imu/data"),
 
@@ -50,6 +54,7 @@ def generate_launch_description():
                         "gyro_scale": gyro_scale,
                         "accel_scale": accel_scale,
                         "gyro_bias_calib_samples": gyro_bias_calib_samples,
+                        "axis_remap": axis_remap,
                     }
                 ],
                 remappings=[
