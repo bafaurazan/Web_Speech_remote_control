@@ -94,7 +94,7 @@ class HeadToTorsoController(Node):
         )
 
         # Service do włączania/wyłączania kontrolera
-        self.create_service(SetBool, "enable_head_to_torso", self._enable_srv_cb)
+        self.create_service(SetBool, "/enable_head_to_torso", self._enable_srv_cb)
 
         # Publikacja
         self.cmd_vel_pub = self.create_publisher(Twist, cmd_vel_topic, 10)

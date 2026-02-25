@@ -18,6 +18,7 @@ def generate_launch_description():
         pkg_hand, "launch", "hand_tracker_launch", "head_to_torso.launch.py"
     )
     camera_launch_file = os.path.join(pkg_oak, "launch", "camera.launch.py")
+    xreal_imu_launch_file = os.path.join(pkg_oak, "launch", "xreal_imu.launch.py")
 
     camera_parent_frame = LaunchConfiguration("camera_parent_frame")
     camera_base_frame = LaunchConfiguration("camera_base_frame")
@@ -60,7 +61,11 @@ def generate_launch_description():
                     "sim_rate_hz": sim_rate_hz,
                 }.items(),
             ),
-            # Sterowanie tułowiem z IMU głowy (domyślnie disabled, czeka na service)
+            # IMU z okularów XREAL (domyślnie disabled, czeka na service /enable_imu)
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(xreal_imu_launch_file),
+            ),
+            # Sterowanie tułowiem z IMU głowy (domyślnie disabled, czeka na service /enable_head_to_torso)
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(head_to_torso_launch_file),
             ),

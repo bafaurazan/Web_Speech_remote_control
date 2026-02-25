@@ -16,6 +16,7 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Imu
+from std_srvs.srv import SetBool
 
 
 @dataclass
@@ -65,6 +66,8 @@ class XrealImuNode(Node):
             # Awaryjnie: katalog domowy, gdyby ament_index nie zadziałał
             default_bias_path = os.path.expanduser("~/.xreal_imu_bias.json")
         self.declare_parameter("bias_file", default_bias_path)
+        # Czy publikować dane od razu (False = czeka na wywołanie service enable_imu)
+        self.declare_parameter("enabled_at_start", False)
 
         self._ip = str(self.get_parameter("ip").value)
         self._port = int(self.get_parameter("port").value)
@@ -80,6 +83,9 @@ class XrealImuNode(Node):
         self._bias_file = str(self.get_parameter("bias_file").value)
         self._bias = _Bias()
         self._load_bias_from_file()
+
+        self._enabled = bool(self.get_parameter("enabled_at_start").value)
+        self.create_service(SetBool, "/enable_imu", self._enable_srv_cb)
 
         self._sock: Optional[socket.socket] = None
         self._recv_buffer = b""
@@ -169,7 +175,18 @@ class XrealImuNode(Node):
     # -----------------------------
     # Publishing
     # -----------------------------
+    def _enable_srv_cb(self, request: SetBool.Request, response: SetBool.Response):
+        """Service: włącz/wyłącz publikację danych IMU."""
+        self._enabled = bool(request.data)
+        state = "ENABLED" if self._enabled else "DISABLED"
+        self.get_logger().info(f"XREAL IMU state changed via service: {state}")
+        response.success = True
+        response.message = state
+        return response
+
     def _publish(self, gx: float, gy: float, gz: float, ax: float, ay: float, az: float):
+        if not self._enabled:
+            return
         # Zastosuj wcześniej zapisaną kalibrację biasu żyroskopu
         gx = (gx - self._bias.gx) * self._gyro_scale
         gy = (gy - self._bias.gy) * self._gyro_scale
