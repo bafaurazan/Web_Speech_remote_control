@@ -22,6 +22,9 @@ def generate_launch_description():
     ik_alpha = LaunchConfiguration("ik_alpha")
     ik_max_dq_step = LaunchConfiguration("ik_max_dq_step")
     arm_velocity_limit = LaunchConfiguration("arm_velocity_limit")
+    viewer_fullscreen = LaunchConfiguration("hand_viewer_fullscreen")
+    viewer_width = LaunchConfiguration("hand_viewer_width")
+    viewer_height = LaunchConfiguration("hand_viewer_height")
 
     urdf = os.path.join(
         get_package_share_directory(package_name), "description_files/urdf", urdf_file_name
@@ -47,6 +50,22 @@ def generate_launch_description():
         DeclareLaunchArgument("ik_alpha", default_value="0.2"),
         DeclareLaunchArgument("ik_max_dq_step", default_value="0.05"),
         DeclareLaunchArgument("arm_velocity_limit", default_value="2.0"),
+        # Parametry okna podglądu dłoni (OpenCV w hand_tracker_node)
+        DeclareLaunchArgument(
+            "hand_viewer_fullscreen",
+            default_value="false",
+            description="Jeśli true, okno kamery startuje w trybie fullscreen",
+        ),
+        DeclareLaunchArgument(
+            "hand_viewer_width",
+            default_value="0",
+            description="Szerokość okna podglądu (0 = oryginalna szerokość obrazu)",
+        ),
+        DeclareLaunchArgument(
+            "hand_viewer_height",
+            default_value="0",
+            description="Wysokość okna podglądu (0 = oryginalna wysokość obrazu)",
+        ),
 
         Node(
             package='g1pilot',
@@ -218,6 +237,11 @@ def generate_launch_description():
             executable="hand_tracker",
             name="hand_tracker_node",
             output="screen",
+            parameters=[{
+                "viewer_fullscreen": ParameterValue(viewer_fullscreen, value_type=bool),
+                "viewer_width": ParameterValue(viewer_width, value_type=int),
+                "viewer_height": ParameterValue(viewer_height, value_type=int),
+            }],
         ),
 
         Node(

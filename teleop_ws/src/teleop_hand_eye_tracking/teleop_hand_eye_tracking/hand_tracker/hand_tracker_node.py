@@ -11,7 +11,25 @@ from collections import deque
 class HandTrackerDepthNode(Node):
     def __init__(self):
         super().__init__('hand_tracker_depth_node')
-        
+
+        # Parametry GUI: czy startować w fullscreen i ewentualna zmiana rozdzielczości okna
+        self.declare_parameter("viewer_fullscreen", False)
+        self.declare_parameter("viewer_width", 0)
+        self.declare_parameter("viewer_height", 0)
+
+        self.viewer_fullscreen = bool(self.get_parameter("viewer_fullscreen").value)
+        self.viewer_width = int(self.get_parameter("viewer_width").value)
+        self.viewer_height = int(self.get_parameter("viewer_height").value)
+
+        # Czy pokazywać tekstowe podpowiedzi przy ikonce „i”
+        self.show_help_overlay = False
+
+        self.window_name = "ROS2 Depth Hand Tracker"
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        if self.viewer_fullscreen:
+            cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        else:
+            cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
         self.sub_rgb = self.create_subscription(
             Image, '/oak/rgb/image_raw', self.rgb_callback, 10)
             
@@ -106,9 +124,136 @@ class HandTrackerDepthNode(Node):
             self.hand_1_votes.clear()
             self.hand_2_votes.clear()
 
-        cv2.imshow("ROS2 Depth Hand Tracker", cv_image)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            pass
+        # Ewentualne skalowanie obrazu do żądanej rozdzielczości (tylko na potrzeby GUI)
+        display_image = cv_image
+        if self.viewer_width > 0 and self.viewer_height > 0:
+            display_image = cv2.resize(cv_image, (self.viewer_width, self.viewer_height))
+
+        # HUD w stylu gry: mała ikonka „i info” w prawym dolnym rogu (styl Battlefield),
+        # tekst pojawia się dopiero po wciśnięciu klawisza 'i'
+        h_disp, w_disp, _ = display_image.shape
+        # Margines ikonki od krawędzi obrazu (jak wcześniej – nie w samym rogu)
+        margin = 10
+
+        # Rozmiar ikony (prostokąt w stylu HUD)
+        icon_width = 28
+        icon_height = 28
+
+        x2 = w_disp - margin
+        x1 = x2 - icon_width
+        y2 = h_disp - margin
+        y1 = y2 - icon_height
+
+        # Najpierw rysujemy tło na osobnej warstwie i mieszamy z obrazem,
+        # żeby uzyskać lekko przezroczysty „kafelek” HUD.
+        overlay = display_image.copy()
+        cv2.rectangle(
+            overlay,
+            (x1, y1),
+            (x2, y2),
+            (210, 210, 210),
+            thickness=-1,
+            lineType=cv2.LINE_AA,
+        )
+        alpha = 0.7  # 0 = pelna przezroczystosc, 1 = brak
+        cv2.addWeighted(overlay, alpha, display_image, 1 - alpha, 0, display_image)
+
+        # Ramka (ciemno-szara, nie idealnie czarna)
+        cv2.rectangle(
+            display_image,
+            (x1, y1),
+            (x2, y2),
+            (80, 80, 80),
+            thickness=2,
+            lineType=cv2.LINE_AA,
+        )
+
+        # Litera „i” wewnątrz (precyzyjnie wycentrowana)
+        icon_center_x = x1 + icon_width // 2
+        icon_center_y = y1 + icon_height // 2
+        label = "i"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        thickness = 2
+        (text_w, text_h), _ = cv2.getTextSize(label, font, font_scale, thickness)
+        # Optical centering: w wielu fontach "i" wygląda lekko przesunięte w lewo/górę,
+        # więc dodajemy mały bias w prawo/dół.
+        i_bias_x = 1
+        i_bias_y = 2
+        text_org = (
+            int(icon_center_x - text_w / 2 + i_bias_x),
+            int(icon_center_y + text_h / 2 - 2 + i_bias_y),
+        )
+        cv2.putText(
+            display_image,
+            label,
+            text_org,
+            font,
+            font_scale,
+            (60, 60, 60),
+            thickness,
+            cv2.LINE_AA,
+        )
+
+        # Tekst pomocy obok ikony – tylko gdy show_help_overlay == True
+        if self.show_help_overlay:
+            info_lines = [
+                "F - toggle fullscreen",
+                "Esc - exit fullscreen",
+            ]
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            scale = 0.5
+            thickness = 1
+
+            # Rysujemy od prawej do lewej, obok ikony, z czarnym obrysem i bialym srodkiem,
+            # zeby tekst byl widoczny na jasnym i ciemnym tle.
+            y = y1
+            for line in reversed(info_lines):
+                (text_w, text_h), _ = cv2.getTextSize(line, font, scale, thickness)
+                text_org = (x1 - margin - text_w, y + text_h)
+
+                # Czarne tło/obrys
+                cv2.putText(
+                    display_image,
+                    line,
+                    text_org,
+                    font,
+                    scale,
+                    (0, 0, 0),
+                    thickness + 2,
+                    cv2.LINE_AA,
+                )
+                # Bialy tekst na wierzchu
+                cv2.putText(
+                    display_image,
+                    line,
+                    text_org,
+                    font,
+                    scale,
+                    (255, 255, 255),
+                    thickness,
+                    cv2.LINE_AA,
+                )
+                y -= text_h + 4
+
+        cv2.imshow(self.window_name, display_image)
+
+        # Uwaga: w OpenCV kod klawisza F11 jest zależny od platformy, dlatego
+        # tu używamy klawisza 'f' do przełączania fullscreen <-> okno.
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('f'):
+            self.viewer_fullscreen = not self.viewer_fullscreen
+            if self.viewer_fullscreen:
+                cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+            else:
+                cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+        elif key == ord('i'):
+            # Toggle help overlay visibility
+            self.show_help_overlay = not self.show_help_overlay
+        elif key == 27:  # Esc
+            # Wyjście z fullscreen do zwykłego okna
+            self.viewer_fullscreen = False
+            cv2.setWindowProperty(self.window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
 
     def get_robust_depth(self, landmarks, h, w):
         z, _q = self.get_robust_depth_with_quality(landmarks, h, w)
