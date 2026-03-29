@@ -22,16 +22,30 @@ def generate_launch_description():
         default_value='True',
         description='Czy uzywac serwerow STUN Google (True/False)'
     )
+    linear_speed_arg = DeclareLaunchArgument(
+        'linear_speed',
+        default_value='0.5',
+        description='Predkosc liniowa dla komend glosowych/button (forward/backward)'
+    )
+    angular_speed_arg = DeclareLaunchArgument(
+        'angular_speed',
+        default_value='0.5',
+        description='Predkosc katowa dla komend glosowych/button (left/right)'
+    )
 
     # 2. Pobranie konfiguracji do zmiennych
     robot_id = LaunchConfiguration('robot_id')
     signaling_url = LaunchConfiguration('signaling_url')
     use_google_stun = LaunchConfiguration('use_google_stun')
+    linear_speed = LaunchConfiguration('linear_speed')
+    angular_speed = LaunchConfiguration('angular_speed')
 
     return LaunchDescription([
         robot_id_arg,
         signaling_url_arg,
         stun_arg,
+        linear_speed_arg,
+        angular_speed_arg,
 
         Node(
             package='teleop_webrtc_joy',
@@ -44,7 +58,9 @@ def generate_launch_description():
             parameters=[{
                 'robot_id': robot_id,
                 'signaling_url': signaling_url,
-                'use_google_stun': use_google_stun
+                'use_google_stun': use_google_stun,
+                'linear_speed': linear_speed,
+                'angular_speed': angular_speed
             }]
             # UWAGA: Sekcja 'env' została usunięta, bo już nie jest potrzebna!
         )

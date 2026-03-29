@@ -30,11 +30,23 @@ def generate_launch_description():
         default_value='True',
         description='Konfiguracja STUN dla webrtc_client'
     )
+    linear_speed_arg = DeclareLaunchArgument(
+        'linear_speed',
+        default_value='0.5',
+        description='Predkosc liniowa dla komend glosowych/button w teleop_bridge'
+    )
+    angular_speed_arg = DeclareLaunchArgument(
+        'angular_speed',
+        default_value='0.5',
+        description='Predkosc katowa dla komend glosowych/button w teleop_bridge'
+    )
 
     use_security = LaunchConfiguration('security')
     use_debug = LaunchConfiguration('debug')
     robot_id = LaunchConfiguration('robot_id')
     use_google_stun = LaunchConfiguration('use_google_stun')
+    linear_speed = LaunchConfiguration('linear_speed')
+    angular_speed = LaunchConfiguration('angular_speed')
 
     pkg_webrtc = get_package_share_directory('teleop_webrtc_joy')
     pkg_joy = get_package_share_directory('teleop_joy_cmd')
@@ -45,7 +57,9 @@ def generate_launch_description():
         condition=UnlessCondition(use_security),
         launch_arguments={
             'robot_id': robot_id, 
-            'use_google_stun': use_google_stun
+            'use_google_stun': use_google_stun,
+            'linear_speed': linear_speed,
+            'angular_speed': angular_speed
         }.items()
     )
 
@@ -67,7 +81,9 @@ def generate_launch_description():
         condition=IfCondition(use_security),
         launch_arguments={
             'robot_id': robot_id, 
-            'use_google_stun': use_google_stun
+            'use_google_stun': use_google_stun,
+            'linear_speed': linear_speed,
+            'angular_speed': angular_speed
         }.items()
     )
 
@@ -89,6 +105,8 @@ def generate_launch_description():
         debug_arg,
         robot_id_arg,
         stun_arg,
+        linear_speed_arg,
+        angular_speed_arg,
         
         LogInfo(msg=["Uruchamianie systemu. Security: ", use_security, " | Debug: ", use_debug]),
 

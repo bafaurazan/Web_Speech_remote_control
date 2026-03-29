@@ -17,6 +17,7 @@ from aiortc.contrib.media import MediaPlayer
 # ROS2
 import rclpy
 from rclpy.node import Node
+from rcl_interfaces.msg import SetParametersResult
 from sensor_msgs.msg import Joy, Imu
 from geometry_msgs.msg import PoseStamped  # <--- [NOWOŚĆ] Import wiadomości Pose (6DOF)
 
@@ -93,10 +94,15 @@ class ROS2BridgeNode(Node):
         self.declare_parameter('use_google_stun', True)
         self.declare_parameter('robot_id', 'g1pilot')
         self.declare_parameter('signaling_url', 'wss://rafal.tail692f2a.ts.net/ws')
+        self.declare_parameter('linear_speed', 0.5)
+        self.declare_parameter('angular_speed', 0.5)
         
         self.use_google_stun = self.get_parameter('use_google_stun').value
         self.robot_id = self.get_parameter('robot_id').value
         self.signaling_url = self.get_parameter('signaling_url').value
+        self.linear_speed = float(self.get_parameter('linear_speed').value)
+        self.angular_speed = float(self.get_parameter('angular_speed').value)
+        self.add_on_set_parameters_callback(self._on_parameter_change)
 
         joy_topic_name = f'/{self.robot_id}/joy'
         self.publisher_ = self.create_publisher(Joy, joy_topic_name, 10)
@@ -111,11 +117,28 @@ class ROS2BridgeNode(Node):
         logger.info(f"ROS2 Node Started. Robot ID: {self.robot_id}")
         logger.info(f"📡 Signaling URL: {self.signaling_url}")
         logger.info(f"🌍 STUN Mode: {'GOOGLE STUN' if self.use_google_stun else 'LOCAL/TAILSCALE ONLY'}")
+        logger.info(f"🎚️ Button command speeds: linear_speed={self.linear_speed}, angular_speed={self.angular_speed}")
         
         self.current_axes = [0.0] * 8
         self.current_buttons = [0] * 12
         
         self.publish_task = asyncio.create_task(self._publish_loop())
+
+    def _on_parameter_change(self, params):
+        for param in params:
+            if param.name == 'linear_speed':
+                value = float(param.value)
+                if value < 0.0:
+                    return SetParametersResult(successful=False, reason="linear_speed must be >= 0.0")
+                self.linear_speed = value
+                logger.info(f"🔧 Updated linear_speed={self.linear_speed}")
+            elif param.name == 'angular_speed':
+                value = float(param.value)
+                if value < 0.0:
+                    return SetParametersResult(successful=False, reason="angular_speed must be >= 0.0")
+                self.angular_speed = value
+                logger.info(f"🔧 Updated angular_speed={self.angular_speed}")
+        return SetParametersResult(successful=True)
 
     async def _publish_loop(self):
         while True:
@@ -197,26 +220,23 @@ class ROS2BridgeNode(Node):
         self.current_buttons[8] = 1 if (abs(linear) > 0.05 or abs(angular) > 0.05) else 0
 
     async def handle_button_command(self, command):
-        LINEAR_SPEED = 0.5
-        ANGULAR_SPEED = 0.5
-
         new_axes = [0.0] * 8
         new_buttons = [0] * 12
         
         if command == "forward_rover":
-            new_axes[1] = -LINEAR_SPEED 
+            new_axes[1] = -self.linear_speed
             new_buttons[8] = 1 
             logger.info("🤖 GŁOS: JAZDA CIĄGŁA W PRZÓD")
         elif command == "backward_rover":
-            new_axes[1] = LINEAR_SPEED
+            new_axes[1] = self.linear_speed
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: JAZDA CIĄGŁA W TYŁ")
         elif command == "left_rover":
-            new_axes[2] = -ANGULAR_SPEED
+            new_axes[2] = -self.angular_speed
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W LEWO")
         elif command == "right_rover":
-            new_axes[2] = ANGULAR_SPEED
+            new_axes[2] = self.angular_speed
             new_buttons[8] = 1
             logger.info("🤖 GŁOS: SKRĘT CIĄGŁY W PRAWO")
         elif command == "stop_rover":
