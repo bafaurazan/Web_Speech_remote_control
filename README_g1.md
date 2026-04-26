@@ -16,6 +16,7 @@ ros2 launch teleop_bringup g1_arm_control.launch.py interface:=eno1 publish_join
 ```
 
 Po starcie bringupu masz:
+
 - RViz z modelem G1 i kamerą OAK,
 - węzły: śledzenie rąk, IMU XREAL, sterowanie tułowiem – **nieaktywne** do momentu wywołania serwisów.
 

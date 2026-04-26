@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <contributor><authoring_tool>teleop_moving_window</authoring_tool></contributor>
+    <created>2026-04-23T00:00:00Z</created>
+    <modified>2026-04-23T00:00:00Z</modified>
+    <unit name="meter" meter="1"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+
+  <library_images>
+    <image id="dog_texture_png" name="dog_texture_png">
+      <init_from>dog_texture.png</init_from>
+    </image>
+  </library_images>
+
+  <library_effects>
+    <effect id="dog_fx">
+      <profile_COMMON>
+        <newparam sid="dog_surface">
+          <surface type="2D">
+            <init_from>dog_texture_png</init_from>
+          </surface>
+        </newparam>
+        <newparam sid="dog_sampler">
+          <sampler2D>
+            <source>dog_surface</source>
+          </sampler2D>
+        </newparam>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <texture texture="dog_sampler" texcoord="UVMap"/>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <material id="dog_mat" name="dog_mat">
+      <instance_effect url="#dog_fx"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="PlaneGeometry" name="PlaneGeometry">
+      <mesh>
+        <source id="PlanePositions">
+          <float_array id="PlanePositionsArray" count="12">
+            -0.5 0.0 -0.35
+             0.5 0.0 -0.35
+             0.5 0.0  0.35
+            -0.5 0.0  0.35
+          </float_array>
+          <technique_common>
+            <accessor source="#PlanePositionsArray" count="4" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="PlaneNormals">
+          <float_array id="PlaneNormalsArray" count="3">0 1 0</float_array>
+          <technique_common>
+            <accessor source="#PlaneNormalsArray" count="1" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="PlaneUVs">
+          <float_array id="PlaneUVsArray" count="8">
+            0 1
+            1 1
+            1 0
+            0 0
+          </float_array>
+          <technique_common>
+            <accessor source="#PlaneUVsArray" count="4" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <vertices id="PlaneVertices">
+          <input semantic="POSITION" source="#PlanePositions"/>
+        </vertices>
+
+        <triangles count="4" material="dog_mat">
+          <input semantic="VERTEX" source="#PlaneVertices" offset="0"/>
+          <input semantic="NORMAL" source="#PlaneNormals" offset="1"/>
+          <input semantic="TEXCOORD" source="#PlaneUVs" offset="2" set="0"/>
+          <p>
+            0 0 0 1 0 1 2 0 2
+            0 0 0 2 0 2 3 0 3
+            2 0 2 1 0 1 0 0 0
+            3 0 3 2 0 2 0 0 0
+          </p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+
+  <library_visual_scenes>
+    <visual_scene id="Scene" name="Scene">
+      <node id="PlaneNode" name="PlaneNode">
+        <instance_geometry url="#PlaneGeometry">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="dog_mat" target="#dog_mat">
+                <bind_vertex_input semantic="UVMap" input_semantic="TEXCOORD" input_set="0"/>
+              </instance_material>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+
+  <scene>
+    <instance_visual_scene url="#Scene"/>
+  </scene>
+</COLLADA>

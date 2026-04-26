@@ -28,3 +28,4 @@ ros2 launch teleop_xreal_oak xreal_imu.launch.py
 - `gyro_in_degs` (default: `true`) – jeśli IMU podaje deg/s, node przeliczy na rad/s
 - `accel_in_g` (default: `true`) – jeśli IMU podaje w g, node przeliczy na m/s^2
 - `gyro_bias_calib_samples` (default: `500`) – ile próbek uśrednić na starcie do biasu żyroskopu
+
