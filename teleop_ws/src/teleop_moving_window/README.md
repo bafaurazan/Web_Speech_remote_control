@@ -18,6 +18,7 @@ Dodatkowo możesz dynamicznie dodawać nowe bloki przez topic:
   - `numpy`
   - `scipy`
   - `cv_bridge`
+  - `opencv-python`
 
 ## Uruchomienie noda
 
@@ -93,3 +94,46 @@ Podgląd statycznego TF:
 ```bash
 ros2 topic echo /tf_static --once
 ```
+
+## Stream z kamery laptopa do ROS2
+
+Nowy node: `laptop_camera_stream_node.py`
+
+Publikuje obraz z kamery laptopa jako `sensor_msgs/Image` (OpenCV + cv_bridge), domyślnie na:
+- `/laptop/camera/image_raw`
+
+Uruchomienie:
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/laptop_camera_stream_node.py
+```
+
+Uruchomienie z parametrami:
+
+```bash
+python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/laptop_camera_stream_node.py \
+  --ros-args \
+  -p camera_index:=0 \
+  -p fps:=30.0 \
+  -p width:=1280 \
+  -p height:=720 \
+  -p image_topic:=/laptop/camera/image_raw \
+  -p frame_id:=laptop_camera_frame
+```
+
+Opis parametrów:
+- `camera_index` - indeks kamery w systemie (najczęściej `0`)
+- `fps` - docelowa częstotliwość publikacji
+- `width`, `height` - żądana rozdzielczość
+- `image_topic` - topic wyjściowy obrazu
+- `frame_id` - `frame_id` w nagłówku wiadomości `Image`
+
+Podgląd:
+
+```bash
+ros2 run rqt_image_view rqt_image_view
+```
+
+Wybierz topic:
+- `/laptop/camera/image_raw`
