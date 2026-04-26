@@ -237,6 +237,9 @@ def generate_launch_description():
             executable="hand_tracker",
             name="hand_tracker_node",
             output="screen",
+            remappings=[
+                ("/oak/rgb/image_raw", "/xreal/camera/image_raw"),
+            ],
             parameters=[{
                 "viewer_fullscreen": ParameterValue(viewer_fullscreen, value_type=bool),
                 "viewer_width": ParameterValue(viewer_width, value_type=int),

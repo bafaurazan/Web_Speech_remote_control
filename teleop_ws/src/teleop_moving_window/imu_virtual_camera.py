@@ -8,6 +8,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import TransformStamped
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from cv_bridge import CvBridge
+import cv2
 import pyvista as pv
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -29,6 +30,18 @@ class ImuCameraNode(Node):
             '/xreal/imu/data', 
             self.imu_callback, 
             qos_profile
+        )
+        # Subskrybent obrazu z laptopowej kamery - ten obraz będzie teksturą bloków.
+        camera_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5
+        )
+        self.laptop_image_sub = self.create_subscription(
+            Image,
+            '/laptop/camera/image_raw',
+            self.laptop_image_callback,
+            camera_qos
         )
         
         # Publikator wygenerowanego obrazu z kamery
@@ -69,6 +82,11 @@ class ImuCameraNode(Node):
         self.plotter = pv.Plotter(off_screen=True, window_size=[640, 480])
         self.scene_blocks = []
         self.next_block_id = 100
+        self.camera_screen_block_id = 0
+        self.camera_screen_position = (5.0, 0.0, 0.0)
+        self.camera_screen_height = 1.2
+        self.camera_screen_depth = 0.05
+        self.latest_camera_texture = None
         self.setup_virtual_scene()
         
         self.latest_quat = [0.0, 0.0, 0.0, 1.0]
@@ -79,15 +97,18 @@ class ImuCameraNode(Node):
         self.timer = self.create_timer(1.0 / 30.0, self.render_and_publish)
         self.marker_timer = self.create_timer(1.0, self.publish_scene_markers)
         
-        self.get_logger().info("Węzeł Wirtualnej Kamery uruchomiony. Oczekiwanie na dane IMU z /xreal/imu/data...")
+        self.get_logger().info(
+            "Węzeł Wirtualnej Kamery uruchomiony. Oczekiwanie na IMU (/xreal/imu/data) "
+            "i teksturę kamery laptopa (/laptop/camera/image_raw)..."
+        )
 
     def setup_virtual_scene(self):
         """Tworzy wirtualne środowisko wokół kamery."""
         grid = pv.Plane(center=(0, 0, -2), direction=(0, 0, 1), i_size=20, j_size=20)
         self.plotter.add_mesh(grid, show_edges=True, color='white')
 
-        # Spójna scena "bloków": te same obiekty idą do kamery i RViz2.
-        self.add_scene_block((5.0, 0.0, 0.0), (1.0, 1.0, 1.0), (1.0, 0.0, 0.0), block_id=0)
+        # Jeden blok działa jako "ekran" kamery laptopa (id=0).
+        self.update_camera_screen_block(aspect_ratio=16.0 / 9.0)
         self.add_scene_block((0.0, 5.0, 0.0), (1.0, 1.0, 1.0), (0.0, 1.0, 0.0), block_id=1)
         self.add_scene_block((-5.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.0, 0.0, 1.0), block_id=2)
         self.add_scene_block((0.0, -5.0, 0.0), (1.0, 1.0, 1.0), (1.0, 1.0, 0.0), block_id=3)
@@ -113,20 +134,97 @@ class ImuCameraNode(Node):
         self.static_tf_broadcaster.sendTransform(tf_msg)
 
     def add_scene_block(self, position_xyz, scale_xyz, color_rgb, block_id=None):
-        """Dodaje blok do sceny PyVista i listy publikowanej do RViz2."""
+        """Dodaje zwykły kolorowy blok do sceny PyVista i listy do RViz2."""
         if block_id is None:
             block_id = self.next_block_id
             self.next_block_id += 1
 
         cube = pv.Cube(center=position_xyz, x_length=scale_xyz[0], y_length=scale_xyz[1], z_length=scale_xyz[2])
-        self.plotter.add_mesh(cube, color=tuple(color_rgb))
+        mesh_name = f"scene_block_{int(block_id)}"
+        self.plotter.add_mesh(cube, name=mesh_name, color=tuple(color_rgb), show_edges=False)
 
-        self.scene_blocks.append({
+        self._upsert_block_state(
+            block_id=int(block_id),
+            position_xyz=position_xyz,
+            scale_xyz=scale_xyz,
+            color_rgb=color_rgb,
+            mesh_name=mesh_name
+        )
+
+    def _upsert_block_state(self, block_id, position_xyz, scale_xyz, color_rgb, mesh_name):
+        block = {
             "id": int(block_id),
             "position": tuple(position_xyz),
             "scale": tuple(scale_xyz),
-            "color": tuple(color_rgb)
-        })
+            "color": tuple(color_rgb),
+            "mesh_name": mesh_name
+        }
+        for idx, existing in enumerate(self.scene_blocks):
+            if existing["id"] == int(block_id):
+                self.scene_blocks[idx] = block
+                return
+
+        self.scene_blocks.append(block)
+
+    def update_camera_screen_block(self, aspect_ratio):
+        """Aktualizuje blok-ekomran (id=0) pod proporcje obrazu kamery laptopa."""
+        safe_aspect = float(np.clip(aspect_ratio, 0.5, 3.0))
+        width = self.camera_screen_height * safe_aspect
+        scale_xyz = (width, self.camera_screen_height, self.camera_screen_depth)
+        mesh_name = f"scene_block_{self.camera_screen_block_id}"
+        # Dla poprawnego rozlozenia obrazu uzywamy panelu (Plane),
+        # bo mapowanie UV na Cube moze dawac paski i znieksztalcenia.
+        screen_panel = pv.Plane(
+            center=self.camera_screen_position,
+            direction=(1.0, 0.0, 0.0),
+            i_size=scale_xyz[1],  # os Y
+            j_size=scale_xyz[0],  # os Z
+            i_resolution=1,
+            j_resolution=1
+        )
+        screen_panel.texture_map_to_plane(inplace=True)
+
+        if self.latest_camera_texture is not None:
+            self.plotter.add_mesh(
+                screen_panel,
+                name=mesh_name,
+                texture=self.latest_camera_texture,
+                show_edges=False
+            )
+        else:
+            # Zanim przyjdzie obraz z laptopa, pokazuj biały "ekran".
+            self.plotter.add_mesh(screen_panel, name=mesh_name, color=(1.0, 1.0, 1.0), show_edges=False)
+
+        self._upsert_block_state(
+            block_id=self.camera_screen_block_id,
+            position_xyz=self.camera_screen_position,
+            scale_xyz=scale_xyz,
+            color_rgb=(1.0, 1.0, 1.0),
+            mesh_name=mesh_name
+        )
+
+    def laptop_image_callback(self, msg):
+        """Aktualizuje teksturę bloków na podstawie /laptop/camera/image_raw."""
+        try:
+            frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception as exc:
+            self.get_logger().warn(f"Nie udalo sie zdekodowac obrazu z kamery laptopa: {exc}")
+            return
+
+        if frame_bgr is None or frame_bgr.size == 0:
+            return
+
+        h, w = frame_bgr.shape[:2]
+        if h <= 0 or w <= 0:
+            return
+
+        # Zachowaj proporcje obrazu przy zmniejszeniu, aby "ekran" nie był rozjechany.
+        target_w = 320
+        target_h = max(1, int(target_w * (h / w)))
+        tex_bgr = cv2.resize(frame_bgr, (target_w, target_h), interpolation=cv2.INTER_AREA)
+        tex_rgb = cv2.cvtColor(tex_bgr, cv2.COLOR_BGR2RGB)
+        self.latest_camera_texture = pv.numpy_to_texture(tex_rgb)
+        self.update_camera_screen_block(aspect_ratio=(w / h))
 
     def add_block_callback(self, msg):
         """Przyjmuje nowy blok przez Marker i dodaje go do kamery + RViz2."""
