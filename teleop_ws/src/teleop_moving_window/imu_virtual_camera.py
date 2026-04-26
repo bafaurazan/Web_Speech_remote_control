@@ -16,6 +16,20 @@ from scipy.spatial.transform import Rotation as R
 class ImuCameraNode(Node):
     def __init__(self):
         super().__init__('imu_virtual_camera_node')
+
+        # Rozdzielczosc renderu i publikowanego obrazu /xreal/camera/image_raw
+        self.declare_parameter("output_width", 1280)
+        self.declare_parameter("output_height", 720)
+        self.declare_parameter("render_fps", 60.0)
+        self.output_width = int(self.get_parameter("output_width").value)
+        self.output_height = int(self.get_parameter("output_height").value)
+        self.render_fps = float(self.get_parameter("render_fps").value)
+        if self.output_width <= 0:
+            self.output_width = 1280
+        if self.output_height <= 0:
+            self.output_height = 720
+        if self.render_fps <= 0.0:
+            self.render_fps = 60.0
         
         # Konfiguracja QoS dokładnie pod Twojego Publishera (RELIABLE, głębokość 5)
         qos_profile = QoSProfile(
@@ -79,7 +93,10 @@ class ImuCameraNode(Node):
         self.bridge = CvBridge()
         
         # Konfiguracja silnika 3D
-        self.plotter = pv.Plotter(off_screen=True, window_size=[640, 480])
+        self.plotter = pv.Plotter(
+            off_screen=True,
+            window_size=[self.output_width, self.output_height]
+        )
         self.scene_blocks = []
         self.next_block_id = 100
         self.camera_screen_block_id = 0
@@ -93,13 +110,19 @@ class ImuCameraNode(Node):
         self.first_msg_received = False
         self.marker_frame_id = "xreal_imu"
         
-        # Timer działający w 30 FPS
-        self.timer = self.create_timer(1.0 / 30.0, self.render_and_publish)
+        # Timer renderowania/publikacji obrazu
+        self.timer = self.create_timer(1.0 / self.render_fps, self.render_and_publish)
         self.marker_timer = self.create_timer(1.0, self.publish_scene_markers)
         
         self.get_logger().info(
             "Węzeł Wirtualnej Kamery uruchomiony. Oczekiwanie na IMU (/xreal/imu/data) "
             "i teksturę kamery laptopa (/laptop/camera/image_raw)..."
+        )
+        self.get_logger().info(
+            f"Rozdzielczosc wyjscia /xreal/camera/image_raw: {self.output_width}x{self.output_height}"
+        )
+        self.get_logger().info(
+            f"Czestotliwosc publikacji /xreal/camera/image_raw: {self.render_fps:.1f} FPS"
         )
 
     def setup_virtual_scene(self):

@@ -29,9 +29,27 @@ python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window
 
 Node:
 - subskrybuje IMU z `/xreal/imu/data`,
+- subskrybuje obraz z laptopa z `/laptop/camera/image_raw` (używany jako tekstura na jednym bloku-ekranie),
 - publikuje obraz na `/xreal/camera/image_raw`,
 - publikuje markery na `/xreal/virtual_scene/markers`,
 - publikuje statyczny TF: `xreal_imu -> xreal_camera_frame`.
+
+## Rozdzielczość wyjścia `/xreal/camera/image_raw`
+
+Node `imu_virtual_camera.py` ma parametry:
+- `output_width` (domyślnie `1280`)
+- `output_height` (domyślnie `720`)
+
+Przykład (FullHD):
+
+```bash
+python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/imu_virtual_camera.py \
+  --ros-args \
+  -p output_width:=1920 \
+  -p output_height:=1080
+```
+
+Po starcie node loguje ustawioną rozdzielczość.
 
 ## Podgląd obrazu kamery
 
@@ -74,6 +92,7 @@ Uwagi:
 - `id` powinno być unikalne dla nowego obiektu.
 - `scale` musi być dodatnie; gdy podasz `0`, node użyje wartości domyślnej `1.0`.
 - Kanał `a` (alpha) warto ustawić na `1.0`, żeby blok był w pełni widoczny.
+- Blok `id=0` jest specjalnym „ekranem” z teksturą kamery laptopa; pozostałe bloki są kolorowe.
 
 ## Szybka diagnostyka
 
