@@ -18,18 +18,39 @@ class ImuCameraNode(Node):
         super().__init__('imu_virtual_camera_node')
 
         # Rozdzielczosc renderu i publikowanego obrazu /xreal/camera/image_raw
-        self.declare_parameter("output_width", 1280)
-        self.declare_parameter("output_height", 720)
-        self.declare_parameter("render_fps", 60.0)
+        self.declare_parameter("output_width", 1920)
+        self.declare_parameter("output_height", 1080)
+        self.declare_parameter("render_fps", 90.0)
+        self.declare_parameter("imu_deadzone_deg", 0.45)
+        self.declare_parameter("imu_softzone_deg", 2.2)
+        self.declare_parameter("imu_filter_alpha", 0.24)
+        self.declare_parameter("imu_fast_alpha", 0.88)
+        self.declare_parameter("imu_fast_trigger_deg", 6.0)
+        self.declare_parameter("imu_max_step_deg", 3.0)
+        self.declare_parameter("imu_max_step_fast_deg", 22.0)
         self.output_width = int(self.get_parameter("output_width").value)
         self.output_height = int(self.get_parameter("output_height").value)
         self.render_fps = float(self.get_parameter("render_fps").value)
+        self.imu_deadzone_deg = float(self.get_parameter("imu_deadzone_deg").value)
+        self.imu_softzone_deg = float(self.get_parameter("imu_softzone_deg").value)
+        self.imu_filter_alpha = float(self.get_parameter("imu_filter_alpha").value)
+        self.imu_fast_alpha = float(self.get_parameter("imu_fast_alpha").value)
+        self.imu_fast_trigger_deg = float(self.get_parameter("imu_fast_trigger_deg").value)
+        self.imu_max_step_deg = float(self.get_parameter("imu_max_step_deg").value)
+        self.imu_max_step_fast_deg = float(self.get_parameter("imu_max_step_fast_deg").value)
         if self.output_width <= 0:
-            self.output_width = 1280
+            self.output_width = 1920
         if self.output_height <= 0:
-            self.output_height = 720
+            self.output_height = 1080
         if self.render_fps <= 0.0:
             self.render_fps = 60.0
+        self.imu_deadzone_deg = max(0.0, self.imu_deadzone_deg)
+        self.imu_softzone_deg = max(self.imu_deadzone_deg + 1e-3, self.imu_softzone_deg)
+        self.imu_filter_alpha = float(np.clip(self.imu_filter_alpha, 0.01, 1.0))
+        self.imu_fast_alpha = float(np.clip(self.imu_fast_alpha, self.imu_filter_alpha, 1.0))
+        self.imu_fast_trigger_deg = max(0.5, self.imu_fast_trigger_deg)
+        self.imu_max_step_deg = max(0.1, self.imu_max_step_deg)
+        self.imu_max_step_fast_deg = max(self.imu_max_step_deg, self.imu_max_step_fast_deg)
         
         # Konfiguracja QoS dokładnie pod Twojego Publishera (RELIABLE, głębokość 5)
         qos_profile = QoSProfile(
@@ -106,7 +127,9 @@ class ImuCameraNode(Node):
         self.latest_camera_texture = None
         self.setup_virtual_scene()
         
-        self.latest_quat = [0.0, 0.0, 0.0, 1.0]
+        self.imu_neutral_rot = None
+        self.target_rot = R.from_quat([0.0, 0.0, 0.0, 1.0])
+        self.filtered_rot = R.from_quat([0.0, 0.0, 0.0, 1.0])
         self.first_msg_received = False
         self.marker_frame_id = "xreal_imu"
         
@@ -123,6 +146,14 @@ class ImuCameraNode(Node):
         )
         self.get_logger().info(
             f"Czestotliwosc publikacji /xreal/camera/image_raw: {self.render_fps:.1f} FPS"
+        )
+        self.get_logger().info(
+            "Filtr IMU: "
+            f"deadzone={self.imu_deadzone_deg:.2f}deg, "
+            f"softzone={self.imu_softzone_deg:.2f}deg, "
+            f"alpha={self.imu_filter_alpha:.2f}->{self.imu_fast_alpha:.2f}, "
+            f"trigger={self.imu_fast_trigger_deg:.2f}deg, "
+            f"max_step={self.imu_max_step_deg:.2f}->{self.imu_max_step_fast_deg:.2f}deg"
         )
 
     def setup_virtual_scene(self):
@@ -308,19 +339,80 @@ class ImuCameraNode(Node):
             )
         self.marker_pub.publish(markers)
 
+    def _slerp_rot(self, rot_a, rot_b, t):
+        """Sferyczna interpolacja między dwiema rotacjami."""
+        qa = rot_a.as_quat()
+        qb = rot_b.as_quat()
+        dot = float(np.dot(qa, qb))
+
+        if dot < 0.0:
+            qb = -qb
+            dot = -dot
+
+        # Dla bardzo małych różnic przejdź na liniowe mieszanie.
+        if dot > 0.9995:
+            q = qa + t * (qb - qa)
+            q /= np.linalg.norm(q)
+            return R.from_quat(q)
+
+        theta_0 = np.arccos(np.clip(dot, -1.0, 1.0))
+        sin_theta_0 = np.sin(theta_0)
+        theta = theta_0 * t
+        sin_theta = np.sin(theta)
+
+        s0 = np.cos(theta) - dot * sin_theta / sin_theta_0
+        s1 = sin_theta / sin_theta_0
+        q = (s0 * qa) + (s1 * qb)
+        q /= np.linalg.norm(q)
+        return R.from_quat(q)
+
+    def _smooth_gain(self, angle_rad):
+        """Deadzone + smoothstep dla małych ruchów głowy."""
+        dead = np.deg2rad(self.imu_deadzone_deg)
+        soft = np.deg2rad(self.imu_softzone_deg)
+        if angle_rad <= dead:
+            return 0.0
+        if angle_rad >= soft:
+            return 1.0
+        x = (angle_rad - dead) / (soft - dead)
+        return x * x * (3.0 - 2.0 * x)
+
     def imu_callback(self, msg):
         """Aktualizuje orientację na podstawie danych z IMU."""
         # Logika informacyjna dla użytkownika
         if not self.first_msg_received:
             self.get_logger().info("Sukces! Otrzymano pierwsze dane z IMU. Rozpoczynam publikowanie klatek wideo do ROS 2.")
             self.first_msg_received = True
-            
-        self.latest_quat = [
-            msg.orientation.x,
-            msg.orientation.y,
-            msg.orientation.z,
-            msg.orientation.w
-        ]
+
+        try:
+            raw_rot = R.from_quat([
+                msg.orientation.x,
+                msg.orientation.y,
+                msg.orientation.z,
+                msg.orientation.w
+            ])
+        except ValueError:
+            self.get_logger().warn("Otrzymano niepoprawny kwaternion z IMU.")
+            return
+
+        # Pierwsza poprawna próbka staje się pozycją neutralną.
+        if self.imu_neutral_rot is None:
+            self.imu_neutral_rot = raw_rot
+            self.target_rot = raw_rot
+            self.filtered_rot = raw_rot
+            return
+
+        # Rotacja względna od pozycji neutralnej.
+        rel_rotvec = (self.imu_neutral_rot.inv() * raw_rot).as_rotvec()
+        rel_angle = float(np.linalg.norm(rel_rotvec))
+        gain = self._smooth_gain(rel_angle)
+
+        if rel_angle > 1e-9:
+            filtered_rel_rotvec = rel_rotvec * gain
+        else:
+            filtered_rel_rotvec = np.zeros(3)
+
+        self.target_rot = self.imu_neutral_rot * R.from_rotvec(filtered_rel_rotvec)
 
     def render_and_publish(self):
         """Oblicza widok kamery, renderuje klatkę i wysyła ją do ROS."""
@@ -328,18 +420,28 @@ class ImuCameraNode(Node):
         if not self.first_msg_received:
             return
 
-        # Próba zbudowania macierzy rotacji
-        try:
-            rot = R.from_quat(self.latest_quat)
-        except ValueError:
-            self.get_logger().warn("Otrzymano niepoprawny kwaternion z IMU.")
-            rot = R.from_quat([0.0, 0.0, 0.0, 1.0])
+        # Adaptacyjne wygładzanie:
+        # mały ruch = stabilnie, duży ruch = szybsza reakcja i mniejsze opóźnienie.
+        tracking_error = float(np.linalg.norm((self.filtered_rot.inv() * self.target_rot).as_rotvec()))
+        fast_trigger = np.deg2rad(self.imu_fast_trigger_deg)
+        fast_gain = float(np.clip(tracking_error / fast_trigger, 0.0, 1.0))
+        dynamic_alpha = self.imu_filter_alpha + (self.imu_fast_alpha - self.imu_filter_alpha) * fast_gain
+        dynamic_max_step_deg = self.imu_max_step_deg + (self.imu_max_step_fast_deg - self.imu_max_step_deg) * fast_gain
+        dynamic_max_step = np.deg2rad(dynamic_max_step_deg)
+
+        candidate = self._slerp_rot(self.filtered_rot, self.target_rot, dynamic_alpha)
+        step_angle = float(np.linalg.norm((self.filtered_rot.inv() * candidate).as_rotvec()))
+        if step_angle > dynamic_max_step and step_angle > 1e-9:
+            ratio = dynamic_max_step / step_angle
+            self.filtered_rot = self._slerp_rot(self.filtered_rot, candidate, ratio)
+        else:
+            self.filtered_rot = candidate
             
         base_forward = np.array([0.0, 1.0, 0.0])
         base_up = np.array([-1.0, 0.0, 0.0])
         
-        forward = rot.apply(base_forward)
-        up = rot.apply(base_up)
+        forward = self.filtered_rot.apply(base_forward)
+        up = self.filtered_rot.apply(base_up)
         
         self.plotter.camera.position = (0.0, 0.0, 0.0)
         self.plotter.camera.focal_point = forward
