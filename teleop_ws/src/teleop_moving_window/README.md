@@ -1,158 +1,135 @@
 # teleop_moving_window
 
-Node `imu_virtual_camera.py` tworzy wirtualną scenę 3D sterowaną orientacją IMU i publikuje ją jednocześnie jako:
+Pakiet zawiera nody do:
+- wirtualnej sceny IMU (`imu_virtual_camera.py`),
+- streamu z kamery laptopa (`laptop_camera_stream_node.py`),
+- niskolatencyjnego streamu ekranu desktopu (`desktop_screen_stream_node`, C++),
+- utworzenia dodatkowego okna pomocniczego (`virtual_display_window_node`, C++).
 
-- obraz kamery: `/xreal/camera/image_raw` (`sensor_msgs/Image`),
-- markery do RViz2: `/xreal/virtual_scene/markers` (`visualization_msgs/MarkerArray`).
-
-Dodatkowo możesz dynamicznie dodawać nowe bloki przez topic:
-
-- `/xreal/virtual_scene/add_block` (`visualization_msgs/Marker`, tylko `type=CUBE`).
-
-## Wymagania
-
-- ROS2 (testowane z Humble)
-- Python3
-- pakiety Python:
-  - `pyvista`
-  - `numpy`
-  - `scipy`
-  - `cv_bridge`
-  - `opencv-python`
-
-## Uruchomienie noda
+## Build (colcon)
 
 ```bash
+cd /home/rafal/Web_Speech_remote_control/teleop_ws
 source /opt/ros/humble/setup.bash
-python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/imu_virtual_camera.py
+colcon build --packages-select teleop_moving_window
+source install/setup.bash
 ```
 
-Node:
-- subskrybuje IMU z `/xreal/imu/data`,
-- subskrybuje obraz z laptopa z `/laptop/camera/image_raw` (używany jako tekstura na jednym bloku-ekranie),
-- publikuje obraz na `/xreal/camera/image_raw`,
-- publikuje markery na `/xreal/virtual_scene/markers`,
-- publikuje statyczny TF: `xreal_imu -> xreal_camera_frame`.
+Jeśli używasz makra `build()` z `macros.bash`, zależności APT są w:
+- `teleop_moving_window/apt_packages.txt`
 
-## Rozdzielczość wyjścia `/xreal/camera/image_raw`
+## 1) Virtual camera IMU
 
-Node `imu_virtual_camera.py` ma parametry:
-- `output_width` (domyślnie `1280`)
-- `output_height` (domyślnie `720`)
+Plik: `imu_virtual_camera.py`
 
-Przykład (FullHD):
+Publikuje:
+- `/xreal/camera/image_raw` (`sensor_msgs/Image`)
+- `/xreal/virtual_scene/markers` (`visualization_msgs/MarkerArray`)
 
-```bash
-python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/imu_virtual_camera.py \
-  --ros-args \
-  -p output_width:=1920 \
-  -p output_height:=1080
-```
-
-Po starcie node loguje ustawioną rozdzielczość.
-
-## Podgląd obrazu kamery
-
-```bash
-ros2 run rqt_image_view rqt_image_view
-```
-
-Wybierz topic:
-- `/xreal/camera/image_raw`
-
-## Konfiguracja RViz2 (żeby widzieć bloki)
-
-1. Uruchom RViz2.
-2. Ustaw `Global Options -> Fixed Frame` na:
-   - `xreal_imu`
-3. Kliknij `Add` i dodaj display:
-   - `MarkerArray`
-4. W `MarkerArray` ustaw:
-   - `Topic = /xreal/virtual_scene/markers`
-   - `Reliability Policy = Reliable` (jeśli opcja jest dostępna)
-   - `Durability Policy = Transient Local` (jeśli opcja jest dostępna)
-5. Ustaw widok kamery RViz (`Orbit`/`TopDownOrtho`) i oddal kamerę, bo obiekty są kilka metrów od środka.
-
-## Dodawanie nowego bloku przez ROS2
-
-Przykład (ten sam, którego używasz):
-
-```bash
-ros2 topic pub --once /xreal/virtual_scene/add_block visualization_msgs/msg/Marker "{
-  id: 10,
-  type: 1,
-  pose: { position: { x: 2.0, y: 1.0, z: 0.0 } },
-  scale: { x: 0.8, y: 0.8, z: 0.8 },
-  color: { r: 1.0, g: 0.3, b: 0.0, a: 1.0 }
-}"
-```
-
-Uwagi:
-- `type: 1` oznacza `CUBE`.
-- `id` powinno być unikalne dla nowego obiektu.
-- `scale` musi być dodatnie; gdy podasz `0`, node użyje wartości domyślnej `1.0`.
-- Kanał `a` (alpha) warto ustawić na `1.0`, żeby blok był w pełni widoczny.
-- Blok `id=0` jest specjalnym „ekranem” z teksturą kamery laptopa; pozostałe bloki są kolorowe.
-
-## Szybka diagnostyka
-
-Lista topiców:
-
-```bash
-ros2 topic list | rg xreal/virtual_scene
-```
-
-Podgląd markerów:
-
-```bash
-ros2 topic echo /xreal/virtual_scene/markers --once
-```
-
-Podgląd statycznego TF:
-
-```bash
-ros2 topic echo /tf_static --once
-```
-
-## Stream z kamery laptopa do ROS2
-
-Nowy node: `laptop_camera_stream_node.py`
-
-Publikuje obraz z kamery laptopa jako `sensor_msgs/Image` (OpenCV + cv_bridge), domyślnie na:
+Subskrybuje:
+- `/xreal/imu/data`
 - `/laptop/camera/image_raw`
 
 Uruchomienie:
-
 ```bash
-source /opt/ros/humble/setup.bash
+python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/imu_virtual_camera.py
+```
+
+## 2) Stream z kamery laptopa
+
+Plik: `laptop_camera_stream_node.py`
+
+Domyślny topic:
+- `/laptop/camera/image_raw`
+
+Uruchomienie:
+```bash
 python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/laptop_camera_stream_node.py
 ```
 
-Uruchomienie z parametrami:
+## 3) Stream ekranu desktopu (C++, low-latency)
 
+Executable:
+- `desktop_screen_stream_node`
+
+Uruchomienie:
 ```bash
-python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/laptop_camera_stream_node.py \
-  --ros-args \
-  -p camera_index:=0 \
-  -p fps:=30.0 \
-  -p width:=1280 \
-  -p height:=720 \
-  -p image_topic:=/laptop/camera/image_raw \
-  -p frame_id:=laptop_camera_frame
+ros2 run teleop_moving_window desktop_screen_stream_node
 ```
 
-Opis parametrów:
-- `camera_index` - indeks kamery w systemie (najczęściej `0`)
-- `fps` - docelowa częstotliwość publikacji
-- `width`, `height` - żądana rozdzielczość
-- `image_topic` - topic wyjściowy obrazu
-- `frame_id` - `frame_id` w nagłówku wiadomości `Image`
+Domyślnie:
+- topic: `/desktop/screen/image_raw`
+- encoding: `bgra8`
+- QoS: `best_effort`, `keep_last(1)`
+- pokazuje kursor (`show_cursor:=true`)
 
-Podgląd:
+### Kluczowe parametry
+
+- `fps` (np. `90.0`)
+- `image_topic` (np. `/desktop/screen/image_raw`)
+- `frame_id` (np. `desktop_screen_frame`)
+- `primary_monitor_only` (`true/false`)
+- `prefer_internal_monitor` (`true/false`)
+- `monitor_name` (np. `eDP`, `DisplayPort-1`, `Virtual-2-1`)
+- `show_cursor` (`true/false`)
+- `capture_x`, `capture_y`, `capture_width`, `capture_height`
+
+### Przykłady
+
+Tylko ekran laptopa:
+```bash
+ros2 run teleop_moving_window desktop_screen_stream_node --ros-args \
+  -p monitor_name:=eDP \
+  -p primary_monitor_only:=true \
+  -p prefer_internal_monitor:=true \
+  -p fps:=90.0
+```
+
+Tylko monitor wirtualny (np. z `vkms`):
+```bash
+ros2 run teleop_moving_window desktop_screen_stream_node --ros-args \
+  -p monitor_name:=Virtual-2-1 \
+  -p primary_monitor_only:=true \
+  -p prefer_internal_monitor:=false \
+  -p fps:=90.0 \
+  -p image_topic:=/desktop/screen/image_raw
+```
+
+## 4) Dodatkowe okno pomocnicze
+
+Executable:
+- `virtual_display_window_node`
+
+Uruchomienie:
+```bash
+ros2 run teleop_moving_window virtual_display_window_node
+```
+
+Uwaga: to jest zwykłe okno X11, **nie** nowy monitor systemowy.
+
+## 5) Jak uzyskać prawdziwy trzeci monitor
+
+Najprościej testowo:
+```bash
+sudo modprobe vkms
+xrandr --query
+```
+
+Jeśli pojawi się output np. `Virtual-2-1`, ustaw układ:
+```bash
+xrandr --output Virtual-2-1 --mode 1920x1080 --left-of eDP
+```
+
+Potem streamuj ten monitor przez:
+- `monitor_name:=Virtual-2-1`
+
+## Podgląd obrazu
 
 ```bash
 ros2 run rqt_image_view rqt_image_view
 ```
 
 Wybierz topic:
+- `/desktop/screen/image_raw`
+- `/xreal/camera/image_raw`
 - `/laptop/camera/image_raw`

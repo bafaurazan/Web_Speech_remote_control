@@ -42,6 +42,8 @@ public:
     declare_parameter("show_cursor", true);
     declare_parameter("primary_monitor_only", true);
     declare_parameter("prefer_internal_monitor", true);
+    declare_parameter("monitor_name", "");  // e.g. "eDP-1", "HDMI-1", "DVI-I-1"
+    declare_parameter("geometry_refresh_every_frames", 300);  // 0 disables periodic refresh
 
     fps_ = std::max(1.0, get_parameter("fps").as_double());
     image_topic_ = get_parameter("image_topic").as_string();
@@ -55,6 +57,9 @@ public:
     show_cursor_ = get_parameter("show_cursor").as_bool();
     primary_monitor_only_ = get_parameter("primary_monitor_only").as_bool();
     prefer_internal_monitor_ = get_parameter("prefer_internal_monitor").as_bool();
+    monitor_name_ = get_parameter("monitor_name").as_string();
+    geometry_refresh_every_frames_ = std::max(
+      0, static_cast<int>(get_parameter("geometry_refresh_every_frames").as_int()));
 
     // Low-latency profile: do not queue old frames.
     auto qos = rclcpp::QoS(rclcpp::KeepLast(1));
@@ -75,9 +80,9 @@ public:
 
     RCLCPP_INFO(
       get_logger(),
-      "Desktop screen stream started: topic=%s frame=%s fps=%.1f region=(x=%d,y=%d,w=%d,h=%d)",
+      "Desktop screen stream started: topic=%s frame=%s fps=%.1f region=(x=%d,y=%d,w=%d,h=%d) monitor_name='%s'",
       image_topic_.c_str(), frame_id_.c_str(), fps_,
-      capture_x_, capture_y_, capture_width_, capture_height_);
+      capture_x_, capture_y_, capture_width_, capture_height_, monitor_name_.c_str());
   }
 
   ~DesktopScreenStreamNode() override
@@ -147,7 +152,27 @@ private:
 
     const XRRMonitorInfo * chosen = nullptr;
 
-    if (prefer_internal_monitor_) {
+    if (!monitor_name_.empty()) {
+      for (int i = 0; i < monitor_count; ++i) {
+        const char * atom_name = XGetAtomName(display_, monitors[i].name);
+        std::string name = atom_name != nullptr ? atom_name : "";
+        if (atom_name != nullptr) {
+          XFree(const_cast<char *>(atom_name));
+        }
+        if (name == monitor_name_) {
+          chosen = &monitors[i];
+          break;
+        }
+      }
+      if (chosen == nullptr) {
+        RCLCPP_WARN_THROTTLE(
+          get_logger(), *get_clock(), 3000,
+          "monitor_name='%s' not found, falling back to auto selection.",
+          monitor_name_.c_str());
+      }
+    }
+
+    if (chosen == nullptr && prefer_internal_monitor_) {
       for (int i = 0; i < monitor_count; ++i) {
         const char * atom_name = XGetAtomName(display_, monitors[i].name);
         std::string monitor_name = atom_name != nullptr ? atom_name : "";
@@ -231,21 +256,23 @@ private:
     }
 
     // Re-check root geometry occasionally in case resolution/layout changed.
-    ++geometry_check_counter_;
-    if (geometry_check_counter_ >= 300) {
-      geometry_check_counter_ = 0;
-      try {
-        const int old_w = capture_width_;
-        const int old_h = capture_height_;
-        refresh_capture_geometry_or_throw();
-        if (capture_width_ != old_w || capture_height_ != old_h) {
-          prepare_message_buffer();
-          RCLCPP_INFO(
-            get_logger(), "Capture region updated: (x=%d,y=%d,w=%d,h=%d)",
-            capture_x_, capture_y_, capture_width_, capture_height_);
+    if (geometry_refresh_every_frames_ > 0) {
+      ++geometry_check_counter_;
+      if (geometry_check_counter_ >= geometry_refresh_every_frames_) {
+        geometry_check_counter_ = 0;
+        try {
+          const int old_w = capture_width_;
+          const int old_h = capture_height_;
+          refresh_capture_geometry_or_throw();
+          if (capture_width_ != old_w || capture_height_ != old_h) {
+            prepare_message_buffer();
+            RCLCPP_INFO(
+              get_logger(), "Capture region updated: (x=%d,y=%d,w=%d,h=%d)",
+              capture_x_, capture_y_, capture_width_, capture_height_);
+          }
+        } catch (const std::exception & e) {
+          RCLCPP_WARN(get_logger(), "Geometry refresh failed: %s", e.what());
         }
-      } catch (const std::exception & e) {
-        RCLCPP_WARN(get_logger(), "Geometry refresh failed: %s", e.what());
       }
     }
 
@@ -396,9 +423,11 @@ private:
   int capture_width_ = 0;
   int capture_height_ = 0;
   int geometry_check_counter_ = 0;
+  int geometry_refresh_every_frames_ = 300;
   bool show_cursor_ = true;
   bool primary_monitor_only_ = true;
   bool prefer_internal_monitor_ = true;
+  std::string monitor_name_;
 };
 
 int main(int argc, char ** argv)

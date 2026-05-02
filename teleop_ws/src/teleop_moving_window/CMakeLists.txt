@@ -21,9 +21,18 @@ add_executable(desktop_screen_stream_node
   desktop_screen_stream_node.cpp
 )
 
+add_executable(virtual_display_window_node
+  virtual_display_window_node.cpp
+)
+
 target_include_directories(desktop_screen_stream_node PRIVATE
   ${X11_INCLUDE_DIRS}
   ${XFIXES_INCLUDE_DIRS}
+  ${XRANDR_INCLUDE_DIRS}
+)
+
+target_include_directories(virtual_display_window_node PRIVATE
+  ${X11_INCLUDE_DIRS}
   ${XRANDR_INCLUDE_DIRS}
 )
 
@@ -33,9 +42,19 @@ target_link_directories(desktop_screen_stream_node PRIVATE
   ${XRANDR_LIBRARY_DIRS}
 )
 
+target_link_directories(virtual_display_window_node PRIVATE
+  ${X11_LIBRARY_DIRS}
+  ${XRANDR_LIBRARY_DIRS}
+)
+
 target_link_libraries(desktop_screen_stream_node
   ${X11_LIBRARIES}
   ${XFIXES_LIBRARIES}
+  ${XRANDR_LIBRARIES}
+)
+
+target_link_libraries(virtual_display_window_node
+  ${X11_LIBRARIES}
   ${XRANDR_LIBRARIES}
 )
 
@@ -44,7 +63,13 @@ ament_target_dependencies(desktop_screen_stream_node
   sensor_msgs
 )
 
-install(TARGETS desktop_screen_stream_node
+ament_target_dependencies(virtual_display_window_node
+  rclcpp
+)
+
+install(TARGETS
+  desktop_screen_stream_node
+  virtual_display_window_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
