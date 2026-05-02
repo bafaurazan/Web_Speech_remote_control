@@ -12,6 +12,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(OpenCV REQUIRED)
 
 pkg_check_modules(X11 REQUIRED x11)
 pkg_check_modules(XFIXES REQUIRED xfixes)
@@ -23,6 +24,10 @@ add_executable(desktop_screen_stream_node
 
 add_executable(virtual_display_window_node
   virtual_display_window_node.cpp
+)
+
+add_executable(desktop_screen_viewer_node
+  desktop_screen_viewer_node.cpp
 )
 
 target_include_directories(desktop_screen_stream_node PRIVATE
@@ -58,6 +63,10 @@ target_link_libraries(virtual_display_window_node
   ${XRANDR_LIBRARIES}
 )
 
+target_link_libraries(desktop_screen_viewer_node
+  ${OpenCV_LIBS}
+)
+
 ament_target_dependencies(desktop_screen_stream_node
   rclcpp
   sensor_msgs
@@ -67,9 +76,15 @@ ament_target_dependencies(virtual_display_window_node
   rclcpp
 )
 
+ament_target_dependencies(desktop_screen_viewer_node
+  rclcpp
+  sensor_msgs
+)
+
 install(TARGETS
   desktop_screen_stream_node
   virtual_display_window_node
+  desktop_screen_viewer_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

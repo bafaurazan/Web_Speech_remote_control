@@ -133,3 +133,16 @@ Wybierz topic:
 - `/desktop/screen/image_raw`
 - `/xreal/camera/image_raw`
 - `/laptop/camera/image_raw`
+
+## Lekki viewer C++ (płynniejszy niż rqt_image_view)
+
+```bash
+cd /home/rafal/Web_Speech_remote_control/teleop_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run teleop_moving_window desktop_screen_viewer_node --ros-args \
+  -p image_topic:=/desktop/screen/image_raw \
+  -p display_fps:=60.0 \
+  -p fullscreen:=true \
+  -p drop_if_stale_ms:=60
+```

@@ -3,3 +3,4 @@ pkg-config
 libx11-dev
 libxfixes-dev
 libxrandr-dev
+libopencv-dev
