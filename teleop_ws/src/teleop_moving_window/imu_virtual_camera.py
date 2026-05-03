@@ -3,6 +3,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from std_srvs.srv import SetBool
 from sensor_msgs.msg import Imu, Image
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import TransformStamped
@@ -28,6 +29,10 @@ class ImuCameraNode(Node):
         self.declare_parameter("imu_fast_trigger_deg", 6.0)
         self.declare_parameter("imu_max_step_deg", 3.0)
         self.declare_parameter("imu_max_step_fast_deg", 22.0)
+        self.declare_parameter(
+            "set_black_background_service",
+            "/xreal/virtual_camera/set_black_background",
+        )
         self.output_width = int(self.get_parameter("output_width").value)
         self.output_height = int(self.get_parameter("output_height").value)
         self.render_fps = float(self.get_parameter("render_fps").value)
@@ -51,6 +56,16 @@ class ImuCameraNode(Node):
         self.imu_fast_trigger_deg = max(0.5, self.imu_fast_trigger_deg)
         self.imu_max_step_deg = max(0.1, self.imu_max_step_deg)
         self.imu_max_step_fast_deg = max(self.imu_max_step_deg, self.imu_max_step_fast_deg)
+
+        srv_name = str(self.get_parameter("set_black_background_service").value)
+        self._bg_black_srv = self.create_service(
+            SetBool,
+            srv_name,
+            self.set_black_background_callback,
+        )
+        self.background_black_requested = False
+        self.background_black_active = False
+        self.grid_actor = None
         
         # Konfiguracja QoS dokładnie pod Twojego Publishera (RELIABLE, głębokość 5)
         qos_profile = QoSProfile(
@@ -155,11 +170,45 @@ class ImuCameraNode(Node):
             f"trigger={self.imu_fast_trigger_deg:.2f}deg, "
             f"max_step={self.imu_max_step_deg:.2f}->{self.imu_max_step_fast_deg:.2f}deg"
         )
+        self.get_logger().info(
+            f"Serwis tła: {srv_name} (SetBool: data=true => czarne tło, data=false => domyślne)"
+        )
+
+    def set_black_background_callback(self, request: SetBool.Request, response: SetBool.Response):
+        """Zażądanie zmiany tła: stosowane w pętli renderowania."""
+        self.background_black_requested = bool(request.data)
+        mode = "czarne" if self.background_black_requested else "domyślne (jasnoniebieskie + siatka)"
+        response.success = True
+        response.message = f"Tło ustawione na żądanie: {mode}"
+        self.get_logger().info(response.message)
+        return response
+
+    def _apply_background_for_render(self):
+        """Utrzymuje spójny stan tła między klatkami (wywoływane w głównym timerze renderu)."""
+        if self.background_black_active == self.background_black_requested:
+            return
+
+        self.background_black_active = self.background_black_requested
+
+        if self.background_black_active:
+            self.plotter.set_background("black")
+            if self.grid_actor is not None:
+                try:
+                    self.grid_actor.SetVisibility(0)
+                except AttributeError:
+                    self.grid_actor.visibility = False
+        else:
+            self.plotter.set_background("lightblue")
+            if self.grid_actor is not None:
+                try:
+                    self.grid_actor.SetVisibility(1)
+                except AttributeError:
+                    self.grid_actor.visibility = True
 
     def setup_virtual_scene(self):
         """Tworzy wirtualne środowisko wokół kamery."""
         grid = pv.Plane(center=(0, 0, -2), direction=(0, 0, 1), i_size=20, j_size=20)
-        self.plotter.add_mesh(grid, show_edges=True, color='white')
+        self.grid_actor = self.plotter.add_mesh(grid, show_edges=True, color="white")
 
         # Jeden blok działa jako "ekran" kamery laptopa (id=0).
         self.update_camera_screen_block(aspect_ratio=16.0 / 9.0)
@@ -446,6 +495,8 @@ class ImuCameraNode(Node):
         self.plotter.camera.position = (0.0, 0.0, 0.0)
         self.plotter.camera.focal_point = forward
         self.plotter.camera.up = up
+
+        self._apply_background_for_render()
         
         self.plotter.render()
         img_array = self.plotter.image

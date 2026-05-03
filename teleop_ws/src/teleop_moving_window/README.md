@@ -29,11 +29,48 @@ Publikuje:
 Subskrybuje:
 - `/xreal/imu/data`
 - `/laptop/camera/image_raw`
+- `/xreal/virtual_scene/add_block` — dodanie lub nadpisanie bloku (`visualization_msgs/Marker`)
 
 Uruchomienie:
 ```bash
 python3 /home/rafal/Web_Speech_remote_control/teleop_ws/src/teleop_moving_window/imu_virtual_camera.py
 ```
+
+### Serwis: czarne tło / domyślne tło
+
+Węzeł udostępnia serwis `std_srvs/srv/SetBool` (domyślna nazwa: `/xreal/virtual_camera/set_black_background`).
+- `{data: true}` — czarne tło, ukrywana jest siatka podłogi (scena 3D i markery bez zmian).
+- `{data: false}` — tło jak domyślnie (jasnoniebieskie niebo + biała siatka podłogi).
+
+```bash
+# Czarne tło
+ros2 service call /xreal/virtual_camera/set_black_background std_srvs/srv/SetBool "{data: true}"
+
+# Powrót do domyślnego tła
+ros2 service call /xreal/virtual_camera/set_black_background std_srvs/srv/SetBool "{data: false}"
+```
+
+Opcjonalnie można zmienić nazwę serwisu parametrem `set_black_background_service` przy starcie (`--ros-args -p ...`).
+
+### Dodawanie nowych bloków (topic `/add_block`)
+
+Na topic **`/xreal/virtual_scene/add_block`** publikuj komunikat **`visualization_msgs/msg/Marker`**.
+
+Wymagania:
+- **`type`** musi być **`CUBE`** (stała z wiadomości `Marker`; w CLI użyj `type:=1`, bo `CUBE==1`).
+- Używane pola: **`pose.position`** (m), **`scale`** (rozmiar prostopadłościanu), **`color`** (RGB w zakresie 0–1, `a` dowolnie), **`id`**: dla **`id >= 0`** podany numer nadpisuje istniejący blok; dla **`id < 0`** (np. **`-1`**) węzeł przydzieli kolejne id od **`100`**. W generatorach wiadomości domyślne **`id: 0`** trafia na **ekran laptopa** (ten sam blok co startowy „ekran”). Żeby uniknąć przypadkowego nadpisania, przy auto-id ustaw **`id: -1`**, a nie opuszczaj pola.
+
+Nie są stosowane do geometrii **`pose.orientation`** (wewnętrznie blok jest jak prostopadłościan wyrównany do osi).
+
+Zarezerwowane id w domyślnej scenie: **`0`** (ekran tekstury z laptopa), **`1–3`** (startowe bloki). Używaj innych id (np. `100+`), żeby nie zastępować ich przypadkiem.
+
+Przykład (czerwony sześcian 0.5 m w punkcie `(2, 1, 0)`, id `42`):
+
+```bash
+ros2 topic pub --once /xreal/virtual_scene/add_block visualization_msgs/msg/Marker "{header: {frame_id: ''}, ns: '', id: 42, type: 1, action: 0, pose: {position: {x: 2.0, y: 1.0, z: 0.0}, orientation: {w: 1.0}}, scale: {x: 0.5, y: 0.5, z: 0.5}, color: {r: 1.0, g: 0.0, b: 0.0, a: 1.0}}"
+```
+
+Bloki trafiają do renderu kamery oraz do **`/xreal/virtual_scene/markers`** (RViz: `MarkerArray`, ramka **`xreal_imu`**).
 
 ## 2) Stream z kamery laptopa
 
